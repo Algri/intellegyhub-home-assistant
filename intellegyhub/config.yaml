@@ -1,0 +1,48 @@
+name: IntellegyHUB
+slug: intellegyhub
+description: IntellegyHUB hardware runtime for Home Assistant native entities
+version: 0.5.62
+stage: experimental
+arch:
+  - aarch64
+startup: services
+boot: auto
+init: false
+ingress: true
+ingress_port: 8098
+panel_icon: mdi:chip
+full_access: true
+gpio: true
+privileged:
+  - SYS_RAWIO
+devices:
+  - /dev/gpiochip0
+  - /dev/gpiomem
+  - /dev/i2c-1
+  - /dev/i2c-10
+  - /dev/mem
+  - /dev/vcio
+options:
+  led_gpio: 22
+  led_active_low: false
+  button_gpio: 26
+  button_active_low: true
+  button_bias: pull_up
+  button_debounce_ms: 50
+  startup_buzzer_enabled: false
+  startup_buzzer_frequency: 2000
+  startup_buzzer_duration_ms: 200
+  onewire_bridge1_poll_interval_seconds: 30
+  onewire_bridge2_poll_interval_seconds: 30
+schema:
+  led_gpio: int(0,53)
+  led_active_low: bool
+  button_gpio: int(0,53)
+  button_active_low: bool
+  button_bias: list(pull_up|pull_down|disabled)
+  button_debounce_ms: int(0,1000)
+  startup_buzzer_enabled: bool
+  startup_buzzer_frequency: int(20,20000)
+  startup_buzzer_duration_ms: int(10,5000)
+  onewire_bridge1_poll_interval_seconds: int(1,3600)
+  onewire_bridge2_poll_interval_seconds: int(1,3600)
