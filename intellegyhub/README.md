@@ -54,6 +54,15 @@ After copying or extracting files, refresh the Add-on Store with the three-dot
 menu `Check for updates`, install `IntellegyHUB`, configure the options, and
 start it.
 
+When installed from a Home Assistant Store repository, the add-on includes a
+bundled copy of the `intellegyhub` custom integration. On startup it compares the
+bundled integration version with `/config/custom_components/intellegyhub` and
+copies the files only when the installed integration is missing or older.
+
+After the add-on installs or updates the integration, restart Home Assistant
+Core so the integration appears under `Settings -> Devices & services -> Add
+integration`.
+
 ## CM4 I2C Notes
 
 For Home Assistant OS on Raspberry Pi CM4, enable I2C in the boot partition `config.txt`:

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import errno
 import glob
+import json
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -97,7 +98,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.62 chip=%s led=%s active_low=%s button=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
+                "Starting v0.5.64 chip=%s led=%s active_low=%s button=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -130,7 +131,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.62", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.64", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 
@@ -146,6 +147,30 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if current.ready:
             return {"status": "ok"}
         raise HTTPException(status_code=503, detail={"status": "error", "error": current.error or "not ready"})
+
+    @app.get("/api/v1/integration/status")
+    async def integration_status() -> dict:
+        status_path = Path("/data/integration_install_status.json")
+        try:
+            return json.loads(status_path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            return {
+                "status": "unknown",
+                "bundled_version": None,
+                "installed_version": None,
+                "target": "/ha_config/custom_components/intellegyhub",
+                "restart_required": False,
+                "error": "integration installer has not written status yet",
+            }
+        except (OSError, json.JSONDecodeError) as exc:
+            return {
+                "status": "error",
+                "bundled_version": None,
+                "installed_version": None,
+                "target": "/ha_config/custom_components/intellegyhub",
+                "restart_required": False,
+                "error": str(exc),
+            }
 
     @app.get("/", response_class=HTMLResponse)
     async def index() -> str:

@@ -122,6 +122,22 @@ On Windows, write that file as ASCII or UTF-8 without BOM. PowerShell's
 default `Set-Content` can write UTF-16, which HAOS will not import as the
 plain module file expected here.
 
+This repository includes a Windows helper script for the tested CM4 setup:
+
+```powershell
+.\scripts\prepare_haos_boot.ps1 -BootDrive E:
+```
+
+It updates the mounted HAOS boot partition `config.txt`, creates
+`E:\CONFIG\modules\rpi-i2c.conf`, and writes `E:\CONFIG\authorized_keys` from
+`$env:USERPROFILE\.ssh\id_ed25519.pub`. To skip SSH key import:
+
+```powershell
+.\scripts\prepare_haos_boot.ps1 -BootDrive E: -SkipSshKey
+```
+
+The script creates a timestamped `config.txt.bak.*` backup before editing.
+
 ```powershell
 New-Item -ItemType Directory -Force -Path E:\CONFIG\modules | Out-Null
 [System.IO.File]::WriteAllText("E:\CONFIG\modules\rpi-i2c.conf", "i2c-dev`n", [System.Text.Encoding]::ASCII)
@@ -416,14 +432,16 @@ If the integration icon still shows `icon not available` immediately after updat
 ## Repository Install Bundle
 
 The build script also creates a second archive for a Home Assistant Store
-repository:
+repository and a third archive for the custom integration:
 
 ```text
 dist/intellegyhub_ha_repository.zip
+dist/intellegyhub_ha_integration.zip
 ```
 
-This archive is not for unpacking into Studio Code Server `~`. It is the layout
-to put at the root of a git repository that Home Assistant can add through:
+`dist/intellegyhub_ha_repository.zip` is not for unpacking into Studio Code
+Server `~`. It is the layout to put at the root of a git repository that Home
+Assistant can add through:
 
 ```text
 Settings -> Apps/Add-ons -> Store -> Repositories
@@ -446,16 +464,72 @@ intellegyhub/logo.png
 intellegyhub/requirements.txt
 ```
 
-Home Assistant Store installs only the add-on from that repository. It does not
-install this custom integration:
+Home Assistant Store installs only the add-on from that repository. The add-on
+package also contains a bundled copy of the custom integration and installs or
+updates it at startup through the mapped Home Assistant config directory:
 
 ```text
-config/custom_components/intellegyhub
+/config/custom_components/intellegyhub
 ```
 
-Until a separate integration delivery path exists, keep using
-`dist/intellegyhub_haos_deploy.zip` for full local development because it copies
-both required parts:
+The integration list under:
+
+```text
+Settings -> Devices & services -> Add integration
+```
+
+is populated by Home Assistant Core. Core discovers custom integrations only
+after their files exist under:
+
+```text
+/config/custom_components/<domain>
+```
+
+and Home Assistant Core has been restarted. The add-on repository does not copy
+files there directly; the installed add-on container performs the copy when it
+starts.
+
+Repository install/update flow:
+
+1. Publish `dist/intellegyhub_ha_repository.zip` contents to the GitHub add-on
+   repository, add that repository in Home Assistant Store, then install
+   `IntellegyHUB`.
+2. Start the add-on. On startup it compares:
+
+```text
+bundled integration version
+installed /config/custom_components/intellegyhub/manifest.json version
+```
+
+3. If the installed integration is missing or older, the add-on updates:
+
+```text
+/config/custom_components/intellegyhub/manifest.json
+```
+
+4. Restart Home Assistant Core, then add:
+
+```text
+Settings -> Devices & services -> Add integration -> IntellegyHUB
+```
+
+The add-on writes its integration installer result to:
+
+```text
+/data/integration_install_status.json
+```
+
+and exposes the same information at:
+
+```text
+GET /api/v1/integration/status
+```
+
+`dist/intellegyhub_ha_integration.zip` remains available as a manual fallback
+package for copying the custom integration yourself.
+
+For full local development, keep using `dist/intellegyhub_haos_deploy.zip`
+because it copies both required parts:
 
 ```text
 addons/intellegyhub

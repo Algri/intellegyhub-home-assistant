@@ -1,0 +1,69 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "IntellegyHUB",
+        "data": {
+          "url": "Backend URL"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to the IntellegyHUB backend",
+      "invalid_url": "Enter a valid http or https URL"
+    },
+    "abort": {
+      "already_configured": "IntellegyHUB is already configured"
+    }
+  },
+  "entity": {
+    "switch": {
+      "led": {
+        "name": "LED"
+      },
+      "xport_do": {
+        "name": "DO"
+      },
+      "ds18b20_power": {
+        "name": "1-Wire Bus Power"
+      }
+    },
+    "binary_sensor": {
+      "button": {
+        "name": "Button"
+      },
+      "xport_di": {
+        "name": "DI"
+      },
+      "onewire_bridge": {
+        "name": "Bridge"
+      }
+    },
+    "select": {
+      "xport_mode": {
+        "name": "Mode"
+      }
+    },
+    "sensor": {
+      "xport_ai": {
+        "name": "AI"
+      },
+      "xport_counter": {
+        "name": "Counter"
+      },
+      "ds18b20_temperature": {
+        "name": "Temperature"
+      }
+    },
+    "number": {
+      "xport_pwm": {
+        "name": "PWM"
+      }
+    },
+    "button": {
+      "xport_counter_reset": {
+        "name": "Reset Counter"
+      }
+    }
+  }
+}

@@ -16,7 +16,7 @@ RUN git clone --depth 1 --branch v79 https://github.com/joan2937/pigpio.git /tmp
 FROM ghcr.io/home-assistant/aarch64-base-python:3.12-alpine3.20
 
 LABEL \
-  io.hass.version="0.5.62" \
+  io.hass.version="0.5.64" \
   io.hass.type="app" \
   io.hass.arch="aarch64"
 
@@ -31,6 +31,7 @@ COPY requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 COPY app /app/app
+COPY bundled_custom_components /opt/intellegyhub/bundled_custom_components
 COPY run.sh /run.sh
 RUN chmod a+x /run.sh
 

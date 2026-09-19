@@ -1,0 +1,24 @@
+{
+  "title": "IntellegyHUB",
+  "config": {
+    "step": {
+      "user": {
+        "title": "IntellegyHUB",
+        "description": "Connect to the IntellegyHUB add-on backend.",
+        "data": {
+          "url": "Backend URL"
+        },
+        "data_description": {
+          "url": "For a local add-on install, use http://local-intellegyhub:8098"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to the IntellegyHUB backend",
+      "invalid_url": "Enter a valid http or https URL"
+    },
+    "abort": {
+      "already_configured": "IntellegyHUB is already configured"
+    }
+  }
+}

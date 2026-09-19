@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.64
+
+- Bundle the Home Assistant custom integration inside the add-on image.
+- Let the add-on install or update `/config/custom_components/intellegyhub` only when the bundled integration version is newer than the installed one.
+- Write integration install status to `/data/integration_install_status.json`; Home Assistant Core still needs a restart after integration files are installed or updated.
+
+## 0.5.63
+
+- Add a separate `dist/intellegyhub_ha_integration.zip` package for installing the Home Assistant custom integration under `/config/custom_components/intellegyhub`.
+- Document that Home Assistant Store repositories install add-ons only; Home Assistant Core discovers custom integrations from `/config/custom_components` after a Core restart.
+
 ## 0.5.62
 
 - Rebuild the local HAOS deploy bundle after adding the separate Home Assistant repository bundle workflow.

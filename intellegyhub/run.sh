@@ -1,6 +1,8 @@
 #!/usr/bin/with-contenv sh
 set -e
 
+python -m app.integration_installer
+
 if command -v pigpiod >/dev/null 2>&1; then
   echo "[intellegyhub] starting pigpiod for GPIO18 hardware PWM"
   pigpiod -g -f -n 127.0.0.1 -x 262144 &
