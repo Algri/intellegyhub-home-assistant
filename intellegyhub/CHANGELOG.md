@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.65
+
+- Have the add-on write the exact installed backend URL into the custom integration as `backend.json`.
+- Let the Home Assistant integration setup use that bundled backend URL first, so repository installs do not require users to find the hashed add-on slug manually.
+- Keep Supervisor add-on discovery and the backend URL field as fallbacks for systems where the hint file is unavailable.
+
 ## 0.5.64
 
 - Bundle the Home Assistant custom integration inside the add-on image.

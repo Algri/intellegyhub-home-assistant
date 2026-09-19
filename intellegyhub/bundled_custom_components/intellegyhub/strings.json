@@ -4,12 +4,12 @@
     "step": {
       "user": {
         "title": "IntellegyHUB",
-        "description": "Connect to the IntellegyHUB add-on backend.",
+        "description": "Connect to the IntellegyHUB add-on backend. The integration tries to detect the installed add-on automatically; use this field only if automatic detection could not reach the backend.",
         "data": {
           "url": "Backend URL"
         },
         "data_description": {
-          "url": "For a local add-on install, use http://local-intellegyhub:8098"
+          "url": "Manual fallback. For local installs use http://local-intellegyhub:8098. For repository installs use the add-on slug with underscores replaced by dashes, for example http://a11dcbe3-intellegyhub:8098."
         }
       }
     },
