@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.66
+
+- Enable Supervisor API access for the add-on so the bundled integration installer can reliably read its installed slug.
+- Include the generated backend URL in `/data/integration_install_status.json` and installer logs for easier HAOS verification.
+
 ## 0.5.65
 
 - Have the add-on write the exact installed backend URL into the custom integration as `backend.json`.

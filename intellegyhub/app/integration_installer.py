@@ -23,6 +23,7 @@ class IntegrationInstallStatus:
     installed_version: str | None
     target: str
     restart_required: bool
+    backend_url: str | None = None
     error: str | None = None
 
 
@@ -64,6 +65,11 @@ def _copy_component(source: Path, target: Path) -> None:
 
 
 def _addon_self_slug() -> str | None:
+    for key in ("SUPERVISOR_ADDON_SLUG", "HASSIO_ADDON_SLUG"):
+        slug = os.environ.get(key)
+        if slug:
+            return slug
+
     token = os.environ.get("SUPERVISOR_TOKEN")
     request = urllib.request.Request("http://supervisor/addons/self/info")
     if token:
@@ -134,13 +140,14 @@ def install_bundled_integration(
         return status
 
     if _version_key(installed_version) >= _version_key(bundled_version):
-        _write_backend_hint(target)
+        backend_url = _write_backend_hint(target)
         status = IntegrationInstallStatus(
             status="up_to_date",
             bundled_version=bundled_version,
             installed_version=installed_version,
             target=str(target),
             restart_required=False,
+            backend_url=backend_url,
         )
         _write_status(status_path, status)
         return status
@@ -148,7 +155,7 @@ def install_bundled_integration(
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
         _copy_component(source, target)
-        _write_backend_hint(target)
+        backend_url = _write_backend_hint(target)
     except OSError as exc:
         status = IntegrationInstallStatus(
             status="install_failed",
@@ -167,6 +174,7 @@ def install_bundled_integration(
         installed_version=installed_version,
         target=str(target),
         restart_required=True,
+        backend_url=backend_url,
     )
     _write_status(status_path, status)
     return status
@@ -182,7 +190,7 @@ def main() -> int:
         "[intellegyhub] integration installer "
         f"status={status.status} bundled={status.bundled_version} "
         f"installed={status.installed_version} restart_required={str(status.restart_required).lower()} "
-        f"target={status.target}"
+        f"backend_url={status.backend_url} target={status.target}"
     )
     if status.error:
         print(f"[intellegyhub] integration installer error={status.error}")

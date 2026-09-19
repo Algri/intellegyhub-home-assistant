@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from .const import NAME
+NAME = "IntellegyHUB"
 
 
 def normalize_url(value: str) -> str:
