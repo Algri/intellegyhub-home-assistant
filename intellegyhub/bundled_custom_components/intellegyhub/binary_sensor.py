@@ -14,6 +14,7 @@ from .xport_entities import setup_xport_dynamic_platform
 BRIDGE_DEVICE_CLASS_CONNECTIVITY = getattr(BinarySensorDeviceClass, "CONNECTIVITY", "connectivity")
 FAULT_DEVICE_CLASS_PROBLEM = getattr(BinarySensorDeviceClass, "PROBLEM", "problem")
 XDI16_INPUT_ICON = "mdi:toggle-switch-outline"
+BUTTON_INPUT_ICON = "mdi:gesture-tap-button"
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
@@ -105,7 +106,7 @@ def _reset_xdi16_registry_entries(hass: HomeAssistant, manager) -> None:
 class IntellegyHubButtonSensor(IntellegyHubGpioEntity, BinarySensorEntity):
     _attr_unique_id = UNIQUE_ID_BUTTON
     _attr_translation_key = "button"
-    _attr_device_class = BinarySensorDeviceClass.OCCUPANCY
+    _attr_icon = BUTTON_INPUT_ICON
 
     @property
     def is_on(self) -> bool:

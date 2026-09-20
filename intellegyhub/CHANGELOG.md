@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.71
+
+- Replace the host `Button` occupancy device class with a dedicated button icon so Home Assistant does not show the occupancy/house icon.
+
 ## 0.5.70
 
 - Rename the host `LED` Home Assistant switch to `USR`.
