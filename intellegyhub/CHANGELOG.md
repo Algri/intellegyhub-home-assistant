@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.72
+
+- Shorten Home Assistant child device names by removing repeated `IntellegyHUB` prefixes from X-Port and X-Bus modules.
+- Shorten 1-Wire bridge device names by hiding the bus/address suffix from the primary display name.
+
 ## 0.5.71
 
 - Replace the host `Button` occupancy device class with a dedicated button icon so Home Assistant does not show the occupancy/house icon.

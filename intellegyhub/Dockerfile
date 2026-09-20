@@ -16,7 +16,7 @@ RUN git clone --depth 1 --branch v79 https://github.com/joan2937/pigpio.git /tmp
 FROM ghcr.io/home-assistant/aarch64-base-python:3.12-alpine3.20
 
 LABEL \
-  io.hass.version="0.5.71" \
+  io.hass.version="0.5.72" \
   io.hass.type="app" \
   io.hass.arch="aarch64"
 

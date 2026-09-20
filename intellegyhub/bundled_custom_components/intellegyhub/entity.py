@@ -45,7 +45,7 @@ class IntellegyHubXPortEntity(IntellegyHubGpioEntity):
     def device_info(self) -> DeviceInfo:
         return DeviceInfo(
             identifiers={(DOMAIN, f"xport_{self.channel}")},
-            name=f"IntellegyHub X-Port X{self.channel}",
+            name=f"X-Port X{self.channel}",
             manufacturer="IntellegyHub",
             model="X-Port",
         )
@@ -97,11 +97,7 @@ def _parent_device_id(entity: Entity, manager: IntellegyHubGpioManager) -> str |
 
 def _onewire_bridge_title(bridge: dict) -> str:
     name = bridge.get("name") or "1-Wire Bridge"
-    bus = bridge.get("bus")
-    address = str(bridge.get("address", "")).upper()
-    if bus is None or not address:
-        return str(name)
-    return f"{name} I2C-{bus} {address}"
+    return str(name)
 
 
 class IntellegyHubXDo8Entity(IntellegyHubGpioEntity):
@@ -128,7 +124,7 @@ class IntellegyHubXDo8Entity(IntellegyHubGpioEntity):
         address = module.get("address", "unknown")
         return DeviceInfo(
             identifiers={(DOMAIN, self.module_id)},
-            name=f"IntellegyHUB xDO-8 {address}",
+            name=f"xDO-8 {address}",
             manufacturer="IntellegyHub",
             model="xDO-8",
             via_device_id=_parent_device_id(self, self.manager),
@@ -159,7 +155,7 @@ class IntellegyHubXDi16Entity(IntellegyHubGpioEntity):
         address = module.get("address", "unknown")
         return DeviceInfo(
             identifiers={(DOMAIN, self.module_id)},
-            name=f"IntellegyHUB xDI-16 {address}",
+            name=f"xDI-16 {address}",
             manufacturer="IntellegyHub",
             model="xDI-16",
             via_device_id=_parent_device_id(self, self.manager),
