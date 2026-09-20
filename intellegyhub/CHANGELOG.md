@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.73
+
+- Shorten X-Port mode labels in the add-on UI and Home Assistant integration to `Off`, `AI`, `DO`, `PWM`, `DI PNP/+24V`, `DI NPN/COM`, `CNT PNP/+24V`, and `CNT NPN/COM`.
+- Keep the internal X-Port API mode values unchanged for compatibility.
+
 ## 0.5.72
 
 - Shorten Home Assistant child device names by removing repeated `IntellegyHUB` prefixes from X-Port and X-Bus modules.

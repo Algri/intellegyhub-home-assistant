@@ -130,12 +130,14 @@ plain module file expected here.
 This repository includes a Windows helper script for the tested CM4 setup:
 
 ```powershell
+cd C:\Users\Algri\Documents\iot\IntellegyHub_HA_GPIO
 .\scripts\prepare_haos_boot_windows.ps1 -BootDrive E:
 ```
 
 Preview the generated files without writing to the mounted boot partition:
 
 ```powershell
+cd C:\Users\Algri\Documents\iot\IntellegyHub_HA_GPIO
 .\scripts\prepare_haos_boot_windows.ps1 -BootDrive E: -Preview
 ```
 
@@ -153,6 +155,8 @@ The script creates a timestamped `config.txt.bak.*` backup before editing.
 On macOS and Linux, mount the HAOS boot partition and pass its mountpoint:
 
 ```sh
+cd /path/to/IntellegyHub_HA_GPIO
+chmod +x scripts/prepare_haos_boot_unix.sh
 scripts/prepare_haos_boot_unix.sh --boot /mnt/boot --preview
 scripts/prepare_haos_boot_unix.sh --boot /mnt/boot
 ```
@@ -160,6 +164,8 @@ scripts/prepare_haos_boot_unix.sh --boot /mnt/boot
 On macOS the mountpoint is commonly under `/Volumes`, for example:
 
 ```sh
+cd /path/to/IntellegyHub_HA_GPIO
+chmod +x scripts/prepare_haos_boot_unix.sh
 scripts/prepare_haos_boot_unix.sh --boot /Volumes/hassos-boot
 ```
 

@@ -25,6 +25,28 @@ XPORT_MODES = [
     "PulseCounterInternalPullUp",
 ]
 
+XPORT_MODE_LABELS = {
+    "Disabled": "Off",
+    "AnalogInput": "AI",
+    "DigitalOutput": "DO",
+    "PwmOutput": "PWM",
+    "DigitalInputExternalVoltage": "DI PNP/+24V",
+    "DigitalInputInternalPullUp": "DI NPN/COM",
+    "PulseCounterExternalVoltage": "CNT PNP/+24V",
+    "PulseCounterInternalPullUp": "CNT NPN/COM",
+}
+XPORT_MODE_LABEL_OPTIONS = [
+    "Off",
+    "AI",
+    "DO",
+    "PWM",
+    "DI PNP/+24V",
+    "DI NPN/COM",
+    "CNT PNP/+24V",
+    "CNT NPN/COM",
+]
+XPORT_MODE_VALUES_BY_LABEL = {label: mode for mode, label in XPORT_MODE_LABELS.items()}
+
 XPORT_MODE_DO = "DigitalOutput"
 XPORT_MODE_PWM = "PwmOutput"
 XPORT_MODE_AI = "AnalogInput"
