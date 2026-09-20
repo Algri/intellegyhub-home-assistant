@@ -28,6 +28,10 @@ class LedPayload(BaseModel):
     on: bool
 
 
+class OutputPayload(BaseModel):
+    on: bool
+
+
 class XPortModePayload(BaseModel):
     mode: XPortMode
     revision: int | None = None
@@ -98,7 +102,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.69 chip=%s led=%s active_low=%s button=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
+                "Starting v0.5.70 chip=%s led=%s active_low=%s button=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -131,7 +135,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.69", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.70", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 
@@ -1236,6 +1240,15 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     async def put_led(payload: LedPayload) -> dict[str, bool]:
         confirmed = await runtime_or_503().set_led(payload.on)
         return {"on": confirmed}
+
+    @app.put("/api/v1/outputs/{output_id}")
+    async def put_output(output_id: str, payload: OutputPayload) -> dict:
+        try:
+            confirmed = await runtime_or_503().set_output(output_id, payload.on)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        snapshot = runtime_or_503().snapshot()["outputs"][output_id]
+        return {**snapshot, "on": confirmed}
 
     @app.websocket("/ws")
     async def websocket_endpoint(websocket: WebSocket) -> None:

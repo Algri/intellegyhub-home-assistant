@@ -19,7 +19,10 @@
   "entity": {
     "switch": {
       "led": {
-        "name": "LED"
+        "name": "USR"
+      },
+      "host_output": {
+        "name": "Output"
       },
       "xport_do": {
         "name": "DO"

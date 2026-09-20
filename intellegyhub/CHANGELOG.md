@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.70
+
+- Rename the host `LED` Home Assistant switch to `USR`.
+- Add host output switches for `STE` GPIO19, `ERR` GPIO20, and `NET` GPIO21.
+- Add the `/api/v1/outputs/{output_id}` API and `output_changed` WebSocket events while keeping `/api/v1/led` compatible.
+
 ## 0.5.69
 
 - Reinitialize persisted xDO-8 MCP23008 modules after X-Bus power is restored, then reapply saved relay states.

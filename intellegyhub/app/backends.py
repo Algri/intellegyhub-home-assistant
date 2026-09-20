@@ -12,12 +12,23 @@ from typing import Any
 from .config import AppConfig
 
 ButtonCallback = Callable[[bool], Awaitable[None]]
+OUTPUTS = {
+    "user_led": {"name": "USR", "gpio": 22, "active_low": False},
+    "ste": {"name": "STE", "gpio": 19, "active_low": False},
+    "err": {"name": "ERR", "gpio": 20, "active_low": False},
+    "net": {"name": "NET", "gpio": 21, "active_low": False},
+}
 
 
 @dataclass
 class HardwareState:
     led_on: bool = False
     button_pressed: bool = False
+    outputs: dict[str, bool] | None = None
+
+    def __post_init__(self) -> None:
+        if self.outputs is None:
+            self.outputs = {output_id: False for output_id in OUTPUTS}
 
 
 class HardwareBackend(ABC):
@@ -26,6 +37,9 @@ class HardwareBackend(ABC):
 
     @abstractmethod
     async def set_led(self, on: bool) -> bool: ...
+
+    @abstractmethod
+    async def set_output(self, output_id: str, on: bool) -> bool: ...
 
     @abstractmethod
     async def read_button(self) -> bool: ...
@@ -37,17 +51,25 @@ class HardwareBackend(ABC):
 class MockGpioBackend(HardwareBackend):
     def __init__(self) -> None:
         self.led_on = False
+        self.outputs = {output_id: False for output_id in OUTPUTS}
         self.button_pressed = False
         self._callback: ButtonCallback | None = None
 
     async def start(self, on_button_changed: ButtonCallback) -> HardwareState:
         self._callback = on_button_changed
         self.led_on = False
-        return HardwareState(led_on=False, button_pressed=self.button_pressed)
+        self.outputs = {output_id: False for output_id in OUTPUTS}
+        return HardwareState(led_on=False, button_pressed=self.button_pressed, outputs=dict(self.outputs))
 
     async def set_led(self, on: bool) -> bool:
-        self.led_on = on
-        return self.led_on
+        return await self.set_output("user_led", on)
+
+    async def set_output(self, output_id: str, on: bool) -> bool:
+        if output_id not in OUTPUTS:
+            raise ValueError(f"Unknown output: {output_id}")
+        self.outputs[output_id] = on
+        self.led_on = self.outputs["user_led"]
+        return self.outputs[output_id]
 
     async def read_button(self) -> bool:
         return self.button_pressed
@@ -59,13 +81,14 @@ class MockGpioBackend(HardwareBackend):
 
     async def stop(self) -> None:
         self.led_on = False
+        self.outputs = {output_id: False for output_id in OUTPUTS}
 
 
 class RealGpiodBackend(HardwareBackend):
     def __init__(self, config: AppConfig) -> None:
         self.config = config
         self._chip: Any = None
-        self._led_request: Any = None
+        self._output_request: Any = None
         self._button_request: Any = None
         self._callback: ButtonCallback | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
@@ -79,11 +102,13 @@ class RealGpiodBackend(HardwareBackend):
         self._callback = on_button_changed
         self._loop = asyncio.get_running_loop()
         await asyncio.to_thread(self._open_lines)
-        await self.set_led(False)
+        outputs = {}
+        for output_id in OUTPUTS:
+            outputs[output_id] = await self.set_output(output_id, False)
         pressed = await self.read_button()
         self._thread = threading.Thread(target=self._watch_edges, name="intellegy-gpio-edge", daemon=True)
         self._thread.start()
-        return HardwareState(led_on=False, button_pressed=pressed)
+        return HardwareState(led_on=outputs["user_led"], button_pressed=pressed, outputs=outputs)
 
     def _open_lines(self) -> None:
         import gpiod
@@ -93,20 +118,21 @@ class RealGpiodBackend(HardwareBackend):
         direction = gpiod.line.Direction
         edge = gpiod.line.Edge
         bias = gpiod.line.Bias
-        value = gpiod.line.Value
         bias_map = {
             "pull_up": bias.PULL_UP,
             "pull_down": bias.PULL_DOWN,
             "disabled": bias.DISABLED,
         }
-        self._led_request = self._chip.request_lines(
-            consumer="intellegyhub-gpio-led",
-            config={
-                self.config.led_gpio: settings_cls(
-                    direction=direction.OUTPUT,
-                    output_value=self._physical_value(False),
-                )
-            },
+        output_config = {}
+        for output_id, definition in OUTPUTS.items():
+            gpio = self.config.led_gpio if output_id == "user_led" else int(definition["gpio"])
+            output_config[gpio] = settings_cls(
+                direction=direction.OUTPUT,
+                output_value=self._physical_output_value(output_id, False),
+            )
+        self._output_request = self._chip.request_lines(
+            consumer="intellegyhub-gpio-outputs",
+            config=output_config,
         )
         self._button_request = self._chip.request_lines(
             consumer="intellegyhub-gpio-button",
@@ -118,10 +144,13 @@ class RealGpiodBackend(HardwareBackend):
                 )
             },
         )
-    def _physical_value(self, logical_on: bool) -> Any:
+
+    def _physical_output_value(self, output_id: str, logical_on: bool) -> Any:
         import gpiod
 
-        electrical = not logical_on if self.config.led_active_low else logical_on
+        definition = OUTPUTS[output_id]
+        active_low = self.config.led_active_low if output_id == "user_led" else bool(definition["active_low"])
+        electrical = not logical_on if active_low else logical_on
         return gpiod.line.Value.ACTIVE if electrical else gpiod.line.Value.INACTIVE
 
     def _logical_pressed_from_value(self, value: Any) -> bool:
@@ -131,9 +160,15 @@ class RealGpiodBackend(HardwareBackend):
         return not electrical_active if self.config.button_active_low else electrical_active
 
     async def set_led(self, on: bool) -> bool:
-        if self._led_request is None:
-            raise RuntimeError("LED line is not initialized")
-        await asyncio.to_thread(self._led_request.set_value, self.config.led_gpio, self._physical_value(on))
+        return await self.set_output("user_led", on)
+
+    async def set_output(self, output_id: str, on: bool) -> bool:
+        if output_id not in OUTPUTS:
+            raise ValueError(f"Unknown output: {output_id}")
+        if self._output_request is None:
+            raise RuntimeError("Output lines are not initialized")
+        gpio = self.config.led_gpio if output_id == "user_led" else int(OUTPUTS[output_id]["gpio"])
+        await asyncio.to_thread(self._output_request.set_value, gpio, self._physical_output_value(output_id, on))
         return on
 
     async def read_button(self) -> bool:
@@ -163,12 +198,13 @@ class RealGpiodBackend(HardwareBackend):
         self._stop.set()
         if self._thread:
             await asyncio.to_thread(self._thread.join, 2)
-        if self._led_request:
+        if self._output_request:
             try:
-                await self.set_led(False)
+                for output_id in OUTPUTS:
+                    await self.set_output(output_id, False)
             except Exception:
                 pass
-            self._led_request.release()
+            self._output_request.release()
         if self._button_request:
             self._button_request.release()
         if self._chip:

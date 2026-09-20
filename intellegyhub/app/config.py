@@ -8,6 +8,11 @@ from pathlib import Path
 
 DEFAULT_OPTIONS_PATH = Path("/data/options.json")
 VALID_BIASES = {"pull_up", "pull_down", "disabled"}
+FIXED_OUTPUT_GPIOS = {
+    "ste_gpio": 19,
+    "err_gpio": 20,
+    "net_gpio": 21,
+}
 
 
 @dataclass(frozen=True)
@@ -65,12 +70,15 @@ def load_config(path: Path | None = None) -> AppConfig:
 
 
 def validate_config(config: AppConfig) -> None:
-    gpio_values = {"led_gpio": config.led_gpio, "button_gpio": config.button_gpio}
+    gpio_values = {"led_gpio": config.led_gpio, "button_gpio": config.button_gpio, **FIXED_OUTPUT_GPIOS}
     for name, value in gpio_values.items():
         if not 0 <= value <= 53:
             raise ValueError(f"{name} must be between 0 and 53")
-    if config.led_gpio == config.button_gpio:
-        raise ValueError("led_gpio and button_gpio must be different")
+    seen: dict[int, str] = {}
+    for name, value in gpio_values.items():
+        if value in seen:
+            raise ValueError(f"{name} and {seen[value]} must be different")
+        seen[value] = name
     if config.button_bias not in VALID_BIASES:
         raise ValueError(f"button_bias must be one of {sorted(VALID_BIASES)}")
     if not 0 <= config.button_debounce_ms <= 1000:

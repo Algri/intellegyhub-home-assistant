@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import WebSocket
 
-from .backends import HardwareBackend, HardwareState
+from .backends import OUTPUTS, HardwareBackend, HardwareState
 from .buzzer import BuzzerManager
 from .carrier import CarrierManager
 from .extensions import ExtensionHardware, ExtensionManager
@@ -93,8 +93,18 @@ class AppRuntime:
         self._clients.clear()
 
     def snapshot(self) -> dict[str, Any]:
+        outputs = self.state.outputs or {output_id: False for output_id in OUTPUTS}
         return {
-            "led": {"on": self.state.led_on},
+            "led": {"on": outputs["user_led"]},
+            "outputs": {
+                output_id: {
+                    "id": output_id,
+                    "name": str(definition["name"]),
+                    "gpio": int(definition["gpio"]),
+                    "on": bool(outputs.get(output_id, False)),
+                }
+                for output_id, definition in OUTPUTS.items()
+            },
             "button": {"pressed": self.state.button_pressed},
             "carrier": self.carrier.snapshot(),
             "xport": self.xport.snapshot(),
@@ -107,11 +117,31 @@ class AppRuntime:
         return self.snapshot()
 
     async def set_led(self, on: bool) -> bool:
+        return await self.set_output("user_led", on)
+
+    async def set_output(self, output_id: str, on: bool) -> bool:
+        if output_id not in OUTPUTS:
+            raise ValueError(f"Unknown output: {output_id}")
         async with self._lock:
-            confirmed = await self.backend.set_led(on)
-            if self.state.led_on != confirmed:
-                self.state.led_on = confirmed
-                await self.broadcast({"type": "led_changed", "on": confirmed})
+            confirmed = await self.backend.set_output(output_id, on)
+            if self.state.outputs is None:
+                self.state.outputs = {item: False for item in OUTPUTS}
+            previous = bool(self.state.outputs.get(output_id, False))
+            self.state.outputs[output_id] = confirmed
+            self.state.led_on = bool(self.state.outputs["user_led"])
+            if previous != confirmed:
+                if output_id == "user_led":
+                    await self.broadcast({"type": "led_changed", "on": confirmed})
+                event = {
+                    "type": "output_changed",
+                    "output": {
+                        "id": output_id,
+                        "name": str(OUTPUTS[output_id]["name"]),
+                        "gpio": int(OUTPUTS[output_id]["gpio"]),
+                        "on": confirmed,
+                    },
+                }
+                await self.broadcast(event)
             return confirmed
 
     async def handle_button_changed(self, pressed: bool) -> None:

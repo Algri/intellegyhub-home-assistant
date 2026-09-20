@@ -8,7 +8,7 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import DOMAIN, UNIQUE_ID_LED, XPORT_MODE_DO
+from .const import DOMAIN, OUTPUTS, XPORT_MODE_DO
 from .entity import (
     IntellegyHubExtensionPowerEntity,
     IntellegyHubGpioEntity,
@@ -46,7 +46,7 @@ async def async_setup_entry(
 
     async_add_entities(
         [
-            IntellegyHubLedSwitch(manager),
+            *(IntellegyHubOutputSwitch(manager, output_id) for output_id in OUTPUTS),
             IntellegyHubExtensionPowerSwitch(manager),
             IntellegyHubOneWirePowerSwitch(manager),
         ]
@@ -79,19 +79,24 @@ async def async_setup_entry(
     check_extension_entities()
 
 
-class IntellegyHubLedSwitch(IntellegyHubGpioEntity, SwitchEntity):
-    _attr_unique_id = UNIQUE_ID_LED
-    _attr_translation_key = "led"
+class IntellegyHubOutputSwitch(IntellegyHubGpioEntity, SwitchEntity):
+    _attr_translation_key = "host_output"
+
+    def __init__(self, manager, output_id: str) -> None:
+        super().__init__(manager)
+        self.output_id = output_id
+        self._attr_unique_id = OUTPUTS[output_id]["unique_id"]
+        self._attr_name = OUTPUTS[output_id]["name"]
 
     @property
     def is_on(self) -> bool:
-        return self.manager.led_on
+        return bool(self.manager.outputs.get(self.output_id, False))
 
     async def async_turn_on(self, **kwargs) -> None:
-        await self.manager.async_set_led(True)
+        await self.manager.async_set_output(self.output_id, True)
 
     async def async_turn_off(self, **kwargs) -> None:
-        await self.manager.async_set_led(False)
+        await self.manager.async_set_output(self.output_id, False)
 
 
 class IntellegyHubXPortDoSwitch(IntellegyHubXPortEntity, SwitchEntity):

@@ -106,6 +106,9 @@ dtparam=i2c1=on
 dtparam=i2c_vc=on
 gpio=16=ip,np
 gpio=23=ip,np
+dtoverlay=gpio-shutdown,gpio_pin=17,active_low=1,gpio_pull=up,debounce=1000
+dtoverlay=pwm,pin=18,func=2
+dtparam=ant2
 ```
 
 HAOS also needs this file on the boot partition:
@@ -127,19 +130,44 @@ plain module file expected here.
 This repository includes a Windows helper script for the tested CM4 setup:
 
 ```powershell
-.\scripts\prepare_haos_boot.ps1 -BootDrive E:
+.\scripts\prepare_haos_boot_windows.ps1 -BootDrive E:
+```
+
+Preview the generated files without writing to the mounted boot partition:
+
+```powershell
+.\scripts\prepare_haos_boot_windows.ps1 -BootDrive E: -Preview
 ```
 
 It updates the mounted HAOS boot partition `config.txt`, including the
 I2C/UART lines and the GPIO16/GPIO23 no-pull fault inputs, creates
-`E:\CONFIG\modules\rpi-i2c.conf`, and writes `E:\CONFIG\authorized_keys` from
-`$env:USERPROFILE\.ssh\id_ed25519.pub`. To skip SSH key import:
+`E:\CONFIG\modules\rpi-i2c.conf`. To also write `E:\CONFIG\authorized_keys`
+from `$env:USERPROFILE\.ssh\id_ed25519.pub`, pass `-SshKey`:
 
 ```powershell
-.\scripts\prepare_haos_boot.ps1 -BootDrive E: -SkipSshKey
+.\scripts\prepare_haos_boot_windows.ps1 -BootDrive E: -SshKey
 ```
 
 The script creates a timestamped `config.txt.bak.*` backup before editing.
+
+On macOS and Linux, mount the HAOS boot partition and pass its mountpoint:
+
+```sh
+scripts/prepare_haos_boot_unix.sh --boot /mnt/boot --preview
+scripts/prepare_haos_boot_unix.sh --boot /mnt/boot
+```
+
+On macOS the mountpoint is commonly under `/Volumes`, for example:
+
+```sh
+scripts/prepare_haos_boot_unix.sh --boot /Volumes/hassos-boot
+```
+
+To also write host SSH access from `~/.ssh/id_ed25519.pub`:
+
+```sh
+scripts/prepare_haos_boot_unix.sh --boot /mnt/boot --ssh-key
+```
 
 ```powershell
 New-Item -ItemType Directory -Force -Path E:\CONFIG\modules | Out-Null

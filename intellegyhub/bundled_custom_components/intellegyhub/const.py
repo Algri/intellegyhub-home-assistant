@@ -7,6 +7,12 @@ DEVICE_IDENTIFIER = "mainboard"
 
 UNIQUE_ID_LED = "intellegyhub_led"
 UNIQUE_ID_BUTTON = "intellegyhub_button"
+OUTPUTS = {
+    "user_led": {"name": "USR", "unique_id": UNIQUE_ID_LED},
+    "ste": {"name": "STE", "unique_id": "intellegyhub_output_ste"},
+    "err": {"name": "ERR", "unique_id": "intellegyhub_output_err"},
+    "net": {"name": "NET", "unique_id": "intellegyhub_output_net"},
+}
 
 XPORT_MODES = [
     "Disabled",
