@@ -320,6 +320,22 @@ class ExtensionHardware:
             self._relay_shadows[address] = confirmed
             return self._xdo8_module(address, True, None)
 
+    async def restore_xdo8_after_power_cycle(self, address_text: str, relays: list[bool]) -> XDo8Module:
+        address = int(address_text, 16)
+        if address not in self.xdo_addresses:
+            raise ValueError("xDO-8 address is outside supported range 0x20-0x27")
+        if _is_mock_platform():
+            return await self.set_xdo8_relays(address_text, relays)
+        async with self._lock:
+            await asyncio.to_thread(self._initialize_xdo8, address)
+            shadow = 0
+            for index, on in enumerate(relays[:8]):
+                if on:
+                    shadow |= 1 << index
+            confirmed = await asyncio.to_thread(self._write_xdo8_outputs, address, shadow)
+            self._relay_shadows[address] = confirmed
+            return self._xdo8_module(address, True, None)
+
     async def read_xdi16_inputs(self, address_text: str) -> ExtensionModule:
         address = int(address_text, 16)
         if address not in self.xdo_addresses:
@@ -672,7 +688,10 @@ class ExtensionManager:
         for module_id, module in self.modules.items():
             try:
                 if module.kind == "relay_output":
-                    updated_modules[module_id] = await self.hardware.set_xdo8_relays(module.address, module.relays or [False] * 8)
+                    updated_modules[module_id] = await self.hardware.restore_xdo8_after_power_cycle(
+                        module.address,
+                        module.relays or [False] * 8,
+                    )
                 elif module.kind == "digital_input":
                     updated_modules[module_id] = await self.hardware.read_xdi16_inputs(module.address)
                 else:

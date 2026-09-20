@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.69
+
+- Reinitialize persisted xDO-8 MCP23008 modules after X-Bus power is restored, then reapply saved relay states.
+- Add a regression test that verifies X-Bus power cycling uses the dedicated xDO-8 restore path instead of only rewriting relay shadow state.
+
 ## 0.5.68
 
 - Push Carrier FAULT GPIO16/GPIO23 changes over WebSocket so Home Assistant fault sensors update without waiting for a full state refresh.
