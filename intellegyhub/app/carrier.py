@@ -6,7 +6,7 @@ import os
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 I2C_SLAVE = 0x0703
 
@@ -116,21 +116,25 @@ class CarrierHardware:
         try:
             import gpiod
 
+            settings = gpiod.LineSettings(
+                direction=gpiod.line.Direction.INPUT,
+                bias=gpiod.line.Bias.DISABLED,
+            )
+            logical_active_low = False
+            if hasattr(settings, "active_low"):
+                settings.active_low = True
+                logical_active_low = True
             with gpiod.Chip(self.gpiochip_path) as chip:
                 request = chip.request_lines(
                     consumer=f"intellegyhub-{fault_id}",
-                    config={
-                        gpio: gpiod.LineSettings(
-                            direction=gpiod.line.Direction.INPUT,
-                            bias=gpiod.line.Bias.DISABLED,
-                        )
-                    },
+                    config={gpio: settings},
                 )
                 try:
                     value = request.get_value(gpio)
                 finally:
                     request.release()
-            return FaultLineState(fault_id, name, gpio, value == gpiod.line.Value.INACTIVE, True)
+            active = value == (gpiod.line.Value.ACTIVE if logical_active_low else gpiod.line.Value.INACTIVE)
+            return FaultLineState(fault_id, name, gpio, active, True)
         except Exception as exc:
             return FaultLineState(fault_id, name, gpio, False, False, str(exc))
 
@@ -167,15 +171,33 @@ class CarrierManager:
         self.available = False
         self.error: str | None = "startup pending"
         self.faults: dict[str, FaultLineState] = {}
+        self._publisher: Callable[[dict[str, Any]], Any] | None = None
+        self._fault_task: asyncio.Task | None = None
+        self._stopped = asyncio.Event()
+
+    def set_publisher(self, publisher: Callable[[dict[str, Any]], Any]) -> None:
+        self._publisher = publisher
 
     async def start(self) -> None:
         try:
+            self._stopped.clear()
             self.available = await self.hardware.initialize()
             self.faults = {fault.id: fault for fault in await self.hardware.fault_lines()}
             self.error = None if self.available else "carrier MCP23017 unavailable"
+            self._fault_task = asyncio.create_task(self._monitor_faults(), name="intellegyhub_carrier_faults")
         except Exception as exc:
             self.available = False
             self.error = str(exc)
+
+    async def stop(self) -> None:
+        self._stopped.set()
+        if self._fault_task:
+            self._fault_task.cancel()
+            try:
+                await self._fault_task
+            except asyncio.CancelledError:
+                pass
+            self._fault_task = None
 
     async def set_xbus_power(self, on: bool) -> bool:
         return await self.hardware.set_bit(CarrierHardware.bit_xbus_power, on)
@@ -192,6 +214,33 @@ class CarrierManager:
     async def refresh_faults(self) -> dict[str, Any]:
         self.faults = {fault.id: fault for fault in await self.hardware.fault_lines()}
         return self.snapshot()
+
+    async def _monitor_faults(self) -> None:
+        while not self._stopped.is_set():
+            try:
+                await asyncio.wait_for(self._stopped.wait(), timeout=0.25)
+                return
+            except asyncio.TimeoutError:
+                pass
+            try:
+                previous = self._fault_signature()
+                await self.refresh_faults()
+                if previous != self._fault_signature():
+                    await self._publish({"type": "carrier_changed", "carrier": self.snapshot()})
+            except Exception:
+                continue
+
+    def _fault_signature(self) -> tuple[tuple[str, bool, bool, str | None], ...]:
+        return tuple(
+            sorted((fault.id, fault.active, fault.available, fault.error) for fault in self.faults.values())
+        )
+
+    async def _publish(self, message: dict[str, Any]) -> None:
+        if self._publisher is None:
+            return
+        result = self._publisher(message)
+        if hasattr(result, "__await__"):
+            await result
 
     def snapshot(self) -> dict[str, Any]:
         return {

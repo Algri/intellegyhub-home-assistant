@@ -300,8 +300,8 @@ class ExtensionHardware:
             shadow = self._relay_shadows.get(address, 0)
             bit = 1 << (channel - 1)
             shadow = (shadow | bit) if on else (shadow & ~bit)
-            self._relay_shadows[address] = shadow
-            await asyncio.to_thread(self._write_xdo8_outputs, address, shadow)
+            confirmed = await asyncio.to_thread(self._write_xdo8_outputs, address, shadow)
+            self._relay_shadows[address] = confirmed
             return self._xdo8_module(address, True, None)
 
     async def set_xdo8_relays(self, address_text: str, relays: list[bool]) -> XDo8Module:
@@ -316,8 +316,8 @@ class ExtensionHardware:
             self._relay_shadows[address] = shadow
             return self._xdo8_module(address, True, None)
         async with self._lock:
-            self._relay_shadows[address] = shadow
-            await asyncio.to_thread(self._write_xdo8_outputs, address, shadow)
+            confirmed = await asyncio.to_thread(self._write_xdo8_outputs, address, shadow)
+            self._relay_shadows[address] = confirmed
             return self._xdo8_module(address, True, None)
 
     async def read_xdi16_inputs(self, address_text: str) -> ExtensionModule:
@@ -454,11 +454,12 @@ class ExtensionHardware:
         except OSError:
             pass
         self._i2c_write(self.xdo_bus, address, bytes([self._mcp23008_iodir, 0x00]))
-        self._write_xdo8_outputs(address, 0)
+        self._relay_shadows[address] = self._write_xdo8_outputs(address, 0)
 
-    def _write_xdo8_outputs(self, address: int, value: int) -> None:
+    def _write_xdo8_outputs(self, address: int, value: int) -> int:
         self._i2c_write(self.xdo_bus, address, bytes([0x0A, value & 0xFF]))
         self._i2c_write(self.xdo_bus, address, bytes([self._mcp23008_gpio, value & 0xFF]))
+        return self._i2c_read_register(self.xdo_bus, address, self._mcp23008_gpio, 1)[0]
 
     def _detect_module_type(self, address: int) -> str:
         original = self._i2c_read_register(self.xdo_bus, address, self._mcp_iocon, 1)[0]

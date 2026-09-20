@@ -253,6 +253,8 @@ class IntellegyHubGpioManager:
         elif event_type == "extensions_changed":
             self.extensions = event.get("extensions", self.extensions)
             self._remove_stale_extension_registry_entries()
+        elif event_type == "carrier_changed":
+            self.carrier = event.get("carrier", self.carrier)
         elif event_type == "extension_module_changed":
             self._apply_extension_module(event.get("module"))
         elif event_type == "extension_module_removed" and isinstance(event.get("module_id"), str):

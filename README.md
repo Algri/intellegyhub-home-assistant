@@ -104,6 +104,8 @@ dtoverlay=uart3
 dtoverlay=uart5
 dtparam=i2c1=on
 dtparam=i2c_vc=on
+gpio=16=ip,np
+gpio=23=ip,np
 ```
 
 HAOS also needs this file on the boot partition:
@@ -128,7 +130,8 @@ This repository includes a Windows helper script for the tested CM4 setup:
 .\scripts\prepare_haos_boot.ps1 -BootDrive E:
 ```
 
-It updates the mounted HAOS boot partition `config.txt`, creates
+It updates the mounted HAOS boot partition `config.txt`, including the
+I2C/UART lines and the GPIO16/GPIO23 no-pull fault inputs, creates
 `E:\CONFIG\modules\rpi-i2c.conf`, and writes `E:\CONFIG\authorized_keys` from
 `$env:USERPROFILE\.ssh\id_ed25519.pub`. To skip SSH key import:
 

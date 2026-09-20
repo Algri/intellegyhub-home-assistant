@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.68
+
+- Push Carrier FAULT GPIO16/GPIO23 changes over WebSocket so Home Assistant fault sensors update without waiting for a full state refresh.
+- Treat Carrier FAULT lines as Active-Low no-pull GPIO inputs and document/add the required HAOS boot `gpio=16=ip,np` and `gpio=23=ip,np` lines.
+- Read back MCP23008 GPIO after xDO-8 relay writes so the add-on state follows the actual expander output register.
+
 ## 0.5.67
 
 - Add a shared Carrier MCP23017 `0x20` manager so X-Bus and 1-Wire power control use one owner, one lock, and one GPIOA/GPIOB shadow.

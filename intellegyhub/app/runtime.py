@@ -43,6 +43,7 @@ class AppRuntime:
     async def start(self) -> None:
         try:
             self.state = await self.backend.start(self.handle_button_changed)
+            self.carrier.set_publisher(self.broadcast)
             self.xport.set_publisher(self.broadcast)
             self.extensions.set_publisher(self.broadcast)
             self.onewire.set_publisher(self.broadcast)
@@ -81,6 +82,7 @@ class AppRuntime:
         await self.onewire.stop()
         await self.extensions.stop()
         await self.xport.stop()
+        await self.carrier.stop()
         await self.backend.stop()
         clients = list(self._clients)
         for ws in clients:
