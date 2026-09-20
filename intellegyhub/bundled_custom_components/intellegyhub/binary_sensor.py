@@ -12,6 +12,7 @@ from .entity import IntellegyHubGpioEntity, IntellegyHubOneWireBridgeEntity, Int
 from .xport_entities import setup_xport_dynamic_platform
 
 BRIDGE_DEVICE_CLASS_CONNECTIVITY = getattr(BinarySensorDeviceClass, "CONNECTIVITY", "connectivity")
+FAULT_DEVICE_CLASS_PROBLEM = getattr(BinarySensorDeviceClass, "PROBLEM", "problem")
 XDI16_INPUT_ICON = "mdi:toggle-switch-outline"
 
 
@@ -19,7 +20,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     manager = hass.data[DOMAIN][entry.entry_id]
     known_onewire_bridges: set[str] = set()
     known_xdi16: set[str] = set()
-    async_add_entities([IntellegyHubButtonSensor(manager)])
+    async_add_entities([
+        IntellegyHubButtonSensor(manager),
+        IntellegyHubCarrierFaultSensor(manager, "onewire_power_fault"),
+        IntellegyHubCarrierFaultSensor(manager, "xbus_power_fault"),
+    ])
     setup_xport_dynamic_platform(
         entry,
         manager,
@@ -105,6 +110,43 @@ class IntellegyHubButtonSensor(IntellegyHubGpioEntity, BinarySensorEntity):
     @property
     def is_on(self) -> bool:
         return self.manager.button_pressed
+
+
+class IntellegyHubCarrierFaultSensor(IntellegyHubGpioEntity, BinarySensorEntity):
+    _attr_translation_key = "carrier_fault"
+    _attr_device_class = FAULT_DEVICE_CLASS_PROBLEM
+
+    def __init__(self, manager, fault_id: str) -> None:
+        super().__init__(manager)
+        self.fault_id = fault_id
+        self._attr_unique_id = f"intellegyhub_{fault_id}"
+        self._attr_name = {
+            "onewire_power_fault": "1-Wire Power Fault",
+            "xbus_power_fault": "X-Bus Power Fault",
+        }.get(fault_id, fault_id)
+
+    @property
+    def fault_state(self) -> dict:
+        for fault in self.manager.carrier.get("faults", []):
+            if fault.get("id") == self.fault_id:
+                return fault
+        return {}
+
+    @property
+    def available(self) -> bool:
+        return self.manager.connected and bool(self.fault_state.get("available", False))
+
+    @property
+    def is_on(self) -> bool:
+        return bool(self.fault_state.get("active", False))
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        fault = self.fault_state
+        return {
+            "gpio": fault.get("gpio"),
+            "error": fault.get("error"),
+        }
 
 
 class IntellegyHubXPortDiSensor(IntellegyHubXPortEntity, BinarySensorEntity):

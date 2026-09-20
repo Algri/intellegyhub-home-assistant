@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.67
+
+- Add a shared Carrier MCP23017 `0x20` manager so X-Bus and 1-Wire power control use one owner, one lock, and one GPIOA/GPIOB shadow.
+- Expose +5V X-Bus and +5V 1-Wire FAULT lines GPIO23/GPIO16 as Home Assistant problem binary sensors.
+- Add `docs/tasks/hardware-coverage-backlog.md` for hardware features still not covered from `docs/HARDWARE.md`.
+
 ## 0.5.66
 
 - Enable Supervisor API access for the add-on so the bundled integration installer can reliably read its installed slug.

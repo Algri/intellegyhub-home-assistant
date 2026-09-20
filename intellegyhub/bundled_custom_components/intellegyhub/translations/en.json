@@ -32,6 +32,9 @@
       "button": {
         "name": "Button"
       },
+      "carrier_fault": {
+        "name": "Fault"
+      },
       "xport_di": {
         "name": "DI"
       },

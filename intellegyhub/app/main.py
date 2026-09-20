@@ -98,7 +98,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.66 chip=%s led=%s active_low=%s button=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
+                "Starting v0.5.67 chip=%s led=%s active_low=%s button=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -131,7 +131,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.66", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.67", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 
@@ -1075,7 +1075,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
 
     @app.get("/api/v1/state")
     async def get_state() -> dict:
-        return runtime_or_503().snapshot()
+        return await runtime_or_503().async_snapshot()
 
     @app.get("/api/v1/xport")
     async def get_xport() -> dict:

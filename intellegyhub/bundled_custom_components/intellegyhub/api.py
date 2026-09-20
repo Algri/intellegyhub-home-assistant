@@ -167,3 +167,5 @@ class IntellegyHubApiClient:
             raise IntellegyHubApiError("Invalid extensions state payload")
         if "onewire" in payload and not isinstance(payload["onewire"], dict):
             raise IntellegyHubApiError("Invalid 1-Wire state payload")
+        if "carrier" in payload and not isinstance(payload["carrier"], dict):
+            raise IntellegyHubApiError("Invalid carrier state payload")

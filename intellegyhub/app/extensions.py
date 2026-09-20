@@ -12,6 +12,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Callable
 
+from .carrier import CarrierManager
+
 I2C_SLAVE = 0x0703
 POWER_SETTLE_SECONDS = 0.15
 XDI16_INTERRUPT_DRAIN_LIMIT = 64
@@ -200,8 +202,9 @@ class ExtensionHardware:
     _mcp23008_gpio = 0x09
     _mcp_iocon = 0x0B
 
-    def __init__(self) -> None:
+    def __init__(self, carrier: CarrierManager | None = None) -> None:
         self._lock = asyncio.Lock()
+        self.carrier = carrier or CarrierManager()
         self._power_gpio_a = 0
         self._power_gpio_b = 0
         self._relay_shadows: dict[int, int] = {}
@@ -218,8 +221,7 @@ class ExtensionHardware:
         async with self._lock:
             if not self._probe(self.power_bus, self.power_address, self._mcp23017_iodirb, 1):
                 return False
-            await asyncio.to_thread(self._write_power_direction)
-            return bool((await asyncio.to_thread(self._read_power_gpio_b)) & 0x80)
+            return await self.carrier.xbus_power_on()
 
     async def start_xdi16_interrupt(self, callback: Callable[[], None]) -> bool:
         if _is_mock_platform():
@@ -256,13 +258,9 @@ class ExtensionHardware:
         if _is_mock_platform():
             return on
         async with self._lock:
-            await asyncio.to_thread(self._write_power_direction)
-            if on:
-                self._power_gpio_b |= 1 << 7
-            else:
-                self._power_gpio_b &= ~(1 << 7)
+            await self.carrier.set_xbus_power(on)
+            if not on:
                 self._relay_shadows.clear()
-            await asyncio.to_thread(self._write_power_outputs)
             return on
 
     async def scan_xdo8(self, power_on: bool) -> list[ExtensionModule]:

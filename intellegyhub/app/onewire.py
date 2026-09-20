@@ -11,6 +11,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Callable
 
+from .carrier import CarrierManager
+
 I2C_SLAVE = 0x0703
 POWER_SETTLE_SECONDS = 0.35
 DS18B20_CONVERT_SECONDS = 0.75
@@ -244,8 +246,9 @@ class OneWireHardware:
     _status_tsb = 0x40
     _status_dir = 0x80
 
-    def __init__(self) -> None:
+    def __init__(self, carrier: CarrierManager | None = None) -> None:
         self._lock = asyncio.Lock()
+        self.carrier = carrier or CarrierManager()
         self._power_gpio_a = 0
         self._power_gpio_b = 0
 
@@ -255,19 +258,13 @@ class OneWireHardware:
         async with self._lock:
             if not self._probe_register(self.power_bus, self.power_address, self._mcp23017_iodirb, 1):
                 return False
-            await asyncio.to_thread(self._write_power_direction)
-            return bool((await asyncio.to_thread(self._read_power_gpio_b)) & (1 << 6))
+            return await self.carrier.onewire_power_on()
 
     async def set_power(self, on: bool) -> bool:
         if _is_mock_platform():
             return on
         async with self._lock:
-            await asyncio.to_thread(self._write_power_direction)
-            if on:
-                self._power_gpio_b |= 1 << 6
-            else:
-                self._power_gpio_b &= ~(1 << 6)
-            await asyncio.to_thread(self._write_power_outputs)
+            await self.carrier.set_onewire_power(on)
             return on
 
     async def scan(self, power_on: bool, enabled_bridges: dict[str, bool]) -> tuple[list[OneWireBridge], list[OneWireSensor]]:

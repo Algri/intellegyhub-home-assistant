@@ -24,6 +24,7 @@ class IntellegyHubGpioManager:
         self.connected = False
         self.led_on = False
         self.button_pressed = False
+        self.carrier: dict = {}
         self.xport: dict = {}
         self.extensions: dict = {}
         self.onewire: dict = {}
@@ -175,6 +176,7 @@ class IntellegyHubGpioManager:
         payload = await self.client.state()
         self.led_on = payload["led"]["on"]
         self.button_pressed = payload["button"]["pressed"]
+        self.carrier = payload.get("carrier", {})
         self.xport = payload.get("xport", {})
         self.extensions = payload.get("extensions", {})
         self.onewire = payload.get("onewire", {})
@@ -235,6 +237,7 @@ class IntellegyHubGpioManager:
         if event_type == "state":
             self.led_on = bool(event["led"]["on"])
             self.button_pressed = bool(event["button"]["pressed"])
+            self.carrier = event.get("carrier", self.carrier)
             self.xport = event.get("xport", self.xport)
             self.extensions = event.get("extensions", self.extensions)
             self.onewire = event.get("onewire", self.onewire)

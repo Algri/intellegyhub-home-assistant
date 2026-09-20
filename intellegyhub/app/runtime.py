@@ -8,8 +8,9 @@ from fastapi import WebSocket
 
 from .backends import HardwareBackend, HardwareState
 from .buzzer import BuzzerManager
-from .extensions import ExtensionManager
-from .onewire import OneWireManager
+from .carrier import CarrierManager
+from .extensions import ExtensionHardware, ExtensionManager
+from .onewire import OneWireHardware, OneWireManager
 from .xport import XPortManager
 
 LOGGER = logging.getLogger(__name__)
@@ -25,10 +26,11 @@ class AppRuntime:
         onewire_poll_intervals: dict[str, int] | None = None,
     ) -> None:
         self.backend = backend
+        self.carrier = CarrierManager()
         self.buzzer = BuzzerManager()
         self.xport = XPortManager()
-        self.extensions = ExtensionManager()
-        self.onewire = OneWireManager(poll_intervals=onewire_poll_intervals)
+        self.extensions = ExtensionManager(hardware=ExtensionHardware(self.carrier))
+        self.onewire = OneWireManager(hardware=OneWireHardware(self.carrier), poll_intervals=onewire_poll_intervals)
         self.state = HardwareState()
         self.ready = False
         self.error: str | None = "startup pending"
@@ -44,6 +46,7 @@ class AppRuntime:
             self.xport.set_publisher(self.broadcast)
             self.extensions.set_publisher(self.broadcast)
             self.onewire.set_publisher(self.broadcast)
+            await self.carrier.start()
             await self.xport.start()
             await self.extensions.start()
             await self.onewire.start()
@@ -91,10 +94,15 @@ class AppRuntime:
         return {
             "led": {"on": self.state.led_on},
             "button": {"pressed": self.state.button_pressed},
+            "carrier": self.carrier.snapshot(),
             "xport": self.xport.snapshot(),
             "extensions": self.extensions.snapshot(),
             "onewire": self.onewire.snapshot(),
         }
+
+    async def async_snapshot(self) -> dict[str, Any]:
+        await self.carrier.refresh_faults()
+        return self.snapshot()
 
     async def set_led(self, on: bool) -> bool:
         async with self._lock:
