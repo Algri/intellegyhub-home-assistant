@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.74
+
+- Add Carrier board monitoring for MCP9808 `0x18` board temperature and ADS1115 `0x48` Vin/+5V/+3.3V rails.
+- Add a top add-on UI controller overview card with the latest monitoring values and timestamps.
+- Expose Carrier monitoring values as Home Assistant diagnostic sensors.
+- Add `carrier_monitoring_poll_interval_seconds`, defaulting to 30 seconds.
+
 ## 0.5.73
 
 - Shorten X-Port mode labels in the add-on UI and Home Assistant integration to `Off`, `AI`, `DO`, `PWM`, `DI PNP/+24V`, `DI NPN/COM`, `CNT PNP/+24V`, and `CNT NPN/COM`.

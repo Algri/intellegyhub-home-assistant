@@ -51,6 +51,12 @@
       }
     },
     "sensor": {
+      "carrier_board_temperature": {
+        "name": "Board Temperature"
+      },
+      "carrier_rail_voltage": {
+        "name": "Rail Voltage"
+      },
       "xport_ai": {
         "name": "AI"
       },

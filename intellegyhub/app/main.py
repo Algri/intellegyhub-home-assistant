@@ -102,7 +102,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.73 chip=%s led=%s active_low=%s button=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
+                "Starting v0.5.74 chip=%s led=%s active_low=%s button=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -113,6 +113,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 config.startup_buzzer_enabled,
                 config.startup_buzzer_frequency,
                 config.startup_buzzer_duration_ms,
+                config.carrier_monitoring_poll_interval_seconds,
                 config.onewire_bridge1_poll_interval_seconds,
                 config.onewire_bridge2_poll_interval_seconds,
                 config.mock,
@@ -124,6 +125,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 startup_buzzer_enabled=config.startup_buzzer_enabled,
                 startup_buzzer_frequency=config.startup_buzzer_frequency,
                 startup_buzzer_duration_ms=config.startup_buzzer_duration_ms,
+                carrier_monitoring_poll_interval_seconds=config.carrier_monitoring_poll_interval_seconds,
                 onewire_poll_intervals={
                     "onewire_bus10_addr1a": config.onewire_bridge1_poll_interval_seconds,
                     "onewire_bus10_addr1b": config.onewire_bridge2_poll_interval_seconds,
@@ -135,7 +137,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.73", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.74", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 
@@ -209,6 +211,114 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       color: var(--ha-text);
     }
     main { width: min(100%, 1520px); margin: 0 auto; }
+    .overview-panel {
+      display: grid;
+      grid-template-columns: minmax(320px, 1.25fr) repeat(2, minmax(220px, 1fr));
+      border: 1px solid var(--ha-card-border);
+      border-radius: 12px;
+      background: #0f1012;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, .22);
+      overflow: hidden;
+      margin-bottom: 18px;
+    }
+    .overview-main {
+      min-height: 300px;
+      padding: 28px;
+      border-right: 1px solid var(--ha-card-border);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 28px;
+    }
+    .overview-icon {
+      width: 50px;
+      height: 50px;
+      border: 1px solid #3c4650;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      color: var(--ha-text);
+      font-weight: 800;
+      font-size: 16px;
+    }
+    .overview-title {
+      font-size: 48px;
+      line-height: 1;
+      margin: 12px 0 10px;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+    .overview-model { color: var(--ha-secondary); font-size: 15px; }
+    .overview-footer {
+      border-top: 1px solid var(--ha-card-border);
+      padding-top: 18px;
+      color: var(--ha-secondary);
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      font-size: 13px;
+    }
+    .overview-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #448aff;
+      display: inline-block;
+      margin-right: 8px;
+    }
+    .overview-status-pill {
+      justify-self: end;
+      min-height: 28px;
+      align-self: start;
+      padding: 6px 13px;
+      border: 1px solid #3c4650;
+      border-radius: 999px;
+      color: var(--ha-text);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .overview-status-pill::before {
+      content: "";
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      margin-right: 8px;
+      border-radius: 50%;
+      background: #8f95a0;
+      vertical-align: 1px;
+    }
+    .overview-status-pill.online::before { background: var(--ha-success); }
+    .overview-metrics {
+      display: grid;
+      grid-column: span 2;
+      grid-template-columns: repeat(2, minmax(210px, 1fr));
+    }
+    .overview-metric {
+      min-height: 150px;
+      padding: 34px 22px 24px;
+      border-right: 1px solid var(--ha-card-border);
+      border-bottom: 1px solid var(--ha-card-border);
+    }
+    .overview-metric:nth-child(2n) { border-right: 0; }
+    .overview-metric:nth-last-child(-n+2) { border-bottom: 0; }
+    .overview-metric-label {
+      color: #9fb0c4;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 26px;
+    }
+    .overview-metric-value {
+      color: #ffffff;
+      font-size: 26px;
+      line-height: 1;
+      font-weight: 800;
+      margin-bottom: 14px;
+    }
+    .overview-metric-meta { color: #8d99a8; font-size: 12px; }
     .xport-panel {
       border: 1px solid var(--ha-card-border);
       border-radius: 12px;
@@ -405,13 +515,53 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     pre { display: none; min-height: 180px; max-height: 360px; overflow: auto; border: 1px solid var(--ha-card-border); border-radius: 8px; padding: 14px; background: #0b0b0b; color: var(--ha-text); font-size: 13px; }
     pre.visible { display: block; }
     @media (max-width: 1300px) { .relay-grid { grid-template-columns: repeat(4, minmax(140px, 1fr)); } }
-    @media (max-width: 1100px) { .ports { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .relay-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); } }
+    @media (max-width: 1100px) { .overview-panel { grid-template-columns: 1fr; } .overview-main { border-right: 0; border-bottom: 1px solid var(--ha-card-border); min-height: 260px; } .overview-metrics { grid-column: auto; } .ports { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .relay-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); } }
     @media (max-width: 1100px) { .buzzer-grid { grid-template-columns: repeat(3, minmax(120px, 1fr)); } }
-    @media (max-width: 620px) { body { padding: 10px; } .xport-panel { padding: 18px 14px; border-radius: 12px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .ports, .relay-grid { grid-template-columns: 1fr; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 620px) { body { padding: 10px; } .overview-main { padding: 22px; } .overview-title { font-size: 38px; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric { border-right: 0; } .overview-metric:nth-last-child(2) { border-bottom: 1px solid var(--ha-card-border); } .xport-panel { padding: 18px 14px; border-radius: 12px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .ports, .relay-grid { grid-template-columns: 1fr; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
   <main>
+    <section class="overview-panel">
+      <div class="overview-main">
+        <div class="module-row">
+          <div class="overview-icon">IHC</div>
+          <div id="carrier-overview-status" class="overview-status-pill">Loading</div>
+        </div>
+        <div>
+          <div class="eyebrow">Controller Overview</div>
+          <div id="carrier-identity-product" class="overview-title">IHC-1400</div>
+          <div id="carrier-identity-model" class="overview-model">Controller - 1.4 Rev.A</div>
+        </div>
+        <div class="overview-footer">
+          <span><span class="overview-dot"></span>Commissioning session active</span>
+          <span>/</span>
+          <span>Controller state synchronized</span>
+        </div>
+      </div>
+      <div class="overview-metrics">
+        <div class="overview-metric">
+          <div class="overview-metric-label">Board Temperature</div>
+          <div id="metric-board-temperature" class="overview-metric-value">--</div>
+          <div id="metric-board-temperature-meta" class="overview-metric-meta">Loading</div>
+        </div>
+        <div class="overview-metric">
+          <div class="overview-metric-label">+5 V Rail</div>
+          <div id="metric-5v" class="overview-metric-value">--</div>
+          <div id="metric-5v-meta" class="overview-metric-meta">Loading</div>
+        </div>
+        <div class="overview-metric">
+          <div class="overview-metric-label">+3.3 V Rail</div>
+          <div id="metric-3v3" class="overview-metric-value">--</div>
+          <div id="metric-3v3-meta" class="overview-metric-meta">Loading</div>
+        </div>
+        <div class="overview-metric">
+          <div class="overview-metric-label">Input Voltage</div>
+          <div id="metric-vin" class="overview-metric-value">--</div>
+          <div id="metric-vin-meta" class="overview-metric-meta">Loading</div>
+        </div>
+      </div>
+    </section>
     <section class="xport-panel">
       <div class="module-row">
         <div>
@@ -717,6 +867,36 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         output.textContent = JSON.stringify(error, null, 2);
       }
     }
+    function paintCarrier(carrier) {
+      const status = document.getElementById('carrier-overview-status');
+      const online = Boolean(carrier && carrier.available);
+      status.className = `overview-status-pill ${online ? 'online' : ''}`;
+      status.textContent = online ? 'Online' : 'Offline';
+      const identity = carrier && carrier.identity ? carrier.identity : {};
+      document.getElementById('carrier-identity-product').textContent = identity.product || 'IHC-1400';
+      document.getElementById('carrier-identity-model').textContent = `${identity.model || 'Controller'} - ${identity.hardware_revision || '1.4 Rev.A'}`;
+      const monitoring = carrier && carrier.monitoring ? carrier.monitoring : {};
+      const temperature = monitoring.temperature || {};
+      const rails = {};
+      for (const rail of monitoring.rails || []) {
+        rails[rail.id] = rail;
+      }
+      paintMetric('board-temperature', temperature, 2);
+      paintMetric('5v', rails['5v'], 2);
+      paintMetric('3v3', rails['3v3'], 2);
+      paintMetric('vin', rails.vin, 2);
+    }
+    function paintMetric(elementId, metric, precision) {
+      const value = document.getElementById(`metric-${elementId}`);
+      const meta = document.getElementById(`metric-${elementId}-meta`);
+      if (!metric || !metric.available || metric.value === null || metric.value === undefined) {
+        value.textContent = '--';
+        meta.textContent = metric && metric.error ? `Error - ${metric.error}` : 'Unavailable';
+        return;
+      }
+      value.textContent = Number(metric.value).toFixed(precision);
+      meta.textContent = `Good - ${metric.last_read_utc || 'just now'}`;
+    }
     async function renderExtensions() {
       const output = document.getElementById('output');
       output.classList.remove('visible');
@@ -982,9 +1162,12 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       socket.onmessage = (event) => {
         const message = JSON.parse(event.data);
         if (message.type === 'state') {
+          paintCarrier(message.carrier);
           paintXPort(message.xport);
           paintExtensions(message.extensions);
           paintOneWire(message.onewire);
+        } else if (message.type === 'carrier_changed') {
+          paintCarrier(message.carrier);
         } else if (message.type === 'xport_changed') {
           paintXPort(message.xport);
         } else if (message.type === 'xport_channel_changed') {

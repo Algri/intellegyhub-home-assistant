@@ -7,8 +7,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, XPORT_MODE_AI, XPORT_MODE_COUNTER
-from .entity import IntellegyHubOneWireSensorEntity, IntellegyHubXPortEntity
+from .entity import IntellegyHubGpioEntity, IntellegyHubOneWireSensorEntity, IntellegyHubXPortEntity
 from .xport_entities import setup_xport_dynamic_platform
+
+try:
+    from homeassistant.helpers.entity import EntityCategory
+except ImportError:
+    EntityCategory = None
 
 try:
     from homeassistant.const import UnitOfTemperature
@@ -17,11 +22,20 @@ except ImportError:
 
 UNIT_CELSIUS = UnitOfTemperature.CELSIUS if UnitOfTemperature is not None else "°C"
 SENSOR_DEVICE_CLASS_TEMPERATURE = getattr(SensorDeviceClass, "TEMPERATURE", "temperature")
+ENTITY_CATEGORY_DIAGNOSTIC = EntityCategory.DIAGNOSTIC if EntityCategory is not None else "diagnostic"
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     manager = hass.data[DOMAIN][entry.entry_id]
     known_onewire: set[str] = set()
+    async_add_entities(
+        [
+            IntellegyHubCarrierTemperatureSensor(manager),
+            IntellegyHubCarrierRailSensor(manager, "vin", "Input Voltage"),
+            IntellegyHubCarrierRailSensor(manager, "5v", "+5 V Rail"),
+            IntellegyHubCarrierRailSensor(manager, "3v3", "+3.3 V Rail"),
+        ]
+    )
     setup_xport_dynamic_platform(
         entry,
         manager,
@@ -60,6 +74,83 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
     entry.async_on_unload(manager.async_add_listener(check_onewire_entities))
     check_onewire_entities()
+
+
+class IntellegyHubCarrierTemperatureSensor(IntellegyHubGpioEntity, SensorEntity):
+    _attr_translation_key = "carrier_board_temperature"
+    _attr_device_class = SENSOR_DEVICE_CLASS_TEMPERATURE
+    _attr_native_unit_of_measurement = UNIT_CELSIUS
+    _attr_suggested_display_precision = 2
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_entity_category = ENTITY_CATEGORY_DIAGNOSTIC
+
+    def __init__(self, manager) -> None:
+        super().__init__(manager)
+        self._attr_unique_id = "intellegyhub_carrier_board_temperature"
+        self._attr_name = "Board Temperature"
+
+    @property
+    def metric_state(self) -> dict:
+        return self.manager.carrier.get("monitoring", {}).get("temperature", {})
+
+    @property
+    def available(self) -> bool:
+        return self.manager.connected and bool(self.metric_state.get("available", False))
+
+    @property
+    def native_value(self):
+        return self.metric_state.get("value")
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        metric = self.metric_state
+        return {
+            "bus": metric.get("bus"),
+            "address": metric.get("address"),
+            "last_read_utc": metric.get("last_read_utc"),
+            "error": metric.get("error"),
+        }
+
+
+class IntellegyHubCarrierRailSensor(IntellegyHubGpioEntity, SensorEntity):
+    _attr_translation_key = "carrier_rail_voltage"
+    _attr_device_class = SensorDeviceClass.VOLTAGE
+    _attr_native_unit_of_measurement = UnitOfElectricPotential.VOLT
+    _attr_suggested_display_precision = 2
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_entity_category = ENTITY_CATEGORY_DIAGNOSTIC
+
+    def __init__(self, manager, rail_id: str, name: str) -> None:
+        super().__init__(manager)
+        self.rail_id = rail_id
+        self._attr_unique_id = f"intellegyhub_carrier_rail_{rail_id}"
+        self._attr_name = name
+
+    @property
+    def metric_state(self) -> dict:
+        for rail in self.manager.carrier.get("monitoring", {}).get("rails", []):
+            if rail.get("id") == self.rail_id:
+                return rail
+        return {}
+
+    @property
+    def available(self) -> bool:
+        return self.manager.connected and bool(self.metric_state.get("available", False))
+
+    @property
+    def native_value(self):
+        return self.metric_state.get("value")
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        metric = self.metric_state
+        return {
+            "bus": metric.get("bus"),
+            "address": metric.get("address"),
+            "channel": metric.get("channel"),
+            "last_read_utc": metric.get("last_read_utc"),
+            "error": metric.get("error"),
+        }
 
 
 class IntellegyHubXPortAiSensor(IntellegyHubXPortEntity, SensorEntity):

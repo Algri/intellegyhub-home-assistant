@@ -23,10 +23,11 @@ class AppRuntime:
         startup_buzzer_enabled: bool = False,
         startup_buzzer_frequency: int = 2000,
         startup_buzzer_duration_ms: int = 200,
+        carrier_monitoring_poll_interval_seconds: int = 30,
         onewire_poll_intervals: dict[str, int] | None = None,
     ) -> None:
         self.backend = backend
-        self.carrier = CarrierManager()
+        self.carrier = CarrierManager(monitoring_interval_seconds=carrier_monitoring_poll_interval_seconds)
         self.buzzer = BuzzerManager()
         self.xport = XPortManager()
         self.extensions = ExtensionManager(hardware=ExtensionHardware(self.carrier))
@@ -114,6 +115,7 @@ class AppRuntime:
 
     async def async_snapshot(self) -> dict[str, Any]:
         await self.carrier.refresh_faults()
+        await self.carrier.refresh_monitoring()
         return self.snapshot()
 
     async def set_led(self, on: bool) -> bool:

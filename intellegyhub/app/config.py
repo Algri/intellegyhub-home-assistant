@@ -26,6 +26,7 @@ class AppConfig:
     startup_buzzer_enabled: bool = False
     startup_buzzer_frequency: int = 2000
     startup_buzzer_duration_ms: int = 200
+    carrier_monitoring_poll_interval_seconds: int = 30
     onewire_bridge1_poll_interval_seconds: int = 30
     onewire_bridge2_poll_interval_seconds: int = 30
     chip_path: str = "/dev/gpiochip0"
@@ -61,6 +62,7 @@ def load_config(path: Path | None = None) -> AppConfig:
         startup_buzzer_enabled=bool(options.get("startup_buzzer_enabled", False)),
         startup_buzzer_frequency=int(options.get("startup_buzzer_frequency", 2000)),
         startup_buzzer_duration_ms=int(options.get("startup_buzzer_duration_ms", 200)),
+        carrier_monitoring_poll_interval_seconds=int(options.get("carrier_monitoring_poll_interval_seconds", 30)),
         onewire_bridge1_poll_interval_seconds=int(options.get("onewire_bridge1_poll_interval_seconds", 30)),
         onewire_bridge2_poll_interval_seconds=int(options.get("onewire_bridge2_poll_interval_seconds", 30)),
         mock=mock,
@@ -87,6 +89,8 @@ def validate_config(config: AppConfig) -> None:
         raise ValueError("startup_buzzer_frequency must be between 20 and 20000")
     if not 10 <= config.startup_buzzer_duration_ms <= 5000:
         raise ValueError("startup_buzzer_duration_ms must be between 10 and 5000")
+    if not 1 <= config.carrier_monitoring_poll_interval_seconds <= 3600:
+        raise ValueError("carrier_monitoring_poll_interval_seconds must be between 1 and 3600")
     if not 1 <= config.onewire_bridge1_poll_interval_seconds <= 3600:
         raise ValueError("onewire_bridge1_poll_interval_seconds must be between 1 and 3600")
     if not 1 <= config.onewire_bridge2_poll_interval_seconds <= 3600:

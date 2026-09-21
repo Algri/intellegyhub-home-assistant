@@ -4,6 +4,7 @@ import asyncio
 import errno
 import os
 import sys
+import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -21,9 +22,25 @@ class FaultLineState:
     error: str | None = None
 
 
+@dataclass
+class CarrierMetricState:
+    id: str
+    name: str
+    value: float | None
+    unit: str
+    bus: int
+    address: str
+    channel: int | None = None
+    available: bool = False
+    error: str | None = None
+    last_read_utc: str | None = None
+
+
 class CarrierHardware:
     bus = 10
     address = 0x20
+    temperature_address = 0x18
+    rails_address = 0x48
     gpiochip_path = "/dev/gpiochip0"
 
     _iodira = 0x00
@@ -88,6 +105,11 @@ class CarrierHardware:
             ]
         return await asyncio.to_thread(self._read_fault_lines)
 
+    async def monitoring_metrics(self) -> dict[str, Any]:
+        if _is_mock_platform():
+            return self._monitoring_error_snapshot("mock")
+        return await asyncio.to_thread(self._read_monitoring_metrics)
+
     def _initialize_sync(self) -> bool:
         if not self._probe_register(self._iodirb, 1):
             return False
@@ -138,6 +160,115 @@ class CarrierHardware:
         except Exception as exc:
             return FaultLineState(fault_id, name, gpio, False, False, str(exc))
 
+    def _read_monitoring_metrics(self) -> dict[str, Any]:
+        now = _utc_timestamp()
+        temperature = self._read_temperature_metric(now)
+        rails = [
+            self._read_ads1115_metric("vin", "Input Voltage", 0, 12.0, now),
+            self._read_ads1115_metric("5v", "+5 V Rail", 1, 1.0, now),
+            self._read_ads1115_metric("3v3", "+3.3 V Rail", 2, 1.0, now),
+        ]
+        return {"temperature": asdict(temperature), "rails": [asdict(item) for item in rails]}
+
+    def _monitoring_error_snapshot(self, error: str) -> dict[str, Any]:
+        return {
+            "temperature": asdict(
+                CarrierMetricState(
+                    "board_temperature",
+                    "Board Temperature",
+                    None,
+                    "C",
+                    self.bus,
+                    f"0x{self.temperature_address:02x}",
+                    available=False,
+                    error=error,
+                )
+            ),
+            "rails": [
+                asdict(CarrierMetricState("vin", "Input Voltage", None, "V", self.bus, f"0x{self.rails_address:02x}", 0, False, error)),
+                asdict(CarrierMetricState("5v", "+5 V Rail", None, "V", self.bus, f"0x{self.rails_address:02x}", 1, False, error)),
+                asdict(CarrierMetricState("3v3", "+3.3 V Rail", None, "V", self.bus, f"0x{self.rails_address:02x}", 2, False, error)),
+            ],
+        }
+
+    def _read_temperature_metric(self, last_read_utc: str) -> CarrierMetricState:
+        try:
+            raw = self._i2c_read_register_for_address(self.temperature_address, 0x05, 2)
+            word = (raw[0] << 8) | raw[1]
+            value = word & 0x0FFF
+            if word & 0x1000:
+                value -= 0x1000
+            temperature_c = value / 16.0
+            return CarrierMetricState(
+                "board_temperature",
+                "Board Temperature",
+                round(temperature_c, 3),
+                "C",
+                self.bus,
+                f"0x{self.temperature_address:02x}",
+                available=True,
+                last_read_utc=last_read_utc,
+            )
+        except Exception as exc:
+            return CarrierMetricState(
+                "board_temperature",
+                "Board Temperature",
+                None,
+                "C",
+                self.bus,
+                f"0x{self.temperature_address:02x}",
+                available=False,
+                error=str(exc),
+            )
+
+    def _read_ads1115_metric(
+        self,
+        metric_id: str,
+        name: str,
+        channel: int,
+        scale: float,
+        last_read_utc: str,
+    ) -> CarrierMetricState:
+        try:
+            raw_voltage = self._read_ads1115_voltage(channel)
+            return CarrierMetricState(
+                metric_id,
+                name,
+                round(raw_voltage * scale, 3),
+                "V",
+                self.bus,
+                f"0x{self.rails_address:02x}",
+                channel,
+                True,
+                None,
+                last_read_utc,
+            )
+        except Exception as exc:
+            return CarrierMetricState(
+                metric_id,
+                name,
+                None,
+                "V",
+                self.bus,
+                f"0x{self.rails_address:02x}",
+                channel,
+                False,
+                str(exc),
+            )
+
+    def _read_ads1115_voltage(self, channel: int) -> float:
+        if channel < 0 or channel > 3:
+            raise ValueError("ADS1115 channel must be between 0 and 3")
+        mux = 0x4000 + (channel << 12)
+        config = 0x8000 | mux | 0x0100 | 0x0080 | 0x0003
+        self._i2c_write_for_address(self.rails_address, bytes([0x01, (config >> 8) & 0xFF, config & 0xFF]))
+        time.sleep(0.01)
+        raw = self._i2c_read_register_for_address(self.rails_address, 0x00, 2)
+        value = (raw[0] << 8) | raw[1]
+        if value & 0x8000:
+            value -= 0x10000
+        return value * 6.144 / 32768.0
+
     def _probe_register(self, register: int, length: int) -> bool:
         try:
             self._i2c_read_register(register, length)
@@ -150,29 +281,38 @@ class CarrierHardware:
             raise
 
     def _i2c_write(self, payload: bytes) -> None:
+        self._i2c_write_for_address(self.address, payload)
+
+    def _i2c_write_for_address(self, address: int, payload: bytes) -> None:
         import fcntl
 
         with Path(f"/dev/i2c-{self.bus}").open("rb+", buffering=0) as device:
-            fcntl.ioctl(device, I2C_SLAVE, self.address)
+            fcntl.ioctl(device, I2C_SLAVE, address)
             os.write(device.fileno(), payload)
 
     def _i2c_read_register(self, register: int, length: int) -> bytes:
+        return self._i2c_read_register_for_address(self.address, register, length)
+
+    def _i2c_read_register_for_address(self, address: int, register: int, length: int) -> bytes:
         import fcntl
 
         with Path(f"/dev/i2c-{self.bus}").open("rb+", buffering=0) as device:
-            fcntl.ioctl(device, I2C_SLAVE, self.address)
+            fcntl.ioctl(device, I2C_SLAVE, address)
             os.write(device.fileno(), bytes([register]))
             return os.read(device.fileno(), length)
 
 
 class CarrierManager:
-    def __init__(self, hardware: CarrierHardware | None = None) -> None:
+    def __init__(self, hardware: CarrierHardware | None = None, monitoring_interval_seconds: int = 30) -> None:
         self.hardware = hardware or CarrierHardware()
+        self.monitoring_interval_seconds = monitoring_interval_seconds
         self.available = False
         self.error: str | None = "startup pending"
         self.faults: dict[str, FaultLineState] = {}
+        self.monitoring: dict[str, Any] = _monitoring_error_snapshot("startup pending")
         self._publisher: Callable[[dict[str, Any]], Any] | None = None
         self._fault_task: asyncio.Task | None = None
+        self._monitoring_task: asyncio.Task | None = None
         self._stopped = asyncio.Event()
 
     def set_publisher(self, publisher: Callable[[dict[str, Any]], Any]) -> None:
@@ -183,8 +323,10 @@ class CarrierManager:
             self._stopped.clear()
             self.available = await self.hardware.initialize()
             self.faults = {fault.id: fault for fault in await self.hardware.fault_lines()}
+            self.monitoring = await self.hardware.monitoring_metrics()
             self.error = None if self.available else "carrier MCP23017 unavailable"
             self._fault_task = asyncio.create_task(self._monitor_faults(), name="intellegyhub_carrier_faults")
+            self._monitoring_task = asyncio.create_task(self._monitor_metrics(), name="intellegyhub_carrier_monitoring")
         except Exception as exc:
             self.available = False
             self.error = str(exc)
@@ -198,6 +340,13 @@ class CarrierManager:
             except asyncio.CancelledError:
                 pass
             self._fault_task = None
+        if self._monitoring_task:
+            self._monitoring_task.cancel()
+            try:
+                await self._monitoring_task
+            except asyncio.CancelledError:
+                pass
+            self._monitoring_task = None
 
     async def set_xbus_power(self, on: bool) -> bool:
         return await self.hardware.set_bit(CarrierHardware.bit_xbus_power, on)
@@ -213,6 +362,10 @@ class CarrierManager:
 
     async def refresh_faults(self) -> dict[str, Any]:
         self.faults = {fault.id: fault for fault in await self.hardware.fault_lines()}
+        return self.snapshot()
+
+    async def refresh_monitoring(self) -> dict[str, Any]:
+        self.monitoring = await self.hardware.monitoring_metrics()
         return self.snapshot()
 
     async def _monitor_faults(self) -> None:
@@ -235,6 +388,24 @@ class CarrierManager:
             sorted((fault.id, fault.active, fault.available, fault.error) for fault in self.faults.values())
         )
 
+    async def _monitor_metrics(self) -> None:
+        while not self._stopped.is_set():
+            try:
+                await asyncio.wait_for(self._stopped.wait(), timeout=self.monitoring_interval_seconds)
+                return
+            except asyncio.TimeoutError:
+                pass
+            try:
+                previous = self._monitoring_signature()
+                await self.refresh_monitoring()
+                if previous != self._monitoring_signature():
+                    await self._publish({"type": "carrier_changed", "carrier": self.snapshot()})
+            except Exception:
+                continue
+
+    def _monitoring_signature(self) -> str:
+        return repr(self.monitoring)
+
     async def _publish(self, message: dict[str, Any]) -> None:
         if self._publisher is None:
             return
@@ -245,8 +416,15 @@ class CarrierManager:
     def snapshot(self) -> dict[str, Any]:
         return {
             "available": self.available,
+            "identity": {
+                "product": "IHC-1400",
+                "model": "Controller",
+                "hardware_revision": "1.4 Rev.A",
+            },
             "controller": {"bus": 10, "address": "0x20", "chip": "MCP23017"},
             "faults": [asdict(fault) for fault in self.faults.values()],
+            "monitoring": self.monitoring,
+            "monitoring_interval_seconds": self.monitoring_interval_seconds,
             "error": self.error,
         }
 
@@ -257,3 +435,29 @@ def _is_mock_platform() -> bool:
         or os.environ.get("INTELLEGY_GPIO_MOCK", "").lower() in {"1", "true", "yes"}
         or os.environ.get("INTELLEGY_MOCK_GPIO", "").lower() in {"1", "true", "yes"}
     )
+
+
+def _monitoring_error_snapshot(error: str) -> dict[str, Any]:
+    return {
+        "temperature": asdict(
+            CarrierMetricState(
+                "board_temperature",
+                "Board Temperature",
+                None,
+                "C",
+                10,
+                "0x18",
+                available=False,
+                error=error,
+            )
+        ),
+        "rails": [
+            asdict(CarrierMetricState("vin", "Input Voltage", None, "V", 10, "0x48", 0, False, error)),
+            asdict(CarrierMetricState("5v", "+5 V Rail", None, "V", 10, "0x48", 1, False, error)),
+            asdict(CarrierMetricState("3v3", "+3.3 V Rail", None, "V", 10, "0x48", 2, False, error)),
+        ],
+    }
+
+
+def _utc_timestamp() -> str:
+    return time.strftime("%H:%M:%S UTC", time.gmtime())
