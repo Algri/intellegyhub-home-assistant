@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.97
+
+- Fix X-Port service diagnostics by adding the missing shared X-Port paint function.
+
 ## 0.5.96
 
 - Remove the unused `Scan I2C-0` service tool button.

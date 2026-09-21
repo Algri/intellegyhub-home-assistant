@@ -113,7 +113,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.96 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
+                "Starting v0.5.97 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -148,7 +148,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.96", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.97", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 
@@ -518,7 +518,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           <dt>Hardware</dt>
           <dd id="carrier-identity-hardware">1.4 Rev.A</dd>
           <dt>Software</dt>
-          <dd id="carrier-identity-software">0.5.96</dd>
+          <dd id="carrier-identity-software">0.5.97</dd>
         </dl>
         <div class="overview-divider"></div>
         <dl class="overview-health">
@@ -730,36 +730,39 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       output.classList.remove('visible');
       try {
         const payload = await requestJson('api/v1/xport');
-        document.getElementById('xport-status').textContent = `X-PORT: ${payload.topology} - ${payload.availability}`;
-        const ports = document.getElementById('ports');
-        ports.innerHTML = '';
-        for (const channel of payload.channels) {
-          const card = document.createElement('article');
-          card.className = 'port-card';
-          const title = document.createElement('div');
-          title.className = 'port-title';
-          title.textContent = `X${channel.channel}`;
-          const label = document.createElement('label');
-          label.textContent = 'Mode';
-          const modeSelect = renderModeSelect(channel, payload.modes);
-          const active = document.createElement('div');
-          active.className = 'active-mode';
-          const activeLabel = document.createElement('span');
-          activeLabel.textContent = 'Active mode:';
-          const activeValue = document.createElement('strong');
-          activeValue.textContent = labels[channel.confirmed_mode] || channel.confirmed_mode;
-          activeValue.title = activeValue.textContent;
-          active.append(activeLabel, activeValue);
-          const modeBody = document.createElement('div');
-          modeBody.className = 'mode-body';
-          modeBody.appendChild(renderModeBody(channel));
-          card.append(title, label, modeSelect, active, modeBody);
-          ports.appendChild(card);
-        }
+        paintXPort(payload);
       } catch (error) {
         document.getElementById('xport-status').textContent = 'X-PORT: Error';
         output.textContent = JSON.stringify(error, null, 2);
         output.classList.add('visible');
+      }
+    }
+    function paintXPort(payload) {
+      document.getElementById('xport-status').textContent = `X-PORT: ${payload.topology} - ${payload.availability}`;
+      const ports = document.getElementById('ports');
+      ports.innerHTML = '';
+      for (const channel of payload.channels) {
+        const card = document.createElement('article');
+        card.className = 'port-card';
+        const title = document.createElement('div');
+        title.className = 'port-title';
+        title.textContent = `X${channel.channel}`;
+        const label = document.createElement('label');
+        label.textContent = 'Mode';
+        const modeSelect = renderModeSelect(channel, payload.modes);
+        const active = document.createElement('div');
+        active.className = 'active-mode';
+        const activeLabel = document.createElement('span');
+        activeLabel.textContent = 'Active mode:';
+        const activeValue = document.createElement('strong');
+        activeValue.textContent = labels[channel.confirmed_mode] || channel.confirmed_mode;
+        activeValue.title = activeValue.textContent;
+        active.append(activeLabel, activeValue);
+        const modeBody = document.createElement('div');
+        modeBody.className = 'mode-body';
+        modeBody.appendChild(renderModeBody(channel));
+        card.append(title, label, modeSelect, active, modeBody);
+        ports.appendChild(card);
       }
     }
     async function setMode(channel, mode) {
@@ -959,7 +962,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       document.getElementById('carrier-identity-model').textContent = identity.model || 'IntellegyHUB Controller';
       document.getElementById('carrier-identity-serial').textContent = identity.serial_number || 'IH1400-00001234';
       document.getElementById('carrier-identity-hardware').textContent = identity.hardware_revision || '1.4 Rev.A';
-      document.getElementById('carrier-identity-software').textContent = identity.software_version || '0.5.96';
+      document.getElementById('carrier-identity-software').textContent = identity.software_version || '0.5.97';
       document.getElementById('carrier-uptime').textContent = formatUptime(appInfo && appInfo.uptime_seconds);
       const monitoring = carrier && carrier.monitoring ? carrier.monitoring : {};
       const temperature = monitoring.temperature || {};
