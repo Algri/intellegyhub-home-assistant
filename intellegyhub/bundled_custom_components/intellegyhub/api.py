@@ -228,6 +228,8 @@ class IntellegyHubApiClient:
             raise IntellegyHubApiError("Invalid outputs state payload")
         if not isinstance(payload.get("button", {}).get("pressed"), bool):
             raise IntellegyHubApiError("Invalid button state payload")
+        if "buttons" in payload and not isinstance(payload["buttons"], dict):
+            raise IntellegyHubApiError("Invalid buttons state payload")
         if "xport" in payload and not isinstance(payload["xport"], dict):
             raise IntellegyHubApiError("Invalid X-Port state payload")
         if "extensions" in payload and not isinstance(payload["extensions"], dict):

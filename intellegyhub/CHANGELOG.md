@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.5.92
+
+- Keep X-Port mode dropdown styling separate from the global add-on action button style.
+
+## 0.5.91
+
+- Restyle add-on UI command buttons with the compact blue-outline action style used by X-Port reset controls.
+
+## 0.5.90
+
+- Fit the four Carrier I/O cards in one horizontal row on wide add-on UI screens.
+
+## 0.5.89
+
+- Add FN1 GPIO27 and FN2 GPIO26 function button reporting to the add-on API, WebSocket events, add-on UI, and Home Assistant integration.
+- Rename host GPIO outputs to `STE LED`, `ERR LED`, `NET LED`, and `USR LED`, and show them in the add-on Carrier I/O panel.
+
 ## 0.5.88
 
 - Stretch the Buzzer parameter group across the available diagnostic card width so no dead space remains beside the controls.

@@ -8,10 +8,14 @@ DEVICE_IDENTIFIER = "mainboard"
 UNIQUE_ID_LED = "intellegyhub_led"
 UNIQUE_ID_BUTTON = "intellegyhub_button"
 OUTPUTS = {
-    "user_led": {"name": "USR", "unique_id": UNIQUE_ID_LED},
-    "ste": {"name": "STE", "unique_id": "intellegyhub_output_ste"},
-    "err": {"name": "ERR", "unique_id": "intellegyhub_output_err"},
-    "net": {"name": "NET", "unique_id": "intellegyhub_output_net"},
+    "ste": {"name": "STE LED", "unique_id": "intellegyhub_output_ste"},
+    "err": {"name": "ERR LED", "unique_id": "intellegyhub_output_err"},
+    "net": {"name": "NET LED", "unique_id": "intellegyhub_output_net"},
+    "user_led": {"name": "USR LED", "unique_id": UNIQUE_ID_LED},
+}
+BUTTONS = {
+    "fn1": {"name": "FN1", "unique_id": "intellegyhub_button_fn1"},
+    "fn2": {"name": "FN2", "unique_id": UNIQUE_ID_BUTTON},
 }
 
 CARRIER_OUTPUTS = {

@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import WebSocket
 
-from .backends import OUTPUTS, HardwareBackend, HardwareState
+from .backends import BUTTONS, OUTPUTS, HardwareBackend, HardwareState
 from .buzzer import BuzzerManager
 from .carrier import CarrierManager
 from .extensions import ExtensionHardware, ExtensionManager
@@ -95,6 +95,7 @@ class AppRuntime:
 
     def snapshot(self) -> dict[str, Any]:
         outputs = self.state.outputs or {output_id: False for output_id in OUTPUTS}
+        buttons = self.state.buttons or {button_id: False for button_id in BUTTONS}
         return {
             "led": {"on": outputs["user_led"]},
             "outputs": {
@@ -106,7 +107,16 @@ class AppRuntime:
                 }
                 for output_id, definition in OUTPUTS.items()
             },
-            "button": {"pressed": self.state.button_pressed},
+            "button": {"pressed": bool(buttons.get("fn2", self.state.button_pressed))},
+            "buttons": {
+                button_id: {
+                    "id": button_id,
+                    "name": str(definition["name"]),
+                    "gpio": int(definition["gpio"]),
+                    "pressed": bool(buttons.get(button_id, False)),
+                }
+                for button_id, definition in BUTTONS.items()
+            },
             "carrier": self.carrier.snapshot(),
             "xport": self.xport.snapshot(),
             "extensions": self.extensions.snapshot(),
@@ -160,12 +170,25 @@ class AppRuntime:
         await self.broadcast({"type": "buzzer_changed", "buzzer": status})
         return status
 
-    async def handle_button_changed(self, pressed: bool) -> None:
+    async def handle_button_changed(self, button_id: str, pressed: bool) -> None:
+        if button_id not in BUTTONS:
+            return
         async with self._lock:
-            if self.state.button_pressed == pressed:
+            if self.state.buttons is None:
+                self.state.buttons = {item: False for item in BUTTONS}
+            if bool(self.state.buttons.get(button_id, False)) == pressed:
                 return
-            self.state.button_pressed = pressed
-            await self.broadcast({"type": "button_changed", "pressed": pressed})
+            self.state.buttons[button_id] = pressed
+            self.state.button_pressed = bool(self.state.buttons.get("fn2", False))
+            await self.broadcast(
+                {
+                    "type": "button_changed",
+                    "id": button_id,
+                    "name": str(BUTTONS[button_id]["name"]),
+                    "gpio": int(BUTTONS[button_id]["gpio"]),
+                    "pressed": pressed,
+                }
+            )
 
     async def add_client(self, websocket: WebSocket) -> None:
         await websocket.accept()

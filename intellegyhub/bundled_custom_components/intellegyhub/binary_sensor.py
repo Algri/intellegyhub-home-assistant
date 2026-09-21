@@ -7,7 +7,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, UNIQUE_ID_BUTTON, XPORT_MODE_DI
+from .const import BUTTONS, DOMAIN, XPORT_MODE_DI
 from .entity import IntellegyHubGpioEntity, IntellegyHubOneWireBridgeEntity, IntellegyHubXDi16Entity, IntellegyHubXPortEntity
 from .xport_entities import setup_xport_dynamic_platform
 
@@ -22,7 +22,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     known_onewire_bridges: set[str] = set()
     known_xdi16: set[str] = set()
     async_add_entities([
-        IntellegyHubButtonSensor(manager),
+        *(IntellegyHubButtonSensor(manager, button_id) for button_id in BUTTONS),
         IntellegyHubCarrierFaultSensor(manager, "onewire_power_fault"),
         IntellegyHubCarrierFaultSensor(manager, "xbus_power_fault"),
     ])
@@ -104,13 +104,18 @@ def _reset_xdi16_registry_entries(hass: HomeAssistant, manager) -> None:
 
 
 class IntellegyHubButtonSensor(IntellegyHubGpioEntity, BinarySensorEntity):
-    _attr_unique_id = UNIQUE_ID_BUTTON
     _attr_translation_key = "button"
     _attr_icon = BUTTON_INPUT_ICON
 
+    def __init__(self, manager, button_id: str) -> None:
+        super().__init__(manager)
+        self.button_id = button_id
+        self._attr_unique_id = BUTTONS[button_id]["unique_id"]
+        self._attr_name = BUTTONS[button_id]["name"]
+
     @property
     def is_on(self) -> bool:
-        return self.manager.button_pressed
+        return bool(self.manager.buttons.get(self.button_id, False))
 
 
 class IntellegyHubCarrierFaultSensor(IntellegyHubGpioEntity, BinarySensorEntity):

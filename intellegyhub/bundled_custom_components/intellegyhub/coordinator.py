@@ -10,7 +10,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
 from .api import IntellegyHubApiClient
-from .const import CARRIER_OUTPUTS, DOMAIN, OUTPUTS
+from .const import BUTTONS, CARRIER_OUTPUTS, DOMAIN, OUTPUTS
 from .xport_entities import XPORT_ENTITY_KINDS, xport_desired_unique_ids, xport_platform_value
 
 LOGGER = logging.getLogger(__name__)
@@ -25,6 +25,7 @@ class IntellegyHubGpioManager:
         self.led_on = False
         self.outputs = {output_id: False for output_id in OUTPUTS}
         self.carrier_outputs = {output_id: False for output_id in CARRIER_OUTPUTS}
+        self.buttons = {button_id: False for button_id in BUTTONS}
         self.button_pressed = False
         self.carrier: dict = {}
         self.buzzer: dict = {"volume_percent": 50}
@@ -207,7 +208,8 @@ class IntellegyHubGpioManager:
         payload = await self.client.state()
         self.outputs = self._outputs_from_payload(payload)
         self.led_on = self.outputs["user_led"]
-        self.button_pressed = payload["button"]["pressed"]
+        self.buttons = self._buttons_from_payload(payload)
+        self.button_pressed = self.buttons["fn2"]
         self.carrier = payload.get("carrier", {})
         self.carrier_outputs = self._carrier_outputs_from_payload(self.carrier)
         self.buzzer = payload.get("buzzer", self.buzzer)
@@ -271,7 +273,8 @@ class IntellegyHubGpioManager:
         if event_type == "state":
             self.outputs = self._outputs_from_payload(event)
             self.led_on = self.outputs["user_led"]
-            self.button_pressed = bool(event["button"]["pressed"])
+            self.buttons = self._buttons_from_payload(event)
+            self.button_pressed = self.buttons["fn2"]
             self.carrier = event.get("carrier", self.carrier)
             self.carrier_outputs = self._carrier_outputs_from_payload(self.carrier)
             self.buzzer = event.get("buzzer", self.buzzer)
@@ -292,7 +295,12 @@ class IntellegyHubGpioManager:
             else:
                 return
         elif event_type == "button_changed" and isinstance(event.get("pressed"), bool):
-            self.button_pressed = event["pressed"]
+            button_id = event.get("id", "fn2")
+            if button_id in BUTTONS:
+                self.buttons[button_id] = event["pressed"]
+                self.button_pressed = self.buttons["fn2"]
+            else:
+                return
         elif event_type == "xport_channel_changed":
             self._apply_xport_channel(event.get("channel"))
             self._remove_stale_xport_registry_entries()
@@ -339,6 +347,19 @@ class IntellegyHubGpioManager:
                     result[output_id] = item["on"]
         elif isinstance(payload.get("led", {}).get("on"), bool):
             result["user_led"] = payload["led"]["on"]
+        return result
+
+    @staticmethod
+    def _buttons_from_payload(payload: dict) -> dict[str, bool]:
+        result = {button_id: False for button_id in BUTTONS}
+        buttons = payload.get("buttons")
+        if isinstance(buttons, dict):
+            for button_id in BUTTONS:
+                item = buttons.get(button_id)
+                if isinstance(item, dict) and isinstance(item.get("pressed"), bool):
+                    result[button_id] = item["pressed"]
+        elif isinstance(payload.get("button", {}).get("pressed"), bool):
+            result["fn2"] = payload["button"]["pressed"]
         return result
 
     @staticmethod

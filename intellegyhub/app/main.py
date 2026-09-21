@@ -113,7 +113,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.88 chip=%s led=%s active_low=%s button=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
+                "Starting v0.5.92 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -148,7 +148,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.88", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.92", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 
@@ -424,8 +424,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .relay-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .state-text { min-width: 30px; text-align: right; color: var(--ha-secondary); font-size: 12px; font-weight: 800; letter-spacing: .04em; }
     .state-text.on { color: #8be9fd; }
-    .carrier-io-grid { display: grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 16px; margin-top: 18px; }
-    .carrier-io-card { border: 1px solid var(--ha-card-border); border-radius: 12px; background: #202020; padding: 18px; min-width: 0; }
+    .carrier-io-grid { display: grid; grid-template-columns: repeat(4, minmax(180px, 1fr)); gap: 16px; margin-top: 18px; }
+    .carrier-io-card { border: 1px solid var(--ha-card-border); border-radius: 12px; background: #202020; padding: 16px; min-width: 0; }
     .carrier-io-title { font-size: 17px; font-weight: 800; margin-bottom: 14px; }
     .carrier-io-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; min-height: 42px; border: 1px solid #333; border-radius: 8px; padding: 8px 10px; background: #1b1b1b; }
     .carrier-io-row + .carrier-io-row { margin-top: 10px; }
@@ -455,10 +455,34 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .buzzer-status { margin-top: 14px; color: var(--ha-secondary); font-size: 13px; overflow-wrap: anywhere; max-width: 980px; }
     .buzzer-detail-line { color: var(--ha-secondary); font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; }
     .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
-    button { border: 1px solid #4a4a4a; background: #202020; color: inherit; border-radius: 8px; min-height: 38px; padding: 8px 12px; cursor: pointer; font-weight: 600; }
-    button:hover { background: #2a2a2a; }
-    button:disabled { cursor: default; }
-    button:disabled:hover { background: inherit; }
+    button:not(.toggle):not(.mode-trigger):not(.mode-option) {
+      border: 1px solid var(--ha-primary);
+      background: transparent;
+      color: var(--ha-primary);
+      border-radius: 8px;
+      min-height: 38px;
+      padding: 8px 14px;
+      cursor: pointer;
+      font-weight: 700;
+      transition: background .15s ease, border-color .15s ease, color .15s ease;
+    }
+    button:not(.toggle):not(.mode-trigger):not(.mode-option):hover,
+    button:not(.toggle):not(.mode-trigger):not(.mode-option):focus-visible {
+      border-color: #4fc3f7;
+      background: rgba(3, 169, 244, .14);
+      color: #b3e5fc;
+      outline: none;
+    }
+    button:not(.toggle):not(.mode-trigger):not(.mode-option):disabled {
+      border-color: #4a4a4a;
+      color: var(--ha-secondary);
+      cursor: default;
+      opacity: .7;
+    }
+    button:not(.toggle):not(.mode-trigger):not(.mode-option):disabled:hover {
+      background: transparent;
+      color: var(--ha-secondary);
+    }
     pre { display: none; min-height: 180px; max-height: 360px; overflow: auto; border: 1px solid var(--ha-card-border); border-radius: 8px; padding: 14px; background: #0b0b0b; color: var(--ha-text); font-size: 13px; }
     pre.visible { display: block; }
     @media (max-width: 1300px) { .relay-grid { grid-template-columns: repeat(4, minmax(140px, 1fr)); } }
@@ -908,6 +932,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         outputs: ['usb12_reset', 'usb3_reset', 'usb4_reset', 'usb_hub_reset']
       }
     ];
+    const hostOutputOrder = ['ste', 'err', 'net', 'user_led'];
+    const hostButtonOrder = ['fn1', 'fn2'];
     function carrierOutputsById(carrier) {
       const result = {};
       for (const output of (carrier && carrier.outputs) || []) {
@@ -919,20 +945,35 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       const output = document.getElementById('output');
       output.classList.remove('visible');
       try {
-        const payload = await requestJson('api/v1/carrier');
-        paintCarrierIO(payload);
+        const payload = await requestJson('api/v1/state');
+        paintCarrierIO(payload.carrier, payload.outputs || {}, payload.buttons || {});
       } catch (error) {
         document.getElementById('carrier-io-status').textContent = 'CARRIER: Error';
         output.textContent = JSON.stringify(error, null, 2);
         output.classList.add('visible');
       }
     }
-    function paintCarrierIO(carrier) {
+    function paintCarrierIO(carrier, hostOutputs = {}, hostButtons = {}) {
       const online = Boolean(carrier && carrier.available);
       document.getElementById('carrier-io-status').textContent = online ? 'CARRIER: online' : 'CARRIER: offline';
       const byId = carrierOutputsById(carrier);
       const root = document.getElementById('carrier-io');
       root.innerHTML = '';
+      const hostCard = document.createElement('article');
+      hostCard.className = 'carrier-io-card';
+      const hostTitle = document.createElement('div');
+      hostTitle.className = 'carrier-io-title';
+      hostTitle.textContent = 'Host GPIO';
+      hostCard.appendChild(hostTitle);
+      for (const outputId of hostOutputOrder) {
+        const item = hostOutputs[outputId] || { id: outputId, name: outputId, on: false };
+        hostCard.appendChild(hostOutputRow(item));
+      }
+      for (const buttonId of hostButtonOrder) {
+        const item = hostButtons[buttonId] || { id: buttonId, name: buttonId.toUpperCase(), pressed: false };
+        hostCard.appendChild(hostButtonRow(item));
+      }
+      root.appendChild(hostCard);
       for (const group of carrierGroups) {
         const card = document.createElement('article');
         card.className = 'carrier-io-card';
@@ -959,6 +1000,53 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           card.appendChild(row);
         }
         root.appendChild(card);
+      }
+    }
+    function hostOutputRow(item) {
+      const row = document.createElement('div');
+      row.className = 'carrier-io-row';
+      const label = document.createElement('span');
+      label.textContent = item.name;
+      const state = document.createElement('span');
+      state.className = `state-text ${item.on ? 'on' : ''}`;
+      state.textContent = item.on ? 'ON' : 'OFF';
+      const toggle = document.createElement('button');
+      toggle.className = `toggle ${item.on ? 'on' : ''}`;
+      toggle.type = 'button';
+      toggle.innerHTML = `<span>${item.on ? 'ON' : 'OFF'}</span>`;
+      toggle.onclick = () => setHostOutput(item.id, !item.on);
+      row.append(label, state, toggle);
+      return row;
+    }
+    function hostButtonRow(item) {
+      const row = document.createElement('div');
+      row.className = 'carrier-io-row';
+      const label = document.createElement('span');
+      label.textContent = item.name;
+      const state = document.createElement('span');
+      state.className = `state-text ${item.pressed ? 'on' : ''}`;
+      state.textContent = item.pressed ? 'PRESSED' : 'OPEN';
+      const indicator = document.createElement('button');
+      indicator.className = `toggle readonly ${item.pressed ? 'on' : ''}`;
+      indicator.type = 'button';
+      indicator.disabled = true;
+      indicator.innerHTML = `<span>${item.pressed ? 'ON' : 'OFF'}</span>`;
+      row.append(label, state, indicator);
+      return row;
+    }
+    async function setHostOutput(outputId, on) {
+      const output = document.getElementById('output');
+      output.classList.remove('visible');
+      try {
+        await requestJson(`api/v1/outputs/${outputId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ on })
+        });
+        await renderCarrierIO();
+      } catch (error) {
+        output.textContent = JSON.stringify(error, null, 2);
+        output.classList.add('visible');
       }
     }
     async function setCarrierOutput(outputId, on) {
@@ -1242,16 +1330,18 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         const message = JSON.parse(event.data);
         if (message.type === 'state') {
           paintCarrier(message.carrier);
-          paintCarrierIO(message.carrier);
+          paintCarrierIO(message.carrier, message.outputs || {}, message.buttons || {});
           paintXPort(message.xport);
           paintExtensions(message.extensions);
           paintOneWire(message.onewire);
         } else if (message.type === 'carrier_changed') {
           paintCarrier(message.carrier);
-          paintCarrierIO(message.carrier);
+          renderCarrierIO();
         } else if (message.type === 'carrier_output_changed') {
           paintCarrier(message.carrier);
-          paintCarrierIO(message.carrier);
+          renderCarrierIO();
+        } else if (message.type === 'output_changed' || message.type === 'button_changed') {
+          renderCarrierIO();
         } else if (message.type === 'xport_changed') {
           paintXPort(message.xport);
         } else if (message.type === 'xport_channel_changed') {

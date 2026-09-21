@@ -13,6 +13,9 @@ FIXED_OUTPUT_GPIOS = {
     "err_gpio": 20,
     "net_gpio": 21,
 }
+FIXED_INPUT_GPIOS = {
+    "fn1_gpio": 27,
+}
 
 
 @dataclass(frozen=True)
@@ -72,7 +75,12 @@ def load_config(path: Path | None = None) -> AppConfig:
 
 
 def validate_config(config: AppConfig) -> None:
-    gpio_values = {"led_gpio": config.led_gpio, "button_gpio": config.button_gpio, **FIXED_OUTPUT_GPIOS}
+    gpio_values = {
+        "led_gpio": config.led_gpio,
+        "button_gpio": config.button_gpio,
+        **FIXED_OUTPUT_GPIOS,
+        **FIXED_INPUT_GPIOS,
+    }
     for name, value in gpio_values.items():
         if not 0 <= value <= 53:
             raise ValueError(f"{name} must be between 0 and 53")

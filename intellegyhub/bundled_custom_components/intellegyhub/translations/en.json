@@ -19,7 +19,7 @@
   "entity": {
     "switch": {
       "led": {
-        "name": "USR"
+        "name": "USR LED"
       },
       "host_output": {
         "name": "Output"
@@ -36,7 +36,7 @@
     },
     "binary_sensor": {
       "button": {
-        "name": "User Defined Button"
+        "name": "Function Button"
       },
       "carrier_fault": {
         "name": "Fault"

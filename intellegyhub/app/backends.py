@@ -11,12 +11,16 @@ from typing import Any
 
 from .config import AppConfig
 
-ButtonCallback = Callable[[bool], Awaitable[None]]
+ButtonCallback = Callable[[str, bool], Awaitable[None]]
 OUTPUTS = {
-    "user_led": {"name": "USR", "gpio": 22, "active_low": False},
-    "ste": {"name": "STE", "gpio": 19, "active_low": False},
-    "err": {"name": "ERR", "gpio": 20, "active_low": False},
-    "net": {"name": "NET", "gpio": 21, "active_low": False},
+    "ste": {"name": "STE LED", "gpio": 19, "active_low": False},
+    "err": {"name": "ERR LED", "gpio": 20, "active_low": False},
+    "net": {"name": "NET LED", "gpio": 21, "active_low": False},
+    "user_led": {"name": "USR LED", "gpio": 22, "active_low": False},
+}
+BUTTONS = {
+    "fn1": {"name": "FN1", "gpio": 27, "active_low": True},
+    "fn2": {"name": "FN2", "gpio": 26, "active_low": True},
 }
 
 
@@ -25,10 +29,14 @@ class HardwareState:
     led_on: bool = False
     button_pressed: bool = False
     outputs: dict[str, bool] | None = None
+    buttons: dict[str, bool] | None = None
 
     def __post_init__(self) -> None:
         if self.outputs is None:
             self.outputs = {output_id: False for output_id in OUTPUTS}
+        if self.buttons is None:
+            self.buttons = {button_id: False for button_id in BUTTONS}
+        self.button_pressed = bool(self.buttons.get("fn2", self.button_pressed))
 
 
 class HardwareBackend(ABC):
@@ -45,6 +53,9 @@ class HardwareBackend(ABC):
     async def read_button(self) -> bool: ...
 
     @abstractmethod
+    async def read_buttons(self) -> dict[str, bool]: ...
+
+    @abstractmethod
     async def stop(self) -> None: ...
 
 
@@ -52,6 +63,7 @@ class MockGpioBackend(HardwareBackend):
     def __init__(self) -> None:
         self.led_on = False
         self.outputs = {output_id: False for output_id in OUTPUTS}
+        self.buttons = {button_id: False for button_id in BUTTONS}
         self.button_pressed = False
         self._callback: ButtonCallback | None = None
 
@@ -59,7 +71,14 @@ class MockGpioBackend(HardwareBackend):
         self._callback = on_button_changed
         self.led_on = False
         self.outputs = {output_id: False for output_id in OUTPUTS}
-        return HardwareState(led_on=False, button_pressed=self.button_pressed, outputs=dict(self.outputs))
+        self.buttons = {button_id: False for button_id in BUTTONS}
+        self.button_pressed = self.buttons["fn2"]
+        return HardwareState(
+            led_on=False,
+            button_pressed=self.button_pressed,
+            outputs=dict(self.outputs),
+            buttons=dict(self.buttons),
+        )
 
     async def set_led(self, on: bool) -> bool:
         return await self.set_output("user_led", on)
@@ -72,16 +91,23 @@ class MockGpioBackend(HardwareBackend):
         return self.outputs[output_id]
 
     async def read_button(self) -> bool:
-        return self.button_pressed
+        return self.buttons["fn2"]
 
-    async def simulate_button(self, pressed: bool) -> None:
-        self.button_pressed = pressed
+    async def read_buttons(self) -> dict[str, bool]:
+        return dict(self.buttons)
+
+    async def simulate_button(self, pressed: bool, button_id: str = "fn2") -> None:
+        if button_id not in BUTTONS:
+            raise ValueError(f"Unknown button: {button_id}")
+        self.buttons[button_id] = pressed
+        self.button_pressed = self.buttons["fn2"]
         if self._callback:
-            await self._callback(pressed)
+            await self._callback(button_id, pressed)
 
     async def stop(self) -> None:
         self.led_on = False
         self.outputs = {output_id: False for output_id in OUTPUTS}
+        self.buttons = {button_id: False for button_id in BUTTONS}
 
 
 class RealGpiodBackend(HardwareBackend):
@@ -105,10 +131,11 @@ class RealGpiodBackend(HardwareBackend):
         outputs = {}
         for output_id in OUTPUTS:
             outputs[output_id] = await self.set_output(output_id, False)
-        pressed = await self.read_button()
+        buttons = await self.read_buttons()
+        pressed = buttons["fn2"]
         self._thread = threading.Thread(target=self._watch_edges, name="intellegy-gpio-edge", daemon=True)
         self._thread.start()
-        return HardwareState(led_on=outputs["user_led"], button_pressed=pressed, outputs=outputs)
+        return HardwareState(led_on=outputs["user_led"], button_pressed=pressed, outputs=outputs, buttons=buttons)
 
     def _open_lines(self) -> None:
         import gpiod
@@ -134,15 +161,17 @@ class RealGpiodBackend(HardwareBackend):
             consumer="intellegyhub-gpio-outputs",
             config=output_config,
         )
-        self._button_request = self._chip.request_lines(
-            consumer="intellegyhub-gpio-button",
-            config={
-                self.config.button_gpio: settings_cls(
+        button_config = {}
+        for button_id, definition in BUTTONS.items():
+            gpio = self.config.button_gpio if button_id == "fn2" else int(definition["gpio"])
+            button_config[gpio] = settings_cls(
                     direction=direction.INPUT,
                     edge_detection=edge.BOTH,
                     bias=bias_map[self.config.button_bias],
                 )
-            },
+        self._button_request = self._chip.request_lines(
+            consumer="intellegyhub-gpio-buttons",
+            config=button_config,
         )
 
     def _physical_output_value(self, output_id: str, logical_on: bool) -> Any:
@@ -153,11 +182,12 @@ class RealGpiodBackend(HardwareBackend):
         electrical = not logical_on if active_low else logical_on
         return gpiod.line.Value.ACTIVE if electrical else gpiod.line.Value.INACTIVE
 
-    def _logical_pressed_from_value(self, value: Any) -> bool:
+    def _logical_pressed_from_value(self, button_id: str, value: Any) -> bool:
         import gpiod
 
         electrical_active = value == gpiod.line.Value.ACTIVE
-        return not electrical_active if self.config.button_active_low else electrical_active
+        active_low = self.config.button_active_low if button_id == "fn2" else bool(BUTTONS[button_id]["active_low"])
+        return not electrical_active if active_low else electrical_active
 
     async def set_led(self, on: bool) -> bool:
         return await self.set_output("user_led", on)
@@ -172,25 +202,37 @@ class RealGpiodBackend(HardwareBackend):
         return on
 
     async def read_button(self) -> bool:
+        return (await self.read_buttons())["fn2"]
+
+    async def read_buttons(self) -> dict[str, bool]:
         if self._button_request is None:
             raise RuntimeError("Button line is not initialized")
-        value = await asyncio.to_thread(self._button_request.get_value, self.config.button_gpio)
-        return self._logical_pressed_from_value(value)
+        result = {}
+        for button_id, definition in BUTTONS.items():
+            gpio = self.config.button_gpio if button_id == "fn2" else int(definition["gpio"])
+            value = await asyncio.to_thread(self._button_request.get_value, gpio)
+            result[button_id] = self._logical_pressed_from_value(button_id, value)
+        return result
 
     def _watch_edges(self) -> None:
         while not self._stop.is_set():
             try:
                 if not self._button_request.wait_edge_events(timeout=0.2):
                     continue
-                self._button_request.read_edge_events()
+                events = self._button_request.read_edge_events()
                 time.sleep(self.config.button_debounce_ms / 1000)
-                pressed = self._logical_pressed_from_value(self._button_request.get_value(self.config.button_gpio))
                 now = time.monotonic()
                 if now - self._last_emit < self.config.button_debounce_ms / 1000:
                     continue
                 self._last_emit = now
-                if self._loop and self._callback:
-                    asyncio.run_coroutine_threadsafe(self._callback(pressed), self._loop)
+                changed_offsets = {_event_line_offset(event) for event in events}
+                for button_id, definition in BUTTONS.items():
+                    gpio = self.config.button_gpio if button_id == "fn2" else int(definition["gpio"])
+                    if gpio not in changed_offsets:
+                        continue
+                    pressed = self._logical_pressed_from_value(button_id, self._button_request.get_value(gpio))
+                    if self._loop and self._callback:
+                        asyncio.run_coroutine_threadsafe(self._callback(button_id, pressed), self._loop)
             except Exception:
                 time.sleep(1)
 
@@ -209,3 +251,8 @@ class RealGpiodBackend(HardwareBackend):
             self._button_request.release()
         if self._chip:
             self._chip.close()
+
+
+def _event_line_offset(event: Any) -> int | None:
+    line_offset = getattr(event, "line_offset", None)
+    return line_offset() if callable(line_offset) else line_offset
