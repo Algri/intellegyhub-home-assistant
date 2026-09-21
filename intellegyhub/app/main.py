@@ -113,7 +113,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.95 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
+                "Starting v0.5.96 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -148,7 +148,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.95", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.96", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 
@@ -518,7 +518,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           <dt>Hardware</dt>
           <dd id="carrier-identity-hardware">1.4 Rev.A</dd>
           <dt>Software</dt>
-          <dd id="carrier-identity-software">0.5.95</dd>
+          <dd id="carrier-identity-software">0.5.96</dd>
         </dl>
         <div class="overview-divider"></div>
         <dl class="overview-health">
@@ -676,13 +676,12 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       <div class="toolbar">
         <button onclick="callApi('health')">Health</button>
         <button onclick="callApi('api/v1/state')">State</button>
-        <button onclick="renderXPort()">X-Port</button>
-        <button onclick="renderExtensions()">Expansion</button>
-        <button onclick="renderOneWire()">1-Wire</button>
+        <button onclick="showXPortDiagnostics()">X-Port</button>
+        <button onclick="showExtensionDiagnostics()">Expansion</button>
+        <button onclick="showOneWireDiagnostics()">1-Wire</button>
         <button onclick="callApi('api/v1/diagnostics/devices')">Devices</button>
         <button onclick="callApi('api/v1/i2c/scan/1')">Scan I2C-1</button>
         <button onclick="callApi('api/v1/i2c/scan/10')">Scan I2C-10</button>
-        <button onclick="callApi('api/v1/i2c/scan/0')">Scan I2C-0</button>
       </div>
       <pre id="output" class="diagnostics-output">Ready.</pre>
     </section>
@@ -906,6 +905,45 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         output.textContent = JSON.stringify(error, null, 2);
       }
     }
+    async function showXPortDiagnostics() {
+      const output = document.getElementById('output');
+      output.classList.add('visible');
+      output.textContent = 'Loading api/v1/xport ...';
+      try {
+        const payload = await requestJson('api/v1/xport');
+        paintXPort(payload);
+        output.textContent = JSON.stringify(payload, null, 2);
+      } catch (error) {
+        document.getElementById('xport-status').textContent = 'X-PORT: Error';
+        output.textContent = JSON.stringify(error, null, 2);
+      }
+    }
+    async function showExtensionDiagnostics() {
+      const output = document.getElementById('output');
+      output.classList.add('visible');
+      output.textContent = 'Loading api/v1/extensions ...';
+      try {
+        const payload = await requestJson('api/v1/extensions');
+        paintExtensions(payload);
+        output.textContent = JSON.stringify(payload, null, 2);
+      } catch (error) {
+        document.getElementById('extension-status').textContent = 'X-BUS: Error';
+        output.textContent = JSON.stringify(error, null, 2);
+      }
+    }
+    async function showOneWireDiagnostics() {
+      const output = document.getElementById('output');
+      output.classList.add('visible');
+      output.textContent = 'Loading api/v1/onewire ...';
+      try {
+        const payload = await requestJson('api/v1/onewire');
+        paintOneWire(payload);
+        output.textContent = JSON.stringify(payload, null, 2);
+      } catch (error) {
+        document.getElementById('onewire-status').textContent = '1-WIRE: Error';
+        output.textContent = JSON.stringify(error, null, 2);
+      }
+    }
     function paintCarrier(carrier, appInfo = latestAppInfo) {
       latestAppInfo = appInfo || latestAppInfo;
       const status = document.getElementById('carrier-overview-status');
@@ -921,7 +959,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       document.getElementById('carrier-identity-model').textContent = identity.model || 'IntellegyHUB Controller';
       document.getElementById('carrier-identity-serial').textContent = identity.serial_number || 'IH1400-00001234';
       document.getElementById('carrier-identity-hardware').textContent = identity.hardware_revision || '1.4 Rev.A';
-      document.getElementById('carrier-identity-software').textContent = identity.software_version || '0.5.95';
+      document.getElementById('carrier-identity-software').textContent = identity.software_version || '0.5.96';
       document.getElementById('carrier-uptime').textContent = formatUptime(appInfo && appInfo.uptime_seconds);
       const monitoring = carrier && carrier.monitoring ? carrier.monitoring : {};
       const temperature = monitoring.temperature || {};

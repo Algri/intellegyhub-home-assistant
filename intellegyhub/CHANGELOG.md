@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.96
+
+- Remove the unused `Scan I2C-0` service tool button.
+- Make the X-Port, Expansion, and 1-Wire service tool buttons print their JSON diagnostics output while still refreshing their UI sections.
+
 ## 0.5.95
 
 - Keep the controller passport free of placeholder Network/IP data and compact the mobile title sizing.
