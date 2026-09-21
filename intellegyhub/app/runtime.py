@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from typing import Any
 
 from fastapi import WebSocket
@@ -40,6 +41,7 @@ class AppRuntime:
         self._startup_buzzer_enabled = startup_buzzer_enabled
         self._startup_buzzer_frequency = startup_buzzer_frequency
         self._startup_buzzer_duration_ms = startup_buzzer_duration_ms
+        self._started_at = time.monotonic()
 
     async def start(self) -> None:
         try:
@@ -118,6 +120,12 @@ class AppRuntime:
                 for button_id, definition in BUTTONS.items()
             },
             "carrier": self.carrier.snapshot(),
+            "app": {
+                "uptime_seconds": max(0, int(time.monotonic() - self._started_at)),
+                "network": {
+                    "interfaces": [],
+                },
+            },
             "xport": self.xport.snapshot(),
             "extensions": self.extensions.snapshot(),
             "onewire": self.onewire.snapshot(),

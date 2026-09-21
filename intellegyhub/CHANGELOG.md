@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.93
+
+- Rework only the left controller overview area into a controller passport with logo, serial placeholder, hardware/software, health, uptime, and network rows.
+
 ## 0.5.92
 
 - Keep X-Port mode dropdown styling separate from the global add-on action button style.

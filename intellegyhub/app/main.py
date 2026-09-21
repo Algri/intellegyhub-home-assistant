@@ -113,7 +113,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.92 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
+                "Starting v0.5.93 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -148,7 +148,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.92", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.93", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 
@@ -223,17 +223,25 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     main { width: min(100%, 1520px); margin: 0 auto; }
     .overview-panel { display: grid; grid-template-columns: minmax(320px, .9fr) minmax(520px, 1.5fr); gap: 0; margin-top: 0; margin-bottom: 18px; padding: 0; overflow: hidden; }
-    .overview-identity { display: flex; flex-direction: column; min-height: 270px; padding: 28px; border-right: 1px solid var(--ha-card-border); }
-    .overview-badge-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: auto; }
-    .overview-logo { display: grid; place-items: center; width: 52px; height: 52px; border: 1px solid #344152; border-radius: 50%; color: var(--ha-text); background: #151515; font-weight: 900; letter-spacing: 0; }
+    .overview-identity { display: flex; flex-direction: column; min-height: 270px; padding: 28px; border-right: 1px solid var(--ha-card-border); font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; }
+    .overview-badge-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 26px; }
+    .overview-logo { display: block; width: 46px; height: 46px; object-fit: contain; }
     .overview-status-pill { min-height: 30px; padding: 6px 12px; border-radius: 999px; border: 1px solid #36543e; color: #8ff0a4; background: rgba(0, 200, 83, .08); font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
     .overview-status-pill.offline { border-color: #5f3434; color: #ffb4ab; background: rgba(244, 67, 54, .10); }
-    .overview-title { margin-top: 26px; }
-    .overview-title h1 { font-size: 48px; line-height: .96; margin-bottom: 10px; font-weight: 800; }
-    .overview-divider { height: 1px; background: var(--ha-card-border); margin: 26px 0 16px; }
-    .overview-sync { display: flex; align-items: center; gap: 14px; color: var(--ha-secondary); font-size: 13px; flex-wrap: wrap; }
+    .overview-title h1 { font-size: 32px; line-height: 1; margin-bottom: 8px; font-weight: 800; }
+    .overview-title .subtitle { color: var(--ha-text); font-size: 13px; margin-bottom: 0; }
+    .overview-facts { display: grid; grid-template-columns: minmax(104px, .72fr) minmax(0, 1fr); gap: 7px 18px; margin-top: 18px; font-size: 12px; line-height: 1.35; }
+    .overview-facts dt { color: var(--ha-text); font-weight: 800; }
+    .overview-facts dd { margin: 0; color: var(--ha-text); font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+    .overview-divider { width: min(250px, 100%); height: 1px; background: var(--ha-card-border); margin: 28px 0 22px; }
+    .overview-health { display: grid; grid-template-columns: minmax(104px, .72fr) minmax(0, 1fr); gap: 7px 18px; font-size: 12px; line-height: 1.35; }
+    .overview-health dt { color: var(--ha-text); font-weight: 800; text-transform: uppercase; }
+    .overview-health dd { margin: 0; color: var(--ha-text); font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+    .overview-health-value { display: inline-flex; align-items: center; gap: 8px; }
     .overview-sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #448aff; }
-    .overview-sync-separator { color: #6f7782; }
+    .overview-sync-dot.online { background: #00e676; }
+    .overview-sync-dot.offline { background: #ff6b6b; }
+    .overview-network-list { display: grid; gap: 3px; }
     .overview-metrics { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); }
     .overview-metric { min-height: 135px; padding: 30px 24px; border-left: 0; border-top: 0; border-right: 1px solid var(--ha-card-border); border-bottom: 1px solid var(--ha-card-border); border-radius: 0; background: transparent; }
     .overview-metric:nth-child(2n) { border-right: 0; }
@@ -497,21 +505,34 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     <section class="extension-panel overview-panel">
       <div class="overview-identity">
         <div class="overview-badge-row">
-          <div class="overview-logo">IHC</div>
+          <img class="overview-logo" src="logo.png" alt="IntellegyHUB">
           <div id="carrier-overview-status" class="overview-status-pill">Loading</div>
         </div>
         <div class="overview-title">
           <div class="eyebrow">Controller Overview</div>
           <h1 id="carrier-identity-product">IHC-1400</h1>
-          <div id="carrier-identity-model" class="subtitle">Controller - 1.4 Rev.A</div>
+          <div id="carrier-identity-model" class="subtitle">IntellegyHUB Controller</div>
         </div>
+        <dl class="overview-facts">
+          <dt>Serial Number</dt>
+          <dd id="carrier-identity-serial">IH1400-00001234</dd>
+          <dt>Hardware</dt>
+          <dd id="carrier-identity-hardware">1.4 Rev.A</dd>
+          <dt>Software</dt>
+          <dd id="carrier-identity-software">0.5.93</dd>
+        </dl>
         <div class="overview-divider"></div>
-        <div class="overview-sync">
-          <span class="overview-sync-dot"></span>
-          <span id="carrier-sync-state">Controller online</span>
-          <span class="overview-sync-separator">/</span>
-          <span>I2C-10</span>
-        </div>
+        <dl class="overview-health">
+          <dt>System Health</dt>
+          <dd class="overview-health-value">
+            <span id="carrier-health-dot" class="overview-sync-dot"></span>
+            <span id="carrier-health-state">Loading</span>
+          </dd>
+          <dt>Uptime</dt>
+          <dd id="carrier-uptime">--</dd>
+          <dt>Network</dt>
+          <dd id="carrier-network" class="overview-network-list">Not available</dd>
+        </dl>
       </div>
       <div class="overview-metrics">
         <article class="overview-metric">
@@ -690,6 +711,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       'PulseCounterExternalVoltage',
       'PulseCounterInternalPullUp'
     ];
+    let latestAppInfo = { uptime_seconds: 0, network: { interfaces: [] } };
     function apiUrl(path) {
       const basePath = window.location.pathname.endsWith('/') ? window.location.pathname : window.location.pathname + '/';
       return new URL(path, window.location.origin + basePath);
@@ -887,15 +909,24 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         output.textContent = JSON.stringify(error, null, 2);
       }
     }
-    function paintCarrier(carrier) {
+    function paintCarrier(carrier, appInfo = latestAppInfo) {
+      latestAppInfo = appInfo || latestAppInfo;
       const status = document.getElementById('carrier-overview-status');
       const online = Boolean(carrier && carrier.available);
       status.textContent = online ? 'Online' : 'Offline';
       status.classList.toggle('offline', !online);
-      document.getElementById('carrier-sync-state').textContent = online ? 'Controller online' : 'Controller offline';
+      const healthDot = document.getElementById('carrier-health-dot');
+      healthDot.classList.toggle('online', online);
+      healthDot.classList.toggle('offline', !online);
+      document.getElementById('carrier-health-state').textContent = online ? 'Normal' : 'Offline';
       const identity = carrier && carrier.identity ? carrier.identity : {};
       document.getElementById('carrier-identity-product').textContent = identity.product || 'IHC-1400';
-      document.getElementById('carrier-identity-model').textContent = `${identity.model || 'Controller'} - ${identity.hardware_revision || '1.4 Rev.A'}`;
+      document.getElementById('carrier-identity-model').textContent = identity.model || 'IntellegyHUB Controller';
+      document.getElementById('carrier-identity-serial').textContent = identity.serial_number || 'IH1400-00001234';
+      document.getElementById('carrier-identity-hardware').textContent = identity.hardware_revision || '1.4 Rev.A';
+      document.getElementById('carrier-identity-software').textContent = identity.software_version || '0.5.93';
+      document.getElementById('carrier-uptime').textContent = formatUptime(appInfo && appInfo.uptime_seconds);
+      paintNetwork(appInfo && appInfo.network ? appInfo.network.interfaces : []);
       const monitoring = carrier && carrier.monitoring ? carrier.monitoring : {};
       const temperature = monitoring.temperature || {};
       const rails = {};
@@ -906,6 +937,30 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       paintMetric('5v', rails['5v'], 2);
       paintMetric('3v3', rails['3v3'], 2);
       paintMetric('vin', rails.vin, 2);
+    }
+    function formatUptime(seconds) {
+      const total = Math.max(0, Number(seconds || 0));
+      const days = Math.floor(total / 86400);
+      const hours = Math.floor((total % 86400) / 3600);
+      const minutes = Math.floor((total % 3600) / 60);
+      if (days > 0) return `${days}d ${String(hours).padStart(2, '0')}h ${String(minutes).padStart(2, '0')}m`;
+      if (hours > 0) return `${hours}h ${String(minutes).padStart(2, '0')}m`;
+      return `${minutes}m`;
+    }
+    function paintNetwork(interfaces) {
+      const root = document.getElementById('carrier-network');
+      const items = Array.isArray(interfaces) ? interfaces : [];
+      if (items.length === 0) {
+        root.textContent = 'Not available';
+        return;
+      }
+      root.textContent = '';
+      for (const item of items) {
+        const line = document.createElement('span');
+        const label = item.label || item.type || 'Network';
+        line.textContent = item.address ? `${label} - ${item.address}` : label;
+        root.appendChild(line);
+      }
     }
     function paintMetric(elementId, metric, precision) {
       const value = document.getElementById(`metric-${elementId}`);
@@ -1329,7 +1384,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       socket.onmessage = (event) => {
         const message = JSON.parse(event.data);
         if (message.type === 'state') {
-          paintCarrier(message.carrier);
+          paintCarrier(message.carrier, message.app);
           paintCarrierIO(message.carrier, message.outputs || {}, message.buttons || {});
           paintXPort(message.xport);
           paintExtensions(message.extensions);
@@ -1470,6 +1525,10 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     @app.get("/favicon.ico", include_in_schema=False)
     async def favicon() -> FileResponse:
         return FileResponse(Path(__file__).resolve().parents[1] / "icon.png")
+
+    @app.get("/logo.png", include_in_schema=False)
+    async def logo() -> FileResponse:
+        return FileResponse(Path(__file__).resolve().parents[1] / "logo.png")
 
     @app.get("/api/v1/state")
     async def get_state() -> dict:
