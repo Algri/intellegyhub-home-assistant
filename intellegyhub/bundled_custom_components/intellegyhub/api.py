@@ -86,6 +86,19 @@ class IntellegyHubApiClient:
                 raise IntellegyHubApiError(f"X-Port counter reset failed with HTTP {response.status}")
             return await response.json()
 
+    async def set_buzzer_volume(self, volume_percent: int) -> dict[str, Any]:
+        async with self.session.put(
+            urljoin(self.base_url, "api/v1/buzzer/volume"),
+            json={"volume_percent": volume_percent},
+            timeout=10,
+        ) as response:
+            if response.status != 200:
+                raise IntellegyHubApiError(f"Buzzer volume command failed with HTTP {response.status}")
+            payload = await response.json()
+        if not isinstance(payload.get("volume_percent"), int):
+            raise IntellegyHubApiError("Invalid buzzer volume response")
+        return payload
+
     async def set_extension_power(self, on: bool) -> dict[str, Any]:
         async with self.session.put(
             urljoin(self.base_url, "api/v1/extensions/power"),
@@ -184,3 +197,5 @@ class IntellegyHubApiClient:
             raise IntellegyHubApiError("Invalid 1-Wire state payload")
         if "carrier" in payload and not isinstance(payload["carrier"], dict):
             raise IntellegyHubApiError("Invalid carrier state payload")
+        if "buzzer" in payload and not isinstance(payload["buzzer"], dict):
+            raise IntellegyHubApiError("Invalid buzzer state payload")

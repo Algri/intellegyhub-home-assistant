@@ -60,7 +60,12 @@ class OneWireBridgeEnabledPayload(BaseModel):
 class BuzzerTestPayload(BaseModel):
     frequency: int = 2000
     duration_ms: int = 300
-    duty: float = 0.5
+    duty: float | None = None
+    volume_percent: int | None = None
+
+
+class BuzzerVolumePayload(BaseModel):
+    volume_percent: int
 
 
 def collect_device_diagnostics() -> dict[str, list[str]]:
@@ -102,7 +107,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.77 chip=%s led=%s active_low=%s button=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
+                "Starting v0.5.82 chip=%s led=%s active_low=%s button=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -137,7 +142,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.77", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.82", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 
@@ -413,9 +418,21 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .relay-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .state-text { min-width: 30px; text-align: right; color: var(--ha-secondary); font-size: 12px; font-weight: 800; letter-spacing: .04em; }
     .state-text.on { color: #8be9fd; }
-    .buzzer-grid { display: grid; grid-template-columns: repeat(3, minmax(150px, 205px)) minmax(170px, 205px) minmax(130px, 205px); gap: 14px; margin-top: 16px; align-items: end; }
+    .buzzer-grid {
+      display: grid;
+      grid-template-columns: 220px 220px minmax(300px, 460px) 170px 130px;
+      gap: 14px;
+      margin-top: 18px;
+      align-items: end;
+      min-width: 0;
+      max-width: 1240px;
+    }
     .buzzer-field input { width: 100%; height: 38px; border: 1px solid #4a4a4a; border-radius: 8px; background: var(--ha-field); color: var(--ha-text); padding: 0 10px; font-weight: 600; }
-    .buzzer-grid button { width: 100%; height: 44px; }
+    .buzzer-volume-field { min-width: 0; margin-bottom: 0; }
+    .buzzer-volume-head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 8px; font-size: 13px; font-weight: 700; }
+    .buzzer-volume-head strong { color: #ffffff; }
+    .buzzer-volume-field input { height: 38px; margin: 0; }
+    .buzzer-grid button { width: 100%; height: 38px; }
     .buzzer-status { margin-top: 14px; color: var(--ha-secondary); font-size: 13px; overflow-wrap: anywhere; max-width: 980px; }
     .buzzer-detail-line { color: var(--ha-secondary); font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; }
     .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
@@ -428,8 +445,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     @media (max-width: 1300px) { .relay-grid { grid-template-columns: repeat(4, minmax(140px, 1fr)); } }
     @media (max-width: 1300px) { .overview-panel { grid-template-columns: 1fr; } .overview-identity { border-right: 0; border-bottom: 1px solid var(--ha-card-border); min-height: 240px; } }
     @media (max-width: 1100px) { .ports { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .relay-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); } }
-    @media (max-width: 1100px) { .buzzer-grid { grid-template-columns: repeat(3, minmax(120px, 1fr)); } }
-    @media (max-width: 620px) { body { padding: 10px; } .overview-identity { min-height: 220px; padding: 22px 18px; } .overview-title h1 { font-size: 38px; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+2) { border-right: 0; border-bottom: 1px solid var(--ha-card-border); } .overview-metric:last-child { border-bottom: 0; } .xport-panel { padding: 18px 14px; border-radius: 12px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .ports, .relay-grid { grid-template-columns: 1fr; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 1300px) { .buzzer-grid { grid-template-columns: repeat(2, minmax(180px, 220px)) minmax(280px, 1fr); } .buzzer-grid button { max-width: 220px; } }
+    @media (max-width: 620px) { body { padding: 10px; } .overview-identity { min-height: 220px; padding: 22px 18px; } .overview-title h1 { font-size: 38px; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+2) { border-right: 0; border-bottom: 1px solid var(--ha-card-border); } .overview-metric:last-child { border-bottom: 0; } .xport-panel { padding: 18px 14px; border-radius: 12px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .ports, .relay-grid, .buzzer-grid { grid-template-columns: 1fr; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-grid button { max-width: none; } }
   </style>
 </head>
 <body>
@@ -542,7 +559,10 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       <div class="buzzer-grid">
         <label class="buzzer-field">Frequency Hz<input id="buzzer-frequency" type="number" min="20" max="20000" value="2000"></label>
         <label class="buzzer-field">Duration ms<input id="buzzer-duration" type="number" min="10" max="5000" value="300"></label>
-        <label class="buzzer-field">Duty<input id="buzzer-duty" type="number" min="0.05" max="0.95" step="0.05" value="0.5"></label>
+        <label class="buzzer-volume-field">
+          <span class="buzzer-volume-head"><span>Volume</span><strong id="buzzer-volume-value">50%</strong></span>
+          <input id="buzzer-volume" type="range" min="0" max="100" step="1" value="50" oninput="updateBuzzerVolumeLabel()">
+        </label>
         <button onclick="testBuzzer('test-pwm')">Test PWM</button>
         <button onclick="stopBuzzer()">Stop</button>
       </div>
@@ -1101,6 +1121,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           renderOneWire();
         } else if (message.type === 'onewire_power_changed') {
           renderOneWire();
+        } else if (message.type === 'buzzer_changed') {
+          paintBuzzer(message.buzzer);
         }
       };
       socket.onopen = () => console.info('IntellegyHUB WebSocket connected', url.href);
@@ -1111,22 +1133,34 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       };
     }
     function buzzerPayload() {
+      const volume = Number(document.getElementById('buzzer-volume').value);
       return {
         frequency: Number(document.getElementById('buzzer-frequency').value),
         duration_ms: Number(document.getElementById('buzzer-duration').value),
-        duty: Number(document.getElementById('buzzer-duty').value)
+        volume_percent: volume
       };
+    }
+    function updateBuzzerVolumeLabel() {
+      const value = Number(document.getElementById('buzzer-volume').value);
+      document.getElementById('buzzer-volume-value').textContent = `${value}%`;
     }
     async function renderBuzzerStatus() {
       try {
         const payload = await requestJson('api/v1/buzzer/status');
-        const state = payload.active && payload.active.running ? `running ${payload.active.backend}` : 'stopped';
-        document.getElementById('buzzer-status').textContent = `BUZZER: ${state}`;
+        paintBuzzer(payload);
         document.getElementById('buzzer-detail').textContent = `pigpio: ${payload.pigpio.connected ? 'connected' : 'offline'} · pwmchip: ${payload.pwm.available ? 'available' : 'missing'} · gpio18: ${payload.gpio.available ? 'available' : 'missing'}`;
       } catch (error) {
         document.getElementById('buzzer-status').textContent = 'BUZZER: Error';
         document.getElementById('buzzer-detail').textContent = JSON.stringify(error);
       }
+    }
+    function paintBuzzer(payload) {
+      if (!payload) return;
+      const volume = Number(payload.volume_percent ?? 50);
+      document.getElementById('buzzer-volume').value = volume;
+      updateBuzzerVolumeLabel();
+      const state = payload.active && payload.active.running ? `running ${payload.active.backend}` : 'stopped';
+      document.getElementById('buzzer-status').textContent = `BUZZER: ${state}`;
     }
     async function testBuzzer(kind) {
       const detail = document.getElementById('buzzer-detail');
@@ -1156,6 +1190,20 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         document.getElementById('buzzer-detail').textContent = JSON.stringify(error);
       }
     }
+    document.getElementById('buzzer-volume').addEventListener('change', async () => {
+      const volume = Number(document.getElementById('buzzer-volume').value);
+      updateBuzzerVolumeLabel();
+      try {
+        await requestJson('api/v1/buzzer/volume', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ volume_percent: volume })
+        });
+      } catch (error) {
+        document.getElementById('buzzer-status').textContent = 'BUZZER: volume failed';
+        document.getElementById('buzzer-detail').textContent = JSON.stringify(error);
+      }
+    });
     document.addEventListener('click', (event) => {
       if (!event.target.closest('.mode-select')) {
         document.querySelectorAll('.mode-select.open').forEach((item) => item.classList.remove('open'));
@@ -1269,10 +1317,25 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     async def get_buzzer_status() -> dict:
         return runtime_or_503().buzzer.status()
 
+    @app.put("/api/v1/buzzer/volume")
+    async def put_buzzer_volume(payload: BuzzerVolumePayload) -> dict:
+        try:
+            return await runtime_or_503().set_buzzer_volume(payload.volume_percent)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     @app.post("/api/v1/buzzer/test-pwm")
     async def post_buzzer_test_pwm(payload: BuzzerTestPayload) -> dict:
         try:
-            return await runtime_or_503().buzzer.test_pwm(payload.frequency, payload.duration_ms, payload.duty)
+            current = runtime_or_503()
+            result = await current.buzzer.test_pwm(
+                payload.frequency,
+                payload.duration_ms,
+                payload.duty,
+                payload.volume_percent,
+            )
+            await current.broadcast({"type": "buzzer_changed", "buzzer": current.buzzer.status()})
+            return result
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except OSError as exc:
@@ -1283,7 +1346,15 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     @app.post("/api/v1/buzzer/test-gpio")
     async def post_buzzer_test_gpio(payload: BuzzerTestPayload) -> dict:
         try:
-            return await runtime_or_503().buzzer.test_gpio(payload.frequency, payload.duration_ms, payload.duty)
+            current = runtime_or_503()
+            result = await current.buzzer.test_gpio(
+                payload.frequency,
+                payload.duration_ms,
+                payload.duty,
+                payload.volume_percent,
+            )
+            await current.broadcast({"type": "buzzer_changed", "buzzer": current.buzzer.status()})
+            return result
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except OSError as exc:

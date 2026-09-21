@@ -111,6 +111,7 @@ class AppRuntime:
             "xport": self.xport.snapshot(),
             "extensions": self.extensions.snapshot(),
             "onewire": self.onewire.snapshot(),
+            "buzzer": self.buzzer.status(),
         }
 
     async def async_snapshot(self) -> dict[str, Any]:
@@ -145,6 +146,11 @@ class AppRuntime:
                 }
                 await self.broadcast(event)
             return confirmed
+
+    async def set_buzzer_volume(self, volume_percent: int) -> dict:
+        status = await self.buzzer.set_volume_percent(volume_percent)
+        await self.broadcast({"type": "buzzer_changed", "buzzer": status})
+        return status
 
     async def handle_button_changed(self, pressed: bool) -> None:
         async with self._lock:

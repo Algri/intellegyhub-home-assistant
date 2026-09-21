@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.5.82
+
+- Remove the nested BUZZER control card and use a flat aligned control row with fixed field widths.
+
+## 0.5.81
+
+- Rework the BUZZER add-on UI into a compact control card so the volume slider and action buttons no longer stretch across the whole diagnostic panel.
+
+## 0.5.80
+
+- Clean up the BUZZER add-on UI layout: group frequency/duration, keep Volume as the main slider, and align action buttons as a compact control block.
+
+## 0.5.79
+
+- Replace the BUZZER duty input with a 0-100% Volume slider in the add-on UI.
+- Convert user volume linearly to the calibrated GPIO18 physical PWM duty range.
+- Expose Buzzer Volume as a Home Assistant number slider on the IntellegyHUB device.
+
+## 0.5.78
+
+- Document the local mock-mode add-on UI preview command in the packaged add-on docs.
+
 ## 0.5.77
 
 - Restore the Carrier Overview split layout while keeping the add-on's existing card, border, color, and spacing style.

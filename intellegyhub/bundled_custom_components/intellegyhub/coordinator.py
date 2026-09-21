@@ -26,6 +26,7 @@ class IntellegyHubGpioManager:
         self.outputs = {output_id: False for output_id in OUTPUTS}
         self.button_pressed = False
         self.carrier: dict = {}
+        self.buzzer: dict = {"volume_percent": 50}
         self.xport: dict = {}
         self.extensions: dict = {}
         self.onewire: dict = {}
@@ -90,6 +91,11 @@ class IntellegyHubGpioManager:
     async def async_set_xport_value(self, channel: int, value: float) -> None:
         result = await self.client.set_xport_value(channel, value)
         self._apply_xport_channel(result.get("channel"))
+        self.connected = True
+        self._notify()
+
+    async def async_set_buzzer_volume(self, volume_percent: int) -> None:
+        self.buzzer = await self.client.set_buzzer_volume(int(volume_percent))
         self.connected = True
         self._notify()
 
@@ -183,6 +189,7 @@ class IntellegyHubGpioManager:
         self.led_on = self.outputs["user_led"]
         self.button_pressed = payload["button"]["pressed"]
         self.carrier = payload.get("carrier", {})
+        self.buzzer = payload.get("buzzer", self.buzzer)
         self.xport = payload.get("xport", {})
         self.extensions = payload.get("extensions", {})
         self.onewire = payload.get("onewire", {})
@@ -245,6 +252,7 @@ class IntellegyHubGpioManager:
             self.led_on = self.outputs["user_led"]
             self.button_pressed = bool(event["button"]["pressed"])
             self.carrier = event.get("carrier", self.carrier)
+            self.buzzer = event.get("buzzer", self.buzzer)
             self.xport = event.get("xport", self.xport)
             self.extensions = event.get("extensions", self.extensions)
             self.onewire = event.get("onewire", self.onewire)
@@ -271,6 +279,8 @@ class IntellegyHubGpioManager:
             self._remove_stale_extension_registry_entries()
         elif event_type == "carrier_changed":
             self.carrier = event.get("carrier", self.carrier)
+        elif event_type == "buzzer_changed":
+            self.buzzer = event.get("buzzer", self.buzzer)
         elif event_type == "extension_module_changed":
             self._apply_extension_module(event.get("module"))
         elif event_type == "extension_module_removed" and isinstance(event.get("module_id"), str):

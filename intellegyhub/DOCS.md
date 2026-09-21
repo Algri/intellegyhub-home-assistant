@@ -6,6 +6,27 @@ The button edge listener runs outside the main asyncio loop. On each edge it wai
 
 `GET /health` returns `200 {"status":"ok"}` when ready and `503` while startup or hardware initialization has failed.
 
+## Local UI Preview On Windows
+
+The add-on web UI can be checked locally without HAOS by running the backend
+in mock mode from the repository root:
+
+```powershell
+python -m pip install -r requirements-local-ui.txt
+$env:INTELLEGY_GPIO_MOCK="1"
+$env:INTELLEGY_ADDON_OPTIONS='{"led_gpio":22,"led_active_low":false,"button_gpio":26,"button_active_low":true,"button_bias":"pull_up","button_debounce_ms":50}'
+python -m uvicorn addon.app.main:app --host 127.0.0.1 --port 8098 --reload
+```
+
+Open:
+
+```text
+http://127.0.0.1:8098/
+```
+
+This preview uses mock GPIO/I2C data. It validates the UI layout and API shape,
+but it does not validate real CM4 hardware.
+
 ## CM4 I2C Diagnostics
 
 For the tested CM4 hardware, HAOS exposes the useful I2C buses as `/dev/i2c-1` and `/dev/i2c-10`.

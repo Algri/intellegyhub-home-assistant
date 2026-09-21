@@ -10,6 +10,14 @@ from typing import Any
 
 PIGPIO_HOST = "127.0.0.1"
 PIGPIO_PORT = 8888
+MAX_PHYSICAL_DUTY = 0.375
+
+
+def volume_percent_to_duty(volume_percent: float) -> float:
+    volume = max(0.0, min(100.0, float(volume_percent)))
+    if volume <= 0:
+        return 0.0
+    return MAX_PHYSICAL_DUTY * (volume / 100.0)
 
 
 class BuzzerManager:
@@ -27,6 +35,7 @@ class BuzzerManager:
         self._lock = asyncio.Lock()
         self._active_task: asyncio.Task | None = None
         self._active_backend: str | None = None
+        self.volume_percent = 50
 
     def status(self) -> dict[str, Any]:
         pwm_path = self._pwm_path()
@@ -51,49 +60,78 @@ class BuzzerManager:
                 "running": self._active_task is not None,
                 "backend": self._active_backend,
             },
+            "volume_percent": self.volume_percent,
+            "max_physical_duty": MAX_PHYSICAL_DUTY,
         }
 
     async def stop(self) -> None:
         async with self._lock:
             await self._stop_locked()
 
-    async def test_pwm(self, frequency: int, duration_ms: int, duty: float) -> dict[str, Any]:
-        self._validate(frequency, duration_ms, duty)
+    async def set_volume_percent(self, volume_percent: int) -> dict[str, Any]:
+        self._validate_volume(volume_percent)
+        self.volume_percent = int(volume_percent)
+        return self.status()
+
+    async def test_pwm(self, frequency: int, duration_ms: int, duty: float | None = None, volume_percent: int | None = None) -> dict[str, Any]:
+        volume = self._resolve_volume(duty, volume_percent)
+        self._validate(frequency, duration_ms, volume)
+        physical_duty = volume_percent_to_duty(volume)
         async with self._lock:
             await self._stop_locked()
-            await asyncio.to_thread(self._start_pigpio_pwm, frequency, duty)
-            self._active_backend = "pigpio_hardware_pwm"
-            self._active_task = asyncio.create_task(self._auto_stop_after(duration_ms))
+            if physical_duty > 0:
+                await asyncio.to_thread(self._start_pigpio_pwm, frequency, physical_duty)
+                self._active_backend = "pigpio_hardware_pwm"
+                self._active_task = asyncio.create_task(self._auto_stop_after(duration_ms))
+            self.volume_percent = int(volume)
             return {
                 "status": "ok",
                 "backend": "pigpio_hardware_pwm",
                 "duration_ms": duration_ms,
+                "volume_percent": self.volume_percent,
+                "physical_duty": physical_duty,
                 **self.status(),
             }
 
-    async def play_pwm_once(self, frequency: int, duration_ms: int, duty: float) -> dict[str, Any]:
-        self._validate(frequency, duration_ms, duty)
+    async def play_pwm_once(self, frequency: int, duration_ms: int, duty: float | None = None, volume_percent: int | None = None) -> dict[str, Any]:
+        volume = self._resolve_volume(duty, volume_percent)
+        self._validate(frequency, duration_ms, volume)
+        physical_duty = volume_percent_to_duty(volume)
         async with self._lock:
             await self._stop_locked()
             self._active_backend = "pigpio_hardware_pwm"
             try:
-                await asyncio.to_thread(self._run_pigpio_pwm_once, frequency, duration_ms, duty)
+                if physical_duty > 0:
+                    await asyncio.to_thread(self._run_pigpio_pwm_once, frequency, duration_ms, physical_duty)
             finally:
                 await asyncio.to_thread(self._disable_pwm)
                 self._active_backend = None
+            self.volume_percent = int(volume)
         return {
             "status": "ok",
             "backend": "pigpio_hardware_pwm",
             "duration_ms": duration_ms,
+            "volume_percent": self.volume_percent,
+            "physical_duty": physical_duty,
             **self.status(),
         }
 
-    async def test_gpio(self, frequency: int, duration_ms: int, duty: float) -> dict[str, Any]:
-        self._validate(frequency, duration_ms, duty)
+    async def test_gpio(self, frequency: int, duration_ms: int, duty: float | None = None, volume_percent: int | None = None) -> dict[str, Any]:
+        volume = self._resolve_volume(duty, volume_percent)
+        self._validate(frequency, duration_ms, volume)
+        physical_duty = volume_percent_to_duty(volume)
         async with self._lock:
             await self._stop_locked()
-            await asyncio.to_thread(self._run_gpio_test, frequency, duration_ms, duty)
-            return {"status": "ok", "backend": "software_gpio", **self.status()}
+            if physical_duty > 0:
+                await asyncio.to_thread(self._run_gpio_test, frequency, duration_ms, physical_duty)
+            self.volume_percent = int(volume)
+            return {
+                "status": "ok",
+                "backend": "software_gpio",
+                "volume_percent": self.volume_percent,
+                "physical_duty": physical_duty,
+                **self.status(),
+            }
 
     async def _stop_locked(self) -> None:
         if self._active_task:
@@ -231,13 +269,25 @@ class BuzzerManager:
         return self.pwmchip / f"pwm{self.pwm_channel}"
 
     @staticmethod
-    def _validate(frequency: int, duration_ms: int, duty: float) -> None:
+    def _resolve_volume(duty: float | None, volume_percent: int | None) -> int:
+        if volume_percent is not None:
+            return int(volume_percent)
+        if duty is not None:
+            return round(float(duty) * 100)
+        return 50
+
+    @staticmethod
+    def _validate(frequency: int, duration_ms: int, volume_percent: int) -> None:
         if frequency < 20 or frequency > 20_000:
             raise ValueError("frequency must be between 20 and 20000 Hz")
         if duration_ms < 10 or duration_ms > 5000:
             raise ValueError("duration_ms must be between 10 and 5000")
-        if duty <= 0 or duty >= 1:
-            raise ValueError("duty must be greater than 0 and less than 1")
+        BuzzerManager._validate_volume(volume_percent)
+
+    @staticmethod
+    def _validate_volume(volume_percent: int) -> None:
+        if volume_percent < 0 or volume_percent > 100:
+            raise ValueError("volume_percent must be between 0 and 100")
 
     @staticmethod
     def _read_text(path: Path) -> str | None:
