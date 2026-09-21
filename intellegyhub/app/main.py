@@ -113,7 +113,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.84 chip=%s led=%s active_low=%s button=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
+                "Starting v0.5.88 chip=%s led=%s active_low=%s button=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -148,7 +148,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.84", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.88", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 
@@ -401,7 +401,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       color: #b3e5fc;
       outline: none;
     }
-    .diagnostics { margin-top: 18px; border: 1px solid var(--ha-card-border); border-radius: 12px; padding: 12px; background: var(--ha-card); }
+    .diagnostics-output { margin-top: 16px; }
     .extension-panel { margin-top: 18px; border: 1px solid var(--ha-card-border); border-radius: 12px; background: var(--ha-card); box-shadow: 0 2px 4px rgba(0, 0, 0, .22); padding: 24px; }
     .extension-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 18px; }
     .bus-toolbar { align-items: stretch; border: 1px solid var(--ha-card-border); border-radius: 10px; background: #202020; padding: 12px; }
@@ -424,24 +424,37 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .relay-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .state-text { min-width: 30px; text-align: right; color: var(--ha-secondary); font-size: 12px; font-weight: 800; letter-spacing: .04em; }
     .state-text.on { color: #8be9fd; }
-    .buzzer-grid {
+    .carrier-io-grid { display: grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 16px; margin-top: 18px; }
+    .carrier-io-card { border: 1px solid var(--ha-card-border); border-radius: 12px; background: #202020; padding: 18px; min-width: 0; }
+    .carrier-io-title { font-size: 17px; font-weight: 800; margin-bottom: 14px; }
+    .carrier-io-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; min-height: 42px; border: 1px solid #333; border-radius: 8px; padding: 8px 10px; background: #1b1b1b; }
+    .carrier-io-row + .carrier-io-row { margin-top: 10px; }
+    .carrier-io-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .buzzer-panel {
       display: grid;
-      grid-template-columns: 220px 220px minmax(300px, 460px) 170px 130px;
-      gap: 14px;
+      grid-template-columns: minmax(0, 1fr) 260px;
+      gap: 16px;
       margin-top: 18px;
-      align-items: end;
+      align-items: stretch;
       min-width: 0;
-      max-width: 1240px;
     }
+    .buzzer-group { border: 1px solid var(--ha-card-border); border-radius: 10px; background: #202020; padding: 16px; min-width: 0; }
+    .buzzer-group-title { color: var(--ha-secondary); font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 14px; }
+    .buzzer-settings { display: grid; gap: 12px; }
+    .buzzer-row { display: grid; grid-template-columns: minmax(100px, 150px) minmax(0, 1fr); align-items: center; gap: 14px; min-height: 40px; }
+    .buzzer-row label,
+    .buzzer-volume-label { color: var(--ha-text); font-size: 13px; font-weight: 700; }
+    .buzzer-input-wrap { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+    .buzzer-input-wrap span { color: var(--ha-secondary); font-size: 12px; font-weight: 800; min-width: 26px; }
     .buzzer-field input { width: 100%; height: 38px; border: 1px solid #4a4a4a; border-radius: 8px; background: var(--ha-field); color: var(--ha-text); padding: 0 10px; font-weight: 600; }
-    .buzzer-volume-field { min-width: 0; margin-bottom: 0; }
-    .buzzer-volume-head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 8px; font-size: 13px; font-weight: 700; }
-    .buzzer-volume-head strong { color: #ffffff; }
-    .buzzer-volume-field input { height: 38px; margin: 0; }
-    .buzzer-grid button { width: 100%; height: 38px; }
+    .buzzer-volume-control { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) 44px; align-items: center; gap: 12px; }
+    .buzzer-volume-control input { height: 38px; margin: 0; }
+    .buzzer-volume-control strong { color: #ffffff; text-align: right; font-size: 13px; }
+    .buzzer-actions { display: grid; grid-template-rows: auto auto 1fr; gap: 12px; }
+    .buzzer-actions button { width: 100%; height: 40px; }
     .buzzer-status { margin-top: 14px; color: var(--ha-secondary); font-size: 13px; overflow-wrap: anywhere; max-width: 980px; }
     .buzzer-detail-line { color: var(--ha-secondary); font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; }
-    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
     button { border: 1px solid #4a4a4a; background: #202020; color: inherit; border-radius: 8px; min-height: 38px; padding: 8px 12px; cursor: pointer; font-weight: 600; }
     button:hover { background: #2a2a2a; }
     button:disabled { cursor: default; }
@@ -450,9 +463,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     pre.visible { display: block; }
     @media (max-width: 1300px) { .relay-grid { grid-template-columns: repeat(4, minmax(140px, 1fr)); } }
     @media (max-width: 1300px) { .overview-panel { grid-template-columns: 1fr; } .overview-identity { border-right: 0; border-bottom: 1px solid var(--ha-card-border); min-height: 240px; } }
-    @media (max-width: 1100px) { .ports { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .relay-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); } }
-    @media (max-width: 1300px) { .buzzer-grid { grid-template-columns: repeat(2, minmax(180px, 220px)) minmax(280px, 1fr); } .buzzer-grid button { max-width: 220px; } }
-    @media (max-width: 620px) { body { padding: 10px; } .overview-identity { min-height: 220px; padding: 22px 18px; } .overview-title h1 { font-size: 38px; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+2) { border-right: 0; border-bottom: 1px solid var(--ha-card-border); } .overview-metric:last-child { border-bottom: 0; } .xport-panel { padding: 18px 14px; border-radius: 12px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .ports, .relay-grid, .buzzer-grid { grid-template-columns: 1fr; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-grid button { max-width: none; } }
+    @media (max-width: 1100px) { .ports, .carrier-io-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .relay-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); } }
+    @media (max-width: 900px) { .buzzer-panel { grid-template-columns: 1fr; } .buzzer-actions { grid-template-columns: repeat(2, minmax(120px, 1fr)); grid-template-rows: auto; } .buzzer-actions .buzzer-group-title { grid-column: 1 / -1; } }
+    @media (max-width: 620px) { body { padding: 10px; } .overview-identity { min-height: 220px; padding: 22px 18px; } .overview-title h1 { font-size: 38px; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+2) { border-right: 0; border-bottom: 1px solid var(--ha-card-border); } .overview-metric:last-child { border-bottom: 0; } .xport-panel { padding: 18px 14px; border-radius: 12px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .ports, .carrier-io-grid, .relay-grid { grid-template-columns: 1fr; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-row { grid-template-columns: 1fr; gap: 6px; } }
   </style>
 </head>
 <body>
@@ -562,19 +575,62 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         </div>
         <div class="transport">GPIO18</div>
       </div>
-      <div class="buzzer-grid">
-        <label class="buzzer-field">Frequency Hz<input id="buzzer-frequency" type="number" min="20" max="20000" value="2000"></label>
-        <label class="buzzer-field">Duration ms<input id="buzzer-duration" type="number" min="10" max="5000" value="300"></label>
-        <label class="buzzer-volume-field">
-          <span class="buzzer-volume-head"><span>Volume</span><strong id="buzzer-volume-value">50%</strong></span>
-          <input id="buzzer-volume" type="range" min="0" max="100" step="1" value="50" oninput="updateBuzzerVolumeLabel()">
-        </label>
-        <button onclick="playBuzzer()">Play</button>
-        <button onclick="stopBuzzer()">Stop</button>
+      <div class="buzzer-panel">
+        <div class="buzzer-group">
+          <div class="buzzer-group-title">Parameters</div>
+          <div class="buzzer-settings">
+            <div class="buzzer-row">
+              <label for="buzzer-frequency">Frequency</label>
+              <div class="buzzer-input-wrap buzzer-field">
+                <input id="buzzer-frequency" type="number" min="20" max="20000" value="2000">
+                <span>Hz</span>
+              </div>
+            </div>
+            <div class="buzzer-row">
+              <label for="buzzer-duration">Duration</label>
+              <div class="buzzer-input-wrap buzzer-field">
+                <input id="buzzer-duration" type="number" min="10" max="5000" value="300">
+                <span>ms</span>
+              </div>
+            </div>
+            <div class="buzzer-row">
+              <span class="buzzer-volume-label">Volume</span>
+              <div class="buzzer-volume-control">
+                <input id="buzzer-volume" type="range" min="0" max="100" step="1" value="50" oninput="updateBuzzerVolumeLabel()">
+                <strong id="buzzer-volume-value">50%</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="buzzer-group buzzer-actions">
+          <div class="buzzer-group-title">Command</div>
+          <button onclick="playBuzzer()">Play</button>
+          <button onclick="stopBuzzer()">Stop</button>
+        </div>
       </div>
       <div id="buzzer-detail" class="buzzer-status"></div>
     </section>
-    <section class="diagnostics">
+    <section class="extension-panel">
+      <div class="module-row">
+        <div>
+          <div class="eyebrow">Carrier I/O</div>
+          <h1>CARRIER</h1>
+          <div class="subtitle">MCP23017 controlled carrier outputs</div>
+          <div id="carrier-io-status" class="status">CARRIER: loading...</div>
+        </div>
+        <div class="transport">I2C-10</div>
+      </div>
+      <div id="carrier-io" class="carrier-io-grid"></div>
+    </section>
+    <section class="extension-panel">
+      <div class="module-row">
+        <div>
+          <div class="eyebrow">Service Tools</div>
+          <h1>TOOLS</h1>
+          <div class="subtitle">Quick access to health, state, device discovery and I2C diagnostics.</div>
+        </div>
+        <div class="transport">REST</div>
+      </div>
       <div class="toolbar">
         <button onclick="callApi('health')">Health</button>
         <button onclick="callApi('api/v1/state')">State</button>
@@ -586,7 +642,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         <button onclick="callApi('api/v1/i2c/scan/10')">Scan I2C-10</button>
         <button onclick="callApi('api/v1/i2c/scan/0')">Scan I2C-0</button>
       </div>
-      <pre id="output">Ready.</pre>
+      <pre id="output" class="diagnostics-output">Ready.</pre>
     </section>
   </main>
   <script>
@@ -837,6 +893,88 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       }
       value.textContent = Number(metric.value).toFixed(precision);
       meta.textContent = `Good - ${metric.last_read_utc || 'just now'}`;
+    }
+    const carrierGroups = [
+      {
+        title: 'RS-485',
+        outputs: ['rs485_ch1_termination', 'rs485_ch2_termination']
+      },
+      {
+        title: 'XMOD',
+        outputs: ['xmod1_flash_enable', 'xmod1_reset', 'xmod2_flash_enable', 'xmod2_reset']
+      },
+      {
+        title: 'USB',
+        outputs: ['usb12_reset', 'usb3_reset', 'usb4_reset', 'usb_hub_reset']
+      }
+    ];
+    function carrierOutputsById(carrier) {
+      const result = {};
+      for (const output of (carrier && carrier.outputs) || []) {
+        result[output.id] = output;
+      }
+      return result;
+    }
+    async function renderCarrierIO() {
+      const output = document.getElementById('output');
+      output.classList.remove('visible');
+      try {
+        const payload = await requestJson('api/v1/carrier');
+        paintCarrierIO(payload);
+      } catch (error) {
+        document.getElementById('carrier-io-status').textContent = 'CARRIER: Error';
+        output.textContent = JSON.stringify(error, null, 2);
+        output.classList.add('visible');
+      }
+    }
+    function paintCarrierIO(carrier) {
+      const online = Boolean(carrier && carrier.available);
+      document.getElementById('carrier-io-status').textContent = online ? 'CARRIER: online' : 'CARRIER: offline';
+      const byId = carrierOutputsById(carrier);
+      const root = document.getElementById('carrier-io');
+      root.innerHTML = '';
+      for (const group of carrierGroups) {
+        const card = document.createElement('article');
+        card.className = 'carrier-io-card';
+        const title = document.createElement('div');
+        title.className = 'carrier-io-title';
+        title.textContent = group.title;
+        card.appendChild(title);
+        for (const outputId of group.outputs) {
+          const item = byId[outputId] || { id: outputId, name: outputId, on: false };
+          const row = document.createElement('div');
+          row.className = 'carrier-io-row';
+          const label = document.createElement('span');
+          label.textContent = item.name;
+          const state = document.createElement('span');
+          state.className = `state-text ${item.on ? 'on' : ''}`;
+          state.textContent = item.on ? 'ON' : 'OFF';
+          const toggle = document.createElement('button');
+          toggle.className = `toggle ${item.on ? 'on' : ''}`;
+          toggle.type = 'button';
+          toggle.disabled = !online;
+          toggle.innerHTML = `<span>${item.on ? 'ON' : 'OFF'}</span>`;
+          toggle.onclick = () => setCarrierOutput(item.id, !item.on);
+          row.append(label, state, toggle);
+          card.appendChild(row);
+        }
+        root.appendChild(card);
+      }
+    }
+    async function setCarrierOutput(outputId, on) {
+      const output = document.getElementById('output');
+      output.classList.remove('visible');
+      try {
+        await requestJson(`api/v1/carrier/outputs/${outputId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ on })
+        });
+        await renderCarrierIO();
+      } catch (error) {
+        output.textContent = JSON.stringify(error, null, 2);
+        output.classList.add('visible');
+      }
     }
     async function renderExtensions() {
       const output = document.getElementById('output');
@@ -1104,11 +1242,16 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         const message = JSON.parse(event.data);
         if (message.type === 'state') {
           paintCarrier(message.carrier);
+          paintCarrierIO(message.carrier);
           paintXPort(message.xport);
           paintExtensions(message.extensions);
           paintOneWire(message.onewire);
         } else if (message.type === 'carrier_changed') {
           paintCarrier(message.carrier);
+          paintCarrierIO(message.carrier);
+        } else if (message.type === 'carrier_output_changed') {
+          paintCarrier(message.carrier);
+          paintCarrierIO(message.carrier);
         } else if (message.type === 'xport_changed') {
           paintXPort(message.xport);
         } else if (message.type === 'xport_channel_changed') {
@@ -1224,6 +1367,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       }
     });
     renderXPort();
+    renderCarrierIO();
     renderExtensions();
     renderOneWire();
     renderBuzzerStatus();
@@ -1248,6 +1392,19 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     @app.get("/api/v1/extensions")
     async def get_extensions() -> dict:
         return runtime_or_503().extensions.snapshot()
+
+    @app.get("/api/v1/carrier")
+    async def get_carrier() -> dict:
+        return runtime_or_503().carrier.snapshot()
+
+    @app.put("/api/v1/carrier/outputs/{output_id}")
+    async def put_carrier_output(output_id: str, payload: OutputPayload) -> dict:
+        try:
+            return (await runtime_or_503().carrier.set_output(output_id, payload.on)).__dict__
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except RuntimeError as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     @app.put("/api/v1/extensions/power")
     async def put_extension_power(payload: ExtensionPowerPayload) -> dict:

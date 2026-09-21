@@ -36,6 +36,45 @@ class CarrierMetricState:
     last_read_utc: str | None = None
 
 
+@dataclass(frozen=True)
+class CarrierOutputDefinition:
+    id: str
+    name: str
+    bit: int
+    port: str
+    pin: str
+
+
+@dataclass
+class CarrierOutputState:
+    id: str
+    name: str
+    on: bool
+    bus: int
+    address: str
+    chip: str
+    port: str
+    pin: str
+
+
+def _carrier_output(output_id: str, name: str, bit: int, port: str, pin: str) -> CarrierOutputDefinition:
+    return CarrierOutputDefinition(output_id, name, bit, port, pin)
+
+
+CARRIER_OUTPUTS: dict[str, CarrierOutputDefinition] = {
+    "rs485_ch1_termination": _carrier_output("rs485_ch1_termination", "RS-485 CH1 120Ω Termination", 10, "GPIOB", "GPB2"),
+    "rs485_ch2_termination": _carrier_output("rs485_ch2_termination", "RS-485 CH2 120Ω Termination", 13, "GPIOB", "GPB5"),
+    "xmod1_reset": _carrier_output("xmod1_reset", "XMOD1 Reset", 8, "GPIOB", "GPB0"),
+    "xmod1_flash_enable": _carrier_output("xmod1_flash_enable", "XMOD1 Flash / Enable", 9, "GPIOB", "GPB1"),
+    "xmod2_reset": _carrier_output("xmod2_reset", "XMOD2 Reset", 11, "GPIOB", "GPB3"),
+    "xmod2_flash_enable": _carrier_output("xmod2_flash_enable", "XMOD2 Flash / Enable", 12, "GPIOB", "GPB4"),
+    "usb12_reset": _carrier_output("usb12_reset", "USB1/2 Reset", 1, "GPIOA", "GPA1"),
+    "usb3_reset": _carrier_output("usb3_reset", "USB3 Reset", 2, "GPIOA", "GPA2"),
+    "usb4_reset": _carrier_output("usb4_reset", "USB4 Reset", 3, "GPIOA", "GPA3"),
+    "usb_hub_reset": _carrier_output("usb_hub_reset", "USB Hub Reset", 4, "GPIOA", "GPA4"),
+}
+
+
 class CarrierHardware:
     bus = 10
     address = 0x20
@@ -87,15 +126,29 @@ class CarrierHardware:
             await asyncio.to_thread(self._write_outputs)
             return on
 
+    async def outputs(self) -> dict[str, bool]:
+        if _is_mock_platform():
+            return {output_id: False for output_id in CARRIER_OUTPUTS}
+        async with self._lock:
+            if not self._available:
+                self._available = await asyncio.to_thread(self._initialize_sync)
+            return {
+                output_id: self._bit_on_unlocked(definition.bit)
+                for output_id, definition in CARRIER_OUTPUTS.items()
+            }
+
     async def bit_on(self, bit: int) -> bool:
         if _is_mock_platform():
             return False
         async with self._lock:
             if not self._available:
                 self._available = await asyncio.to_thread(self._initialize_sync)
-            if bit < 8:
-                return bool(self._gpio_a & (1 << bit))
-            return bool(self._gpio_b & (1 << (bit - 8)))
+            return self._bit_on_unlocked(bit)
+
+    def _bit_on_unlocked(self, bit: int) -> bool:
+        if bit < 8:
+            return bool(self._gpio_a & (1 << bit))
+        return bool(self._gpio_b & (1 << (bit - 8)))
 
     async def fault_lines(self) -> list[FaultLineState]:
         if _is_mock_platform():
@@ -310,6 +363,7 @@ class CarrierManager:
         self.error: str | None = "startup pending"
         self.faults: dict[str, FaultLineState] = {}
         self.monitoring: dict[str, Any] = _monitoring_error_snapshot("startup pending")
+        self.outputs: dict[str, bool] = {output_id: False for output_id in CARRIER_OUTPUTS}
         self._publisher: Callable[[dict[str, Any]], Any] | None = None
         self._fault_task: asyncio.Task | None = None
         self._monitoring_task: asyncio.Task | None = None
@@ -322,6 +376,7 @@ class CarrierManager:
         try:
             self._stopped.clear()
             self.available = await self.hardware.initialize()
+            self.outputs = await self.hardware.outputs()
             self.faults = {fault.id: fault for fault in await self.hardware.fault_lines()}
             self.monitoring = await self.hardware.monitoring_metrics()
             self.error = None if self.available else "carrier MCP23017 unavailable"
@@ -359,6 +414,22 @@ class CarrierManager:
 
     async def onewire_power_on(self) -> bool:
         return await self.hardware.bit_on(CarrierHardware.bit_onewire_power)
+
+    async def set_output(self, output_id: str, on: bool) -> CarrierOutputState:
+        if output_id not in CARRIER_OUTPUTS:
+            raise ValueError(f"Unknown carrier output: {output_id}")
+        definition = CARRIER_OUTPUTS[output_id]
+        confirmed = await self.hardware.set_bit(definition.bit, on)
+        previous = self.outputs.get(output_id)
+        self.outputs[output_id] = confirmed
+        state = self._output_state(output_id, confirmed)
+        if previous != confirmed:
+            await self._publish({"type": "carrier_output_changed", "output": asdict(state), "carrier": self.snapshot()})
+        return state
+
+    async def refresh_outputs(self) -> dict[str, bool]:
+        self.outputs = await self.hardware.outputs()
+        return dict(self.outputs)
 
     async def refresh_faults(self) -> dict[str, Any]:
         self.faults = {fault.id: fault for fault in await self.hardware.fault_lines()}
@@ -423,10 +494,24 @@ class CarrierManager:
             },
             "controller": {"bus": 10, "address": "0x20", "chip": "MCP23017"},
             "faults": [asdict(fault) for fault in self.faults.values()],
+            "outputs": [asdict(self._output_state(output_id, on)) for output_id, on in self.outputs.items()],
             "monitoring": self.monitoring,
             "monitoring_interval_seconds": self.monitoring_interval_seconds,
             "error": self.error,
         }
+
+    def _output_state(self, output_id: str, on: bool) -> CarrierOutputState:
+        definition = CARRIER_OUTPUTS[output_id]
+        return CarrierOutputState(
+            definition.id,
+            definition.name,
+            bool(on),
+            CarrierHardware.bus,
+            f"0x{CarrierHardware.address:02x}",
+            "MCP23017",
+            definition.port,
+            definition.pin,
+        )
 
 
 def _is_mock_platform() -> bool:

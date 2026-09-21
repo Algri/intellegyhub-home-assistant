@@ -10,7 +10,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
 from .api import IntellegyHubApiClient
-from .const import DOMAIN, OUTPUTS
+from .const import CARRIER_OUTPUTS, DOMAIN, OUTPUTS
 from .xport_entities import XPORT_ENTITY_KINDS, xport_desired_unique_ids, xport_platform_value
 
 LOGGER = logging.getLogger(__name__)
@@ -24,6 +24,7 @@ class IntellegyHubGpioManager:
         self.connected = False
         self.led_on = False
         self.outputs = {output_id: False for output_id in OUTPUTS}
+        self.carrier_outputs = {output_id: False for output_id in CARRIER_OUTPUTS}
         self.button_pressed = False
         self.carrier: dict = {}
         self.buzzer: dict = {"volume_percent": 50}
@@ -78,6 +79,12 @@ class IntellegyHubGpioManager:
         result = await self.client.set_output(output_id, on)
         self.outputs[output_id] = bool(result["on"])
         self.led_on = self.outputs.get("user_led", self.led_on)
+        self.connected = True
+        self._notify()
+
+    async def async_set_carrier_output(self, output_id: str, on: bool) -> None:
+        result = await self.client.set_carrier_output(output_id, on)
+        self._apply_carrier_output(result)
         self.connected = True
         self._notify()
 
@@ -202,6 +209,7 @@ class IntellegyHubGpioManager:
         self.led_on = self.outputs["user_led"]
         self.button_pressed = payload["button"]["pressed"]
         self.carrier = payload.get("carrier", {})
+        self.carrier_outputs = self._carrier_outputs_from_payload(self.carrier)
         self.buzzer = payload.get("buzzer", self.buzzer)
         self.xport = payload.get("xport", {})
         self.extensions = payload.get("extensions", {})
@@ -265,6 +273,7 @@ class IntellegyHubGpioManager:
             self.led_on = self.outputs["user_led"]
             self.button_pressed = bool(event["button"]["pressed"])
             self.carrier = event.get("carrier", self.carrier)
+            self.carrier_outputs = self._carrier_outputs_from_payload(self.carrier)
             self.buzzer = event.get("buzzer", self.buzzer)
             self.xport = event.get("xport", self.xport)
             self.extensions = event.get("extensions", self.extensions)
@@ -292,6 +301,11 @@ class IntellegyHubGpioManager:
             self._remove_stale_extension_registry_entries()
         elif event_type == "carrier_changed":
             self.carrier = event.get("carrier", self.carrier)
+            self.carrier_outputs = self._carrier_outputs_from_payload(self.carrier)
+        elif event_type == "carrier_output_changed" and isinstance(event.get("output"), dict):
+            self.carrier = event.get("carrier", self.carrier)
+            self.carrier_outputs = self._carrier_outputs_from_payload(self.carrier)
+            self._apply_carrier_output(event["output"])
         elif event_type == "buzzer_changed":
             self.buzzer = event.get("buzzer", self.buzzer)
         elif event_type == "extension_module_changed":
@@ -326,6 +340,27 @@ class IntellegyHubGpioManager:
         elif isinstance(payload.get("led", {}).get("on"), bool):
             result["user_led"] = payload["led"]["on"]
         return result
+
+    @staticmethod
+    def _carrier_outputs_from_payload(payload: dict) -> dict[str, bool]:
+        result = {output_id: False for output_id in CARRIER_OUTPUTS}
+        outputs = payload.get("outputs")
+        if isinstance(outputs, list):
+            for item in outputs:
+                if not isinstance(item, dict):
+                    continue
+                output_id = item.get("id")
+                if output_id in CARRIER_OUTPUTS and isinstance(item.get("on"), bool):
+                    result[output_id] = item["on"]
+        return result
+
+    @callback
+    def _apply_carrier_output(self, output: dict | None) -> None:
+        if not isinstance(output, dict):
+            return
+        output_id = output.get("id")
+        if output_id in CARRIER_OUTPUTS and isinstance(output.get("on"), bool):
+            self.carrier_outputs[output_id] = output["on"]
 
     @callback
     def _apply_xport_channel(self, channel: dict | None) -> None:

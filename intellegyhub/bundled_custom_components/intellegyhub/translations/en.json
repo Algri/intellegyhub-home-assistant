@@ -24,6 +24,9 @@
       "host_output": {
         "name": "Output"
       },
+      "carrier_output": {
+        "name": "Carrier Output"
+      },
       "xport_do": {
         "name": "DO"
       },

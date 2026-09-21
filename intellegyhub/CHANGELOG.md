@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.5.88
+
+- Stretch the Buzzer parameter group across the available diagnostic card width so no dead space remains beside the controls.
+
+## 0.5.87
+
+- Rework the Buzzer add-on UI into compact Parameters and Command groups that fit cleanly inside the diagnostic card.
+
+## 0.5.86
+
+- Move Carrier I/O below Buzzer so service controls stay close to low-level tools.
+- Restyle the quick action area as a Service Tools panel using the add-on section layout.
+
+## 0.5.85
+
+- Add Carrier I/O retained toggle controls for RS-485 120Ω termination, XMOD Flash/Enable and Reset, and USB reset lines.
+- Expose Carrier I/O outputs through the add-on API, add-on UI, WebSocket events, and Home Assistant switch entities.
+- Document that Carrier MCP23017 `0x20` writes must use the shared shadow so changing one output does not clear other outputs.
+
 ## 0.5.84
 
 - Rename the Home Assistant host device to `Hardware Host`.

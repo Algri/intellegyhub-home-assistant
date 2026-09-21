@@ -8,7 +8,7 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import DOMAIN, OUTPUTS, XPORT_MODE_DO
+from .const import CARRIER_OUTPUTS, DOMAIN, OUTPUTS, XPORT_MODE_DO
 from .entity import (
     IntellegyHubExtensionPowerEntity,
     IntellegyHubGpioEntity,
@@ -47,6 +47,7 @@ async def async_setup_entry(
     async_add_entities(
         [
             *(IntellegyHubOutputSwitch(manager, output_id) for output_id in OUTPUTS),
+            *(IntellegyHubCarrierOutputSwitch(manager, output_id) for output_id in CARRIER_OUTPUTS),
             IntellegyHubExtensionPowerSwitch(manager),
             IntellegyHubOneWirePowerSwitch(manager),
         ]
@@ -97,6 +98,26 @@ class IntellegyHubOutputSwitch(IntellegyHubGpioEntity, SwitchEntity):
 
     async def async_turn_off(self, **kwargs) -> None:
         await self.manager.async_set_output(self.output_id, False)
+
+
+class IntellegyHubCarrierOutputSwitch(IntellegyHubGpioEntity, SwitchEntity):
+    _attr_translation_key = "carrier_output"
+
+    def __init__(self, manager, output_id: str) -> None:
+        super().__init__(manager)
+        self.output_id = output_id
+        self._attr_unique_id = CARRIER_OUTPUTS[output_id]["unique_id"]
+        self._attr_name = CARRIER_OUTPUTS[output_id]["name"]
+
+    @property
+    def is_on(self) -> bool:
+        return bool(self.manager.carrier_outputs.get(self.output_id, False))
+
+    async def async_turn_on(self, **kwargs) -> None:
+        await self.manager.async_set_carrier_output(self.output_id, True)
+
+    async def async_turn_off(self, **kwargs) -> None:
+        await self.manager.async_set_carrier_output(self.output_id, False)
 
 
 class IntellegyHubXPortDoSwitch(IntellegyHubXPortEntity, SwitchEntity):

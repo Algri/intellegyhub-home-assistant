@@ -54,6 +54,19 @@ class IntellegyHubApiClient:
             raise IntellegyHubApiError("Invalid output response")
         return payload
 
+    async def set_carrier_output(self, output_id: str, on: bool) -> dict[str, Any]:
+        async with self.session.put(
+            urljoin(self.base_url, f"api/v1/carrier/outputs/{output_id}"),
+            json={"on": on},
+            timeout=10,
+        ) as response:
+            if response.status != 200:
+                raise IntellegyHubApiError(f"Carrier output command failed with HTTP {response.status}")
+            payload = await response.json()
+        if not isinstance(payload.get("id"), str) or not isinstance(payload.get("on"), bool):
+            raise IntellegyHubApiError("Invalid carrier output response")
+        return payload
+
     async def set_xport_mode(self, channel: int, mode: str, revision: int | None = None) -> dict[str, Any]:
         body: dict[str, Any] = {"mode": mode}
         if revision is not None:
