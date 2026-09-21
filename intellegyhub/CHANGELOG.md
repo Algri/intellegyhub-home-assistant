@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.75
+
+- Align the Carrier Overview card with the existing add-on UI style, reusing the same section, card, typography, and color treatment as the rest of the add-on.
+- Keep the Carrier identity placeholder in the backend model so EEPROM-backed identity can replace it later without changing the UI contract.
+
 ## 0.5.74
 
 - Add Carrier board monitoring for MCP9808 `0x18` board temperature and ADS1115 `0x48` Vin/+5V/+3.3V rails.
