@@ -102,7 +102,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.75 chip=%s led=%s active_low=%s button=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
+                "Starting v0.5.77 chip=%s led=%s active_low=%s button=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -137,7 +137,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.75", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.77", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 
@@ -211,12 +211,24 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       color: var(--ha-text);
     }
     main { width: min(100%, 1520px); margin: 0 auto; }
-    .overview-panel { margin-top: 0; }
-    .overview-grid { display: grid; grid-template-columns: 1.1fr repeat(4, minmax(150px, 1fr)); gap: 16px; margin-top: 18px; }
-    .overview-identity { min-height: 132px; }
-    .overview-metric { min-height: 132px; }
-    .overview-metric-label { color: var(--ha-secondary); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 18px; }
-    .overview-metric-value { color: var(--ha-text); font-size: 23px; line-height: 1; font-weight: 800; margin-bottom: 12px; }
+    .overview-panel { display: grid; grid-template-columns: minmax(320px, .9fr) minmax(520px, 1.5fr); gap: 0; margin-top: 0; margin-bottom: 18px; padding: 0; overflow: hidden; }
+    .overview-identity { display: flex; flex-direction: column; min-height: 270px; padding: 28px; border-right: 1px solid var(--ha-card-border); }
+    .overview-badge-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: auto; }
+    .overview-logo { display: grid; place-items: center; width: 52px; height: 52px; border: 1px solid #344152; border-radius: 50%; color: var(--ha-text); background: #151515; font-weight: 900; letter-spacing: 0; }
+    .overview-status-pill { min-height: 30px; padding: 6px 12px; border-radius: 999px; border: 1px solid #36543e; color: #8ff0a4; background: rgba(0, 200, 83, .08); font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+    .overview-status-pill.offline { border-color: #5f3434; color: #ffb4ab; background: rgba(244, 67, 54, .10); }
+    .overview-title { margin-top: 26px; }
+    .overview-title h1 { font-size: 48px; line-height: .96; margin-bottom: 10px; font-weight: 800; }
+    .overview-divider { height: 1px; background: var(--ha-card-border); margin: 26px 0 16px; }
+    .overview-sync { display: flex; align-items: center; gap: 14px; color: var(--ha-secondary); font-size: 13px; flex-wrap: wrap; }
+    .overview-sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #448aff; }
+    .overview-sync-separator { color: #6f7782; }
+    .overview-metrics { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); }
+    .overview-metric { min-height: 135px; padding: 30px 24px; border-left: 0; border-top: 0; border-right: 1px solid var(--ha-card-border); border-bottom: 1px solid var(--ha-card-border); border-radius: 0; background: transparent; }
+    .overview-metric:nth-child(2n) { border-right: 0; }
+    .overview-metric:nth-last-child(-n+2) { border-bottom: 0; }
+    .overview-metric-label { color: var(--ha-secondary); font-size: 12px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; margin-bottom: 18px; }
+    .overview-metric-value { color: var(--ha-text); font-size: 27px; line-height: 1; font-weight: 800; margin-bottom: 12px; }
     .overview-metric-meta { color: var(--ha-secondary); font-size: 12px; overflow-wrap: anywhere; }
     .xport-panel {
       border: 1px solid var(--ha-card-border);
@@ -414,46 +426,50 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     pre { display: none; min-height: 180px; max-height: 360px; overflow: auto; border: 1px solid var(--ha-card-border); border-radius: 8px; padding: 14px; background: #0b0b0b; color: var(--ha-text); font-size: 13px; }
     pre.visible { display: block; }
     @media (max-width: 1300px) { .relay-grid { grid-template-columns: repeat(4, minmax(140px, 1fr)); } }
-    @media (max-width: 1300px) { .overview-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .overview-identity { grid-column: 1 / -1; } }
+    @media (max-width: 1300px) { .overview-panel { grid-template-columns: 1fr; } .overview-identity { border-right: 0; border-bottom: 1px solid var(--ha-card-border); min-height: 240px; } }
     @media (max-width: 1100px) { .ports { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .relay-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); } }
     @media (max-width: 1100px) { .buzzer-grid { grid-template-columns: repeat(3, minmax(120px, 1fr)); } }
-    @media (max-width: 620px) { body { padding: 10px; } .overview-grid { grid-template-columns: 1fr; } .overview-identity { grid-column: auto; } .xport-panel { padding: 18px 14px; border-radius: 12px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .ports, .relay-grid { grid-template-columns: 1fr; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 620px) { body { padding: 10px; } .overview-identity { min-height: 220px; padding: 22px 18px; } .overview-title h1 { font-size: 38px; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+2) { border-right: 0; border-bottom: 1px solid var(--ha-card-border); } .overview-metric:last-child { border-bottom: 0; } .xport-panel { padding: 18px 14px; border-radius: 12px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .ports, .relay-grid { grid-template-columns: 1fr; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
   <main>
     <section class="extension-panel overview-panel">
-      <div class="module-row">
-        <div>
+      <div class="overview-identity">
+        <div class="overview-badge-row">
+          <div class="overview-logo">IHC</div>
+          <div id="carrier-overview-status" class="overview-status-pill">Loading</div>
+        </div>
+        <div class="overview-title">
           <div class="eyebrow">Controller Overview</div>
           <h1 id="carrier-identity-product">IHC-1400</h1>
           <div id="carrier-identity-model" class="subtitle">Controller - 1.4 Rev.A</div>
-          <div id="carrier-overview-status" class="status">Controller: loading...</div>
         </div>
-        <div class="transport">I2C-10</div>
+        <div class="overview-divider"></div>
+        <div class="overview-sync">
+          <span class="overview-sync-dot"></span>
+          <span id="carrier-sync-state">Controller online</span>
+          <span class="overview-sync-separator">/</span>
+          <span>I2C-10</span>
+        </div>
       </div>
-      <p class="notice">Carrier board monitoring values are refreshed by the add-on polling interval.</p>
-      <div class="overview-grid">
-        <article class="module-card overview-identity">
-          <div class="module-title">Carrier</div>
-          <div class="module-meta">Identity source: static model until EEPROM identity is enabled</div>
-        </article>
-        <article class="module-card overview-metric">
+      <div class="overview-metrics">
+        <article class="overview-metric">
           <div class="overview-metric-label">Board Temperature</div>
           <div id="metric-board-temperature" class="overview-metric-value">--</div>
           <div id="metric-board-temperature-meta" class="overview-metric-meta">Loading</div>
         </article>
-        <article class="module-card overview-metric">
+        <article class="overview-metric">
           <div class="overview-metric-label">+5 V Rail</div>
           <div id="metric-5v" class="overview-metric-value">--</div>
           <div id="metric-5v-meta" class="overview-metric-meta">Loading</div>
         </article>
-        <article class="module-card overview-metric">
+        <article class="overview-metric">
           <div class="overview-metric-label">+3.3 V Rail</div>
           <div id="metric-3v3" class="overview-metric-value">--</div>
           <div id="metric-3v3-meta" class="overview-metric-meta">Loading</div>
         </article>
-        <article class="module-card overview-metric">
+        <article class="overview-metric">
           <div class="overview-metric-label">Input Voltage</div>
           <div id="metric-vin" class="overview-metric-value">--</div>
           <div id="metric-vin-meta" class="overview-metric-meta">Loading</div>
@@ -768,7 +784,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     function paintCarrier(carrier) {
       const status = document.getElementById('carrier-overview-status');
       const online = Boolean(carrier && carrier.available);
-      status.textContent = online ? 'Controller: online' : 'Controller: offline';
+      status.textContent = online ? 'Online' : 'Offline';
+      status.classList.toggle('offline', !online);
+      document.getElementById('carrier-sync-state').textContent = online ? 'Controller online' : 'Controller offline';
       const identity = carrier && carrier.identity ? carrier.identity : {};
       document.getElementById('carrier-identity-product').textContent = identity.product || 'IHC-1400';
       document.getElementById('carrier-identity-model').textContent = `${identity.model || 'Controller'} - ${identity.hardware_revision || '1.4 Rev.A'}`;

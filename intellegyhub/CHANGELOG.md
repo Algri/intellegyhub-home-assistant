@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.77
+
+- Restore the Carrier Overview split layout while keeping the add-on's existing card, border, color, and spacing style.
+
+## 0.5.76
+
+- Restore the normal section gap below the Carrier Overview panel so it does not touch X-PORT.
+
 ## 0.5.75
 
 - Align the Carrier Overview card with the existing add-on UI style, reusing the same section, card, typography, and color treatment as the rest of the add-on.
