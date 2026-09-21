@@ -44,7 +44,7 @@ class IntellegyHubXPortCounterResetButton(IntellegyHubXPortEntity, ButtonEntity)
 class IntellegyHubBuzzerPlayButton(IntellegyHubGpioEntity, ButtonEntity):
     _attr_translation_key = "buzzer_play"
     _attr_unique_id = "intellegyhub_buzzer_play"
-    _attr_name = "Play Buzzer"
+    _attr_name = "Buzzer Play"
 
     async def async_press(self) -> None:
         await self.manager.async_play_buzzer()

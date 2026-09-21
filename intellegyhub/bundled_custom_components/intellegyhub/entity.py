@@ -23,7 +23,7 @@ class IntellegyHubGpioEntity(Entity):
     def device_info(self) -> DeviceInfo:
         return DeviceInfo(
             identifiers={(DOMAIN, DEVICE_IDENTIFIER)},
-            name="IntellegyHUB",
+            name="Hardware Host",
             manufacturer="IntellegyHub",
             model="Hardware Host",
         )

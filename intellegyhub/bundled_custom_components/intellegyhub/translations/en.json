@@ -33,7 +33,7 @@
     },
     "binary_sensor": {
       "button": {
-        "name": "Button"
+        "name": "User Defined Button"
       },
       "carrier_fault": {
         "name": "Fault"
@@ -83,7 +83,7 @@
     },
     "button": {
       "buzzer_play": {
-        "name": "Play Buzzer"
+        "name": "Buzzer Play"
       },
       "xport_counter_reset": {
         "name": "Reset Counter"

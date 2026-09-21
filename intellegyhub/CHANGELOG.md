@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.84
+
+- Rename the Home Assistant host device to `Hardware Host`.
+- Rename the physical button entity to `User Defined Button`.
+- Rename the buzzer action entity to `Buzzer Play`.
+
 ## 0.5.83
 
 - Rename the user-facing buzzer command API to `/api/v1/buzzer/play` and use `/api/v1/buzzer/play-pwm` from the add-on UI.
