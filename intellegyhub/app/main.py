@@ -113,7 +113,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.93 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
+                "Starting v0.5.95 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -148,7 +148,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.93", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.95", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 
@@ -223,25 +223,24 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     main { width: min(100%, 1520px); margin: 0 auto; }
     .overview-panel { display: grid; grid-template-columns: minmax(320px, .9fr) minmax(520px, 1.5fr); gap: 0; margin-top: 0; margin-bottom: 18px; padding: 0; overflow: hidden; }
-    .overview-identity { display: flex; flex-direction: column; min-height: 270px; padding: 28px; border-right: 1px solid var(--ha-card-border); font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; }
-    .overview-badge-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 26px; }
-    .overview-logo { display: block; width: 46px; height: 46px; object-fit: contain; }
+    .overview-identity { display: flex; flex-direction: column; min-height: 270px; padding: 22px 28px; border-right: 1px solid var(--ha-card-border); font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; }
+    .overview-badge-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 14px; }
+    .overview-logo { display: block; width: 42px; height: 42px; object-fit: contain; }
     .overview-status-pill { min-height: 30px; padding: 6px 12px; border-radius: 999px; border: 1px solid #36543e; color: #8ff0a4; background: rgba(0, 200, 83, .08); font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
     .overview-status-pill.offline { border-color: #5f3434; color: #ffb4ab; background: rgba(244, 67, 54, .10); }
-    .overview-title h1 { font-size: 32px; line-height: 1; margin-bottom: 8px; font-weight: 800; }
+    .overview-title h1 { font-size: 30px; line-height: 1; margin-bottom: 6px; font-weight: 800; }
     .overview-title .subtitle { color: var(--ha-text); font-size: 13px; margin-bottom: 0; }
-    .overview-facts { display: grid; grid-template-columns: minmax(104px, .72fr) minmax(0, 1fr); gap: 7px 18px; margin-top: 18px; font-size: 12px; line-height: 1.35; }
+    .overview-facts { display: grid; grid-template-columns: minmax(104px, .72fr) minmax(0, 1fr); gap: 5px 18px; margin-top: 14px; font-size: 12px; line-height: 1.25; }
     .overview-facts dt { color: var(--ha-text); font-weight: 800; }
     .overview-facts dd { margin: 0; color: var(--ha-text); font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
-    .overview-divider { width: min(250px, 100%); height: 1px; background: var(--ha-card-border); margin: 28px 0 22px; }
-    .overview-health { display: grid; grid-template-columns: minmax(104px, .72fr) minmax(0, 1fr); gap: 7px 18px; font-size: 12px; line-height: 1.35; }
+    .overview-divider { width: min(258px, 100%); height: 1px; background: var(--ha-card-border); margin: 18px 0 14px; }
+    .overview-health { display: grid; grid-template-columns: minmax(104px, .72fr) minmax(0, 1fr); gap: 5px 18px; font-size: 12px; line-height: 1.25; }
     .overview-health dt { color: var(--ha-text); font-weight: 800; text-transform: uppercase; }
     .overview-health dd { margin: 0; color: var(--ha-text); font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
     .overview-health-value { display: inline-flex; align-items: center; gap: 8px; }
     .overview-sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #448aff; }
     .overview-sync-dot.online { background: #00e676; }
     .overview-sync-dot.offline { background: #ff6b6b; }
-    .overview-network-list { display: grid; gap: 3px; }
     .overview-metrics { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); }
     .overview-metric { min-height: 135px; padding: 30px 24px; border-left: 0; border-top: 0; border-right: 1px solid var(--ha-card-border); border-bottom: 1px solid var(--ha-card-border); border-radius: 0; background: transparent; }
     .overview-metric:nth-child(2n) { border-right: 0; }
@@ -497,7 +496,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     @media (max-width: 1300px) { .overview-panel { grid-template-columns: 1fr; } .overview-identity { border-right: 0; border-bottom: 1px solid var(--ha-card-border); min-height: 240px; } }
     @media (max-width: 1100px) { .ports, .carrier-io-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .relay-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); } }
     @media (max-width: 900px) { .buzzer-panel { grid-template-columns: 1fr; } .buzzer-actions { grid-template-columns: repeat(2, minmax(120px, 1fr)); grid-template-rows: auto; } .buzzer-actions .buzzer-group-title { grid-column: 1 / -1; } }
-    @media (max-width: 620px) { body { padding: 10px; } .overview-identity { min-height: 220px; padding: 22px 18px; } .overview-title h1 { font-size: 38px; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+2) { border-right: 0; border-bottom: 1px solid var(--ha-card-border); } .overview-metric:last-child { border-bottom: 0; } .xport-panel { padding: 18px 14px; border-radius: 12px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .ports, .carrier-io-grid, .relay-grid { grid-template-columns: 1fr; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-row { grid-template-columns: 1fr; gap: 6px; } }
+    @media (max-width: 620px) { body { padding: 10px; } .overview-identity { min-height: 220px; padding: 22px 18px; } .overview-title h1 { font-size: 30px; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+2) { border-right: 0; border-bottom: 1px solid var(--ha-card-border); } .overview-metric:last-child { border-bottom: 0; } .xport-panel { padding: 18px 14px; border-radius: 12px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .ports, .carrier-io-grid, .relay-grid { grid-template-columns: 1fr; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-row { grid-template-columns: 1fr; gap: 6px; } }
   </style>
 </head>
 <body>
@@ -519,7 +518,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           <dt>Hardware</dt>
           <dd id="carrier-identity-hardware">1.4 Rev.A</dd>
           <dt>Software</dt>
-          <dd id="carrier-identity-software">0.5.93</dd>
+          <dd id="carrier-identity-software">0.5.95</dd>
         </dl>
         <div class="overview-divider"></div>
         <dl class="overview-health">
@@ -530,8 +529,6 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           </dd>
           <dt>Uptime</dt>
           <dd id="carrier-uptime">--</dd>
-          <dt>Network</dt>
-          <dd id="carrier-network" class="overview-network-list">Not available</dd>
         </dl>
       </div>
       <div class="overview-metrics">
@@ -711,7 +708,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       'PulseCounterExternalVoltage',
       'PulseCounterInternalPullUp'
     ];
-    let latestAppInfo = { uptime_seconds: 0, network: { interfaces: [] } };
+    let latestAppInfo = { uptime_seconds: 0 };
     function apiUrl(path) {
       const basePath = window.location.pathname.endsWith('/') ? window.location.pathname : window.location.pathname + '/';
       return new URL(path, window.location.origin + basePath);
@@ -924,9 +921,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       document.getElementById('carrier-identity-model').textContent = identity.model || 'IntellegyHUB Controller';
       document.getElementById('carrier-identity-serial').textContent = identity.serial_number || 'IH1400-00001234';
       document.getElementById('carrier-identity-hardware').textContent = identity.hardware_revision || '1.4 Rev.A';
-      document.getElementById('carrier-identity-software').textContent = identity.software_version || '0.5.93';
+      document.getElementById('carrier-identity-software').textContent = identity.software_version || '0.5.95';
       document.getElementById('carrier-uptime').textContent = formatUptime(appInfo && appInfo.uptime_seconds);
-      paintNetwork(appInfo && appInfo.network ? appInfo.network.interfaces : []);
       const monitoring = carrier && carrier.monitoring ? carrier.monitoring : {};
       const temperature = monitoring.temperature || {};
       const rails = {};
@@ -946,21 +942,6 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       if (days > 0) return `${days}d ${String(hours).padStart(2, '0')}h ${String(minutes).padStart(2, '0')}m`;
       if (hours > 0) return `${hours}h ${String(minutes).padStart(2, '0')}m`;
       return `${minutes}m`;
-    }
-    function paintNetwork(interfaces) {
-      const root = document.getElementById('carrier-network');
-      const items = Array.isArray(interfaces) ? interfaces : [];
-      if (items.length === 0) {
-        root.textContent = 'Not available';
-        return;
-      }
-      root.textContent = '';
-      for (const item of items) {
-        const line = document.createElement('span');
-        const label = item.label || item.type || 'Network';
-        line.textContent = item.address ? `${label} - ${item.address}` : label;
-        root.appendChild(line);
-      }
     }
     function paintMetric(elementId, metric, precision) {
       const value = document.getElementById(`metric-${elementId}`);

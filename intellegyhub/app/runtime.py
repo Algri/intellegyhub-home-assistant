@@ -122,9 +122,6 @@ class AppRuntime:
             "carrier": self.carrier.snapshot(),
             "app": {
                 "uptime_seconds": max(0, int(time.monotonic() - self._started_at)),
-                "network": {
-                    "interfaces": [],
-                },
             },
             "xport": self.xport.snapshot(),
             "extensions": self.extensions.snapshot(),

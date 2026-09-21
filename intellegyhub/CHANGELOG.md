@@ -1,8 +1,16 @@
 # Changelog
 
+## 0.5.95
+
+- Keep the controller passport free of placeholder Network/IP data and compact the mobile title sizing.
+
+## 0.5.94
+
+- Copy add-on logo/icon assets into the runtime image, compact the controller passport height, and remove the placeholder Network row until real interface data is available.
+
 ## 0.5.93
 
-- Rework only the left controller overview area into a controller passport with logo, serial placeholder, hardware/software, health, uptime, and network rows.
+- Rework only the left controller overview area into a controller passport with logo, serial placeholder, hardware/software, health, and uptime rows.
 
 ## 0.5.92
 
