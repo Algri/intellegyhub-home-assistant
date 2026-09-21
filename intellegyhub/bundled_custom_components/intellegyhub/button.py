@@ -7,12 +7,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, XPORT_MODE_COUNTER
-from .entity import IntellegyHubXPortEntity
+from .entity import IntellegyHubGpioEntity, IntellegyHubXPortEntity
 from .xport_entities import setup_xport_dynamic_platform
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     manager = hass.data[DOMAIN][entry.entry_id]
+    async_add_entities([IntellegyHubBuzzerPlayButton(manager)])
     setup_xport_dynamic_platform(
         entry,
         manager,
@@ -38,3 +39,12 @@ class IntellegyHubXPortCounterResetButton(IntellegyHubXPortEntity, ButtonEntity)
     async def async_press(self) -> None:
         self.assert_mode_available(XPORT_MODE_COUNTER)
         await self.manager.async_reset_xport_counter(self.channel)
+
+
+class IntellegyHubBuzzerPlayButton(IntellegyHubGpioEntity, ButtonEntity):
+    _attr_translation_key = "buzzer_play"
+    _attr_unique_id = "intellegyhub_buzzer_play"
+    _attr_name = "Play Buzzer"
+
+    async def async_press(self) -> None:
+        await self.manager.async_play_buzzer()

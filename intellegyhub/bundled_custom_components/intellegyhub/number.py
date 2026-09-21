@@ -20,7 +20,13 @@ ENTITY_CATEGORY_CONFIG = EntityCategory.CONFIG if EntityCategory is not None els
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     manager = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([IntellegyHubBuzzerVolumeNumber(manager)])
+    async_add_entities(
+        [
+            IntellegyHubBuzzerFrequencyNumber(manager),
+            IntellegyHubBuzzerDurationNumber(manager),
+            IntellegyHubBuzzerVolumeNumber(manager),
+        ]
+    )
     setup_xport_dynamic_platform(
         entry,
         manager,
@@ -74,3 +80,41 @@ class IntellegyHubBuzzerVolumeNumber(IntellegyHubGpioEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         await self.manager.async_set_buzzer_volume(round(value))
+
+
+class IntellegyHubBuzzerFrequencyNumber(IntellegyHubGpioEntity, NumberEntity):
+    _attr_translation_key = "buzzer_frequency"
+    _attr_unique_id = "intellegyhub_buzzer_frequency"
+    _attr_name = "Buzzer Frequency"
+    _attr_native_min_value = 20
+    _attr_native_max_value = 20000
+    _attr_native_step = 10
+    _attr_native_unit_of_measurement = "Hz"
+    _attr_mode = NumberMode.BOX
+    _attr_entity_category = ENTITY_CATEGORY_CONFIG
+
+    @property
+    def native_value(self):
+        return int(self.manager.buzzer.get("frequency", 2000))
+
+    async def async_set_native_value(self, value: float) -> None:
+        await self.manager.async_set_buzzer_settings(frequency=round(value))
+
+
+class IntellegyHubBuzzerDurationNumber(IntellegyHubGpioEntity, NumberEntity):
+    _attr_translation_key = "buzzer_duration"
+    _attr_unique_id = "intellegyhub_buzzer_duration"
+    _attr_name = "Buzzer Duration"
+    _attr_native_min_value = 10
+    _attr_native_max_value = 5000
+    _attr_native_step = 10
+    _attr_native_unit_of_measurement = "ms"
+    _attr_mode = NumberMode.BOX
+    _attr_entity_category = ENTITY_CATEGORY_CONFIG
+
+    @property
+    def native_value(self):
+        return int(self.manager.buzzer.get("duration_ms", 300))
+
+    async def async_set_native_value(self, value: float) -> None:
+        await self.manager.async_set_buzzer_settings(duration_ms=round(value))

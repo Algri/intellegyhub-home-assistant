@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.83
+
+- Rename the user-facing buzzer command API to `/api/v1/buzzer/play` and use `/api/v1/buzzer/play-pwm` from the add-on UI.
+- Add Home Assistant Buzzer Frequency and Buzzer Duration settings.
+- Add a Home Assistant Play Buzzer button that triggers the buzzer with the configured settings.
+
 ## 0.5.82
 
 - Remove the nested BUZZER control card and use a flat aligned control row with fixed field widths.

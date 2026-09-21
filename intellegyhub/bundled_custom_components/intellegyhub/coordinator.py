@@ -95,7 +95,20 @@ class IntellegyHubGpioManager:
         self._notify()
 
     async def async_set_buzzer_volume(self, volume_percent: int) -> None:
-        self.buzzer = await self.client.set_buzzer_volume(int(volume_percent))
+        await self.async_set_buzzer_settings(volume_percent=int(volume_percent))
+
+    async def async_set_buzzer_settings(
+        self,
+        frequency: int | None = None,
+        duration_ms: int | None = None,
+        volume_percent: int | None = None,
+    ) -> None:
+        self.buzzer = await self.client.set_buzzer_settings(frequency, duration_ms, volume_percent)
+        self.connected = True
+        self._notify()
+
+    async def async_play_buzzer(self) -> None:
+        self.buzzer = await self.client.play_buzzer()
         self.connected = True
         self._notify()
 

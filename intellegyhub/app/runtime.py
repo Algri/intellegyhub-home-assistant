@@ -148,7 +148,15 @@ class AppRuntime:
             return confirmed
 
     async def set_buzzer_volume(self, volume_percent: int) -> dict:
-        status = await self.buzzer.set_volume_percent(volume_percent)
+        return await self.set_buzzer_settings(volume_percent=volume_percent)
+
+    async def set_buzzer_settings(
+        self,
+        frequency: int | None = None,
+        duration_ms: int | None = None,
+        volume_percent: int | None = None,
+    ) -> dict:
+        status = await self.buzzer.set_settings(frequency, duration_ms, volume_percent)
         await self.broadcast({"type": "buzzer_changed", "buzzer": status})
         return status
 

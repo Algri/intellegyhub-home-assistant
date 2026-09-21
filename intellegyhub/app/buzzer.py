@@ -35,6 +35,8 @@ class BuzzerManager:
         self._lock = asyncio.Lock()
         self._active_task: asyncio.Task | None = None
         self._active_backend: str | None = None
+        self.frequency = 2000
+        self.duration_ms = 300
         self.volume_percent = 50
 
     def status(self) -> dict[str, Any]:
@@ -60,6 +62,8 @@ class BuzzerManager:
                 "running": self._active_task is not None,
                 "backend": self._active_backend,
             },
+            "frequency": self.frequency,
+            "duration_ms": self.duration_ms,
             "volume_percent": self.volume_percent,
             "max_physical_duty": MAX_PHYSICAL_DUTY,
         }
@@ -69,11 +73,27 @@ class BuzzerManager:
             await self._stop_locked()
 
     async def set_volume_percent(self, volume_percent: int) -> dict[str, Any]:
-        self._validate_volume(volume_percent)
-        self.volume_percent = int(volume_percent)
+        return await self.set_settings(volume_percent=volume_percent)
+
+    async def set_settings(
+        self,
+        frequency: int | None = None,
+        duration_ms: int | None = None,
+        volume_percent: int | None = None,
+    ) -> dict[str, Any]:
+        next_frequency = self.frequency if frequency is None else int(frequency)
+        next_duration = self.duration_ms if duration_ms is None else int(duration_ms)
+        next_volume = self.volume_percent if volume_percent is None else int(volume_percent)
+        self._validate(next_frequency, next_duration, next_volume)
+        self.frequency = next_frequency
+        self.duration_ms = next_duration
+        self.volume_percent = next_volume
         return self.status()
 
-    async def test_pwm(self, frequency: int, duration_ms: int, duty: float | None = None, volume_percent: int | None = None) -> dict[str, Any]:
+    async def test_configured_pwm(self) -> dict[str, Any]:
+        return await self.play_pwm(self.frequency, self.duration_ms, volume_percent=self.volume_percent)
+
+    async def play_pwm(self, frequency: int, duration_ms: int, duty: float | None = None, volume_percent: int | None = None) -> dict[str, Any]:
         volume = self._resolve_volume(duty, volume_percent)
         self._validate(frequency, duration_ms, volume)
         physical_duty = volume_percent_to_duty(volume)
@@ -83,6 +103,8 @@ class BuzzerManager:
                 await asyncio.to_thread(self._start_pigpio_pwm, frequency, physical_duty)
                 self._active_backend = "pigpio_hardware_pwm"
                 self._active_task = asyncio.create_task(self._auto_stop_after(duration_ms))
+            self.frequency = int(frequency)
+            self.duration_ms = int(duration_ms)
             self.volume_percent = int(volume)
             return {
                 "status": "ok",
@@ -106,6 +128,8 @@ class BuzzerManager:
             finally:
                 await asyncio.to_thread(self._disable_pwm)
                 self._active_backend = None
+            self.frequency = int(frequency)
+            self.duration_ms = int(duration_ms)
             self.volume_percent = int(volume)
         return {
             "status": "ok",
@@ -116,6 +140,9 @@ class BuzzerManager:
             **self.status(),
         }
 
+    async def test_pwm(self, frequency: int, duration_ms: int, duty: float | None = None, volume_percent: int | None = None) -> dict[str, Any]:
+        return await self.play_pwm(frequency, duration_ms, duty, volume_percent)
+
     async def test_gpio(self, frequency: int, duration_ms: int, duty: float | None = None, volume_percent: int | None = None) -> dict[str, Any]:
         volume = self._resolve_volume(duty, volume_percent)
         self._validate(frequency, duration_ms, volume)
@@ -124,6 +151,8 @@ class BuzzerManager:
             await self._stop_locked()
             if physical_duty > 0:
                 await asyncio.to_thread(self._run_gpio_test, frequency, duration_ms, physical_duty)
+            self.frequency = int(frequency)
+            self.duration_ms = int(duration_ms)
             self.volume_percent = int(volume)
             return {
                 "status": "ok",

@@ -68,6 +68,12 @@
       }
     },
     "number": {
+      "buzzer_frequency": {
+        "name": "Buzzer Frequency"
+      },
+      "buzzer_duration": {
+        "name": "Buzzer Duration"
+      },
       "buzzer_volume": {
         "name": "Buzzer Volume"
       },
@@ -76,6 +82,9 @@
       }
     },
     "button": {
+      "buzzer_play": {
+        "name": "Play Buzzer"
+      },
       "xport_counter_reset": {
         "name": "Reset Counter"
       }

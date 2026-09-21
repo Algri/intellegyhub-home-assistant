@@ -87,16 +87,42 @@ class IntellegyHubApiClient:
             return await response.json()
 
     async def set_buzzer_volume(self, volume_percent: int) -> dict[str, Any]:
+        return await self.set_buzzer_settings(volume_percent=volume_percent)
+
+    async def set_buzzer_settings(
+        self,
+        frequency: int | None = None,
+        duration_ms: int | None = None,
+        volume_percent: int | None = None,
+    ) -> dict[str, Any]:
+        body = {
+            key: value
+            for key, value in {
+                "frequency": frequency,
+                "duration_ms": duration_ms,
+                "volume_percent": volume_percent,
+            }.items()
+            if value is not None
+        }
         async with self.session.put(
-            urljoin(self.base_url, "api/v1/buzzer/volume"),
-            json={"volume_percent": volume_percent},
+            urljoin(self.base_url, "api/v1/buzzer/settings"),
+            json=body,
             timeout=10,
         ) as response:
             if response.status != 200:
-                raise IntellegyHubApiError(f"Buzzer volume command failed with HTTP {response.status}")
+                raise IntellegyHubApiError(f"Buzzer settings command failed with HTTP {response.status}")
             payload = await response.json()
         if not isinstance(payload.get("volume_percent"), int):
-            raise IntellegyHubApiError("Invalid buzzer volume response")
+            raise IntellegyHubApiError("Invalid buzzer settings response")
+        return payload
+
+    async def play_buzzer(self) -> dict[str, Any]:
+        async with self.session.post(urljoin(self.base_url, "api/v1/buzzer/play"), timeout=10) as response:
+            if response.status != 200:
+                raise IntellegyHubApiError(f"Buzzer play command failed with HTTP {response.status}")
+            payload = await response.json()
+        if payload.get("status") != "ok":
+            raise IntellegyHubApiError("Invalid buzzer play response")
         return payload
 
     async def set_extension_power(self, on: bool) -> dict[str, Any]:

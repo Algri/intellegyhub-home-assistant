@@ -68,6 +68,12 @@ class BuzzerVolumePayload(BaseModel):
     volume_percent: int
 
 
+class BuzzerSettingsPayload(BaseModel):
+    frequency: int | None = None
+    duration_ms: int | None = None
+    volume_percent: int | None = None
+
+
 def collect_device_diagnostics() -> dict[str, list[str]]:
     return {
         "gpio": sorted(glob.glob("/dev/gpio*")),
@@ -107,7 +113,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.82 chip=%s led=%s active_low=%s button=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
+                "Starting v0.5.83 chip=%s led=%s active_low=%s button=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -142,7 +148,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.82", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.83", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 
@@ -563,7 +569,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           <span class="buzzer-volume-head"><span>Volume</span><strong id="buzzer-volume-value">50%</strong></span>
           <input id="buzzer-volume" type="range" min="0" max="100" step="1" value="50" oninput="updateBuzzerVolumeLabel()">
         </label>
-        <button onclick="testBuzzer('test-pwm')">Test PWM</button>
+        <button onclick="playBuzzer()">Play</button>
         <button onclick="stopBuzzer()">Stop</button>
       </div>
       <div id="buzzer-detail" class="buzzer-status"></div>
@@ -1140,6 +1146,19 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         volume_percent: volume
       };
     }
+    async function saveBuzzerSettings() {
+      const requested = buzzerPayload();
+      try {
+        await requestJson('api/v1/buzzer/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requested)
+        });
+      } catch (error) {
+        document.getElementById('buzzer-status').textContent = 'BUZZER: settings failed';
+        document.getElementById('buzzer-detail').textContent = JSON.stringify(error);
+      }
+    }
     function updateBuzzerVolumeLabel() {
       const value = Number(document.getElementById('buzzer-volume').value);
       document.getElementById('buzzer-volume-value').textContent = `${value}%`;
@@ -1156,18 +1175,24 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     function paintBuzzer(payload) {
       if (!payload) return;
+      if (payload.frequency !== undefined) {
+        document.getElementById('buzzer-frequency').value = Number(payload.frequency);
+      }
+      if (payload.duration_ms !== undefined) {
+        document.getElementById('buzzer-duration').value = Number(payload.duration_ms);
+      }
       const volume = Number(payload.volume_percent ?? 50);
       document.getElementById('buzzer-volume').value = volume;
       updateBuzzerVolumeLabel();
       const state = payload.active && payload.active.running ? `running ${payload.active.backend}` : 'stopped';
       document.getElementById('buzzer-status').textContent = `BUZZER: ${state}`;
     }
-    async function testBuzzer(kind) {
+    async function playBuzzer() {
       const detail = document.getElementById('buzzer-detail');
       const requested = buzzerPayload();
-      detail.textContent = `Running ${kind}...`;
+      detail.textContent = 'Playing buzzer...';
       try {
-        const payload = await requestJson(`api/v1/buzzer/${kind}`, {
+        const payload = await requestJson('api/v1/buzzer/play-pwm', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(requested)
@@ -1190,20 +1215,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         document.getElementById('buzzer-detail').textContent = JSON.stringify(error);
       }
     }
-    document.getElementById('buzzer-volume').addEventListener('change', async () => {
-      const volume = Number(document.getElementById('buzzer-volume').value);
-      updateBuzzerVolumeLabel();
-      try {
-        await requestJson('api/v1/buzzer/volume', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ volume_percent: volume })
-        });
-      } catch (error) {
-        document.getElementById('buzzer-status').textContent = 'BUZZER: volume failed';
-        document.getElementById('buzzer-detail').textContent = JSON.stringify(error);
-      }
-    });
+    document.getElementById('buzzer-frequency').addEventListener('change', saveBuzzerSettings);
+    document.getElementById('buzzer-duration').addEventListener('change', saveBuzzerSettings);
+    document.getElementById('buzzer-volume').addEventListener('change', saveBuzzerSettings);
     document.addEventListener('click', (event) => {
       if (!event.target.closest('.mode-select')) {
         document.querySelectorAll('.mode-select.open').forEach((item) => item.classList.remove('open'));
@@ -1324,11 +1338,36 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    @app.post("/api/v1/buzzer/test-pwm")
-    async def post_buzzer_test_pwm(payload: BuzzerTestPayload) -> dict:
+    @app.put("/api/v1/buzzer/settings")
+    async def put_buzzer_settings(payload: BuzzerSettingsPayload) -> dict:
+        try:
+            return await runtime_or_503().set_buzzer_settings(
+                frequency=payload.frequency,
+                duration_ms=payload.duration_ms,
+                volume_percent=payload.volume_percent,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/api/v1/buzzer/play")
+    async def post_buzzer_play() -> dict:
         try:
             current = runtime_or_503()
-            result = await current.buzzer.test_pwm(
+            result = await current.buzzer.test_configured_pwm()
+            await current.broadcast({"type": "buzzer_changed", "buzzer": current.buzzer.status()})
+            return result
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except OSError as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+        except RuntimeError as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    @app.post("/api/v1/buzzer/play-pwm")
+    async def post_buzzer_play_pwm(payload: BuzzerTestPayload) -> dict:
+        try:
+            current = runtime_or_503()
+            result = await current.buzzer.play_pwm(
                 payload.frequency,
                 payload.duration_ms,
                 payload.duty,
@@ -1342,6 +1381,14 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
             raise HTTPException(status_code=500, detail=str(exc)) from exc
         except RuntimeError as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    @app.post("/api/v1/buzzer/test-configured")
+    async def post_buzzer_test_configured() -> dict:
+        return await post_buzzer_play()
+
+    @app.post("/api/v1/buzzer/test-pwm")
+    async def post_buzzer_test_pwm(payload: BuzzerTestPayload) -> dict:
+        return await post_buzzer_play_pwm(payload)
 
     @app.post("/api/v1/buzzer/test-gpio")
     async def post_buzzer_test_gpio(payload: BuzzerTestPayload) -> dict:
