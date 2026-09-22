@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.106
+
+- Keep X-Port cards stable while live telemetry updates so mode dropdowns stay open in AI and other modes.
+
 ## 0.5.105
 
 - Polish add-on UI consistency across action bars, hover states, 1-Wire controls, and buzzer command layout.

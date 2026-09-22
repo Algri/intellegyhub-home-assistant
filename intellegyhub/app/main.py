@@ -118,7 +118,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.105 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
+                "Starting v0.5.106 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -153,7 +153,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.105", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.106", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 
@@ -573,7 +573,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           <dt>Hardware</dt>
           <dd id="carrier-identity-hardware">v1.4 Rev.A</dd>
           <dt>Software</dt>
-          <dd id="carrier-identity-software">v0.5.105</dd>
+          <dd id="carrier-identity-software">v0.5.106</dd>
         </dl>
         <div class="overview-divider"></div>
         <dl class="overview-health">
@@ -837,29 +837,68 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     function paintXPort(payload) {
       document.getElementById('xport-status').textContent = `X-PORT: ${payload.topology} - ${payload.availability}`;
       const ports = document.getElementById('ports');
-      ports.innerHTML = '';
+      const seen = new Set();
       for (const channel of payload.channels) {
-        const card = document.createElement('article');
-        card.className = 'port-card';
-        const title = document.createElement('div');
-        title.className = 'port-title';
-        title.textContent = `X${channel.channel}`;
-        const label = document.createElement('label');
-        label.textContent = 'Mode';
-        const modeSelect = renderModeSelect(channel, payload.modes);
-        const active = document.createElement('div');
-        active.className = 'active-mode';
-        const activeLabel = document.createElement('span');
-        activeLabel.textContent = 'Active mode:';
-        const activeValue = document.createElement('strong');
-        activeValue.textContent = labels[channel.confirmed_mode] || channel.confirmed_mode;
-        activeValue.title = activeValue.textContent;
-        active.append(activeLabel, activeValue);
-        const modeBody = document.createElement('div');
-        modeBody.className = 'mode-body';
-        modeBody.appendChild(renderModeBody(channel));
-        card.append(title, label, modeSelect, active, modeBody);
-        ports.appendChild(card);
+        const key = String(channel.channel);
+        seen.add(key);
+        let card = ports.querySelector(`[data-xport-channel="${key}"]`);
+        if (!card) {
+          card = renderXPortCard(channel, payload.modes);
+          ports.appendChild(card);
+        }
+        updateXPortCard(card, channel, payload.modes);
+      }
+      ports.querySelectorAll('[data-xport-channel]').forEach((card) => {
+        if (!seen.has(card.dataset.xportChannel)) { card.remove(); }
+      });
+    }
+    function renderXPortCard(channel, modes) {
+      const card = document.createElement('article');
+      card.className = 'port-card';
+      card.dataset.xportChannel = String(channel.channel);
+      const title = document.createElement('div');
+      title.className = 'port-title';
+      title.textContent = `X${channel.channel}`;
+      const label = document.createElement('label');
+      label.textContent = 'Mode';
+      const modeSelect = renderModeSelect(channel, modes);
+      const active = document.createElement('div');
+      active.className = 'active-mode';
+      const activeLabel = document.createElement('span');
+      activeLabel.textContent = 'Active mode:';
+      const activeValue = document.createElement('strong');
+      activeValue.className = 'active-mode-value';
+      active.append(activeLabel, activeValue);
+      const modeBody = document.createElement('div');
+      modeBody.className = 'mode-body';
+      card.append(title, label, modeSelect, active, modeBody);
+      return card;
+    }
+    function updateXPortCard(card, channel, modes) {
+      const desiredLabel = labels[channel.desired_mode] || channel.desired_mode;
+      const trigger = card.querySelector('.mode-trigger');
+      if (trigger && trigger.textContent !== desiredLabel) {
+        trigger.textContent = desiredLabel;
+      }
+      card.querySelectorAll('.mode-option').forEach((option) => {
+        option.classList.toggle('active', option.dataset.mode === channel.desired_mode);
+      });
+      const activeValue = card.querySelector('.active-mode-value');
+      const confirmedLabel = labels[channel.confirmed_mode] || channel.confirmed_mode;
+      if (activeValue && activeValue.textContent !== confirmedLabel) {
+        activeValue.textContent = confirmedLabel;
+        activeValue.title = confirmedLabel;
+      }
+      const body = card.querySelector('.mode-body');
+      const bodyKey = [
+        channel.confirmed_mode,
+        channel.error || '',
+        String(channel.value ?? ''),
+        String(channel.counter ?? '')
+      ].join('|');
+      if (body && body.dataset.bodyKey !== bodyKey) {
+        body.replaceChildren(renderModeBody(channel));
+        body.dataset.bodyKey = bodyKey;
       }
     }
     async function setMode(channel, mode) {
@@ -957,6 +996,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       for (const mode of orderedModes) {
         const option = document.createElement('button');
         option.type = 'button';
+        option.dataset.mode = mode;
         option.className = `mode-option ${mode === channel.desired_mode ? 'active' : ''}`;
         option.textContent = labels[mode] || mode;
         option.onclick = () => {
@@ -1059,7 +1099,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       document.getElementById('carrier-identity-model').textContent = identity.model || 'IntellegyHUB Controller';
       document.getElementById('carrier-identity-serial').textContent = identity.serial_number || 'IH1400-00001234';
       document.getElementById('carrier-identity-hardware').textContent = formatVersion(identity.hardware_revision || '1.4 Rev.A');
-      document.getElementById('carrier-identity-software').textContent = formatVersion(identity.software_version || '0.5.105');
+      document.getElementById('carrier-identity-software').textContent = formatVersion(identity.software_version || '0.5.106');
       document.getElementById('carrier-uptime').textContent = formatUptime(appInfo && appInfo.uptime_seconds);
       const monitoring = carrier && carrier.monitoring ? carrier.monitoring : {};
       const temperature = monitoring.temperature || {};
