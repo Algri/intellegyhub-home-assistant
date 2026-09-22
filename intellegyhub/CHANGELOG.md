@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.102
+
+- Keep the Service Tools diagnostics output open while background UI refreshes run.
+
 ## 0.5.101
 
 - Make 1-Wire bus power toggles return immediately while sensor scanning runs after power settles.
