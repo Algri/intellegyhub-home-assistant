@@ -8,6 +8,7 @@ import logging
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse
@@ -74,6 +75,10 @@ class BuzzerSettingsPayload(BaseModel):
     volume_percent: int | None = None
 
 
+class UiThemePayload(BaseModel):
+    theme: Literal["auto", "light", "dark"]
+
+
 def collect_device_diagnostics() -> dict[str, list[str]]:
     return {
         "gpio": sorted(glob.glob("/dev/gpio*")),
@@ -113,7 +118,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.97 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
+                "Starting v0.5.98 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -148,7 +153,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.97", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.98", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 
@@ -211,8 +216,31 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       --ha-text: #e8eaed;
       --ha-secondary: #b8c5d0;
       --ha-field: #202020;
+      --ha-surface: #202020;
+      --ha-row: #1b1b1b;
+      --ha-row-border: #333333;
+      --ha-menu-hover: #2a2a2a;
+      --ha-strong: #ffffff;
+      --ha-pre: #0b0b0b;
+      --ha-action-hover: rgba(3, 169, 244, .14);
       background: var(--ha-page);
       color: var(--ha-text);
+    }
+    html[data-theme="light"] {
+      color-scheme: light;
+      --ha-page: #f3f5f7;
+      --ha-card: #ffffff;
+      --ha-card-border: #d6dde5;
+      --ha-text: #111827;
+      --ha-secondary: #536170;
+      --ha-field: #f8fafc;
+      --ha-surface: #f8fafc;
+      --ha-row: #ffffff;
+      --ha-row-border: #d6dde5;
+      --ha-menu-hover: #e8f4fb;
+      --ha-strong: #0f172a;
+      --ha-pre: #111827;
+      --ha-action-hover: rgba(3, 169, 244, .12);
     }
     * { box-sizing: border-box; }
     body {
@@ -222,6 +250,11 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       color: var(--ha-text);
     }
     main { width: min(100%, 1520px); margin: 0 auto; }
+    .app-toolbar { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+    .theme-switcher { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--ha-card-border); border-radius: 999px; background: var(--ha-card); padding: 4px; }
+    .theme-switcher span { color: var(--ha-secondary); font-size: 12px; font-weight: 800; padding: 0 8px; text-transform: uppercase; letter-spacing: .08em; }
+    .theme-choice { min-height: 30px !important; border-radius: 999px !important; padding: 4px 12px !important; border-color: transparent !important; color: var(--ha-secondary) !important; }
+    .theme-choice.active { border-color: var(--ha-primary) !important; color: var(--ha-primary) !important; background: rgba(3, 169, 244, .12) !important; }
     .overview-panel { display: grid; grid-template-columns: minmax(320px, .9fr) minmax(520px, 1.5fr); gap: 0; margin-top: 0; margin-bottom: 18px; padding: 0; overflow: hidden; }
     .overview-identity { display: flex; flex-direction: column; min-height: 270px; padding: 22px 28px; border-right: 1px solid var(--ha-card-border); font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; }
     .overview-badge-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 14px; }
@@ -264,7 +297,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .transport { border: 1px solid var(--ha-primary); color: var(--ha-primary); background: transparent; border-radius: 999px; padding: 6px 14px; font-size: 12px; font-weight: 500; margin-top: 38px; }
     .notice { color: var(--ha-secondary); font-size: 14px; line-height: 1.45; margin: 0 0 20px; overflow-wrap: anywhere; }
     .ports { display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 16px; }
-    .port-card { border: 1px solid var(--ha-card-border); border-radius: 12px; background: #202020; padding: 20px; min-height: 228px; }
+    .port-card { border: 1px solid var(--ha-card-border); border-radius: 12px; background: var(--ha-surface); padding: 20px; min-height: 228px; }
     .port-title { font-size: 17px; font-weight: 800; margin-bottom: 20px; }
     label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 8px; }
     .mode-select { position: relative; }
@@ -272,7 +305,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       width: 100%;
       height: 48px;
       border-radius: 8px;
-      border: 1px solid #4a4a4a;
+      border: 1px solid var(--ha-row-border);
       background: var(--ha-field);
       color: var(--ha-text);
       padding: 0 42px 0 16px;
@@ -303,9 +336,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       left: 0;
       right: 0;
       overflow: visible;
-      border: 1px solid #4a4a4a;
+      border: 1px solid var(--ha-row-border);
       border-radius: 8px;
-      background: #202020;
+      background: var(--ha-surface);
       box-shadow: 0 8px 20px rgba(0, 0, 0, .42);
       padding: 4px 0;
     }
@@ -323,8 +356,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     .mode-option:hover,
     .mode-option.active {
-      background: #2a2a2a;
-      color: #ffffff;
+      background: var(--ha-menu-hover);
+      color: var(--ha-strong);
     }
     .active-mode {
       display: flex;
@@ -346,7 +379,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       vertical-align: bottom;
     }
     .mode-body { color: var(--ha-secondary); font-size: 15px; line-height: 1.6; margin-top: 26px; min-height: 54px; }
-    .metric strong, .active-mode strong { color: #ffffff; font-weight: 700; }
+    .metric strong, .active-mode strong { color: var(--ha-strong); font-weight: 700; }
     .mode-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
     .switch-row { justify-content: space-between; flex-wrap: nowrap; width: 100%; }
     .toggle {
@@ -411,13 +444,13 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .diagnostics-output { margin-top: 16px; }
     .extension-panel { margin-top: 18px; border: 1px solid var(--ha-card-border); border-radius: 12px; background: var(--ha-card); box-shadow: 0 2px 4px rgba(0, 0, 0, .22); padding: 24px; }
     .extension-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 18px; }
-    .bus-toolbar { align-items: stretch; border: 1px solid var(--ha-card-border); border-radius: 10px; background: #202020; padding: 12px; }
+    .bus-toolbar { align-items: stretch; border: 1px solid var(--ha-card-border); border-radius: 10px; background: var(--ha-surface); padding: 12px; }
     .bus-power-control { display: flex; align-items: center; gap: 10px; min-height: 42px; padding-right: 6px; }
     .bus-power-control .metric { white-space: nowrap; }
     .bus-note { color: var(--ha-secondary); font-size: 13px; line-height: 1.4; flex: 1 1 360px; align-self: center; }
     .bus-action { min-width: 142px; }
     .modules { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 18px; }
-    .module-card { border: 1px solid var(--ha-card-border); border-radius: 12px; background: #202020; padding: 18px; }
+    .module-card { border: 1px solid var(--ha-card-border); border-radius: 12px; background: var(--ha-surface); padding: 18px; }
     .module-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; margin-bottom: 18px; }
     .module-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
     .status-pill { min-height: 30px; padding: 6px 10px; border-radius: 999px; border: 1px solid #36543e; color: #8ff0a4; background: rgba(0, 200, 83, .08); font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
@@ -427,14 +460,14 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .danger-button { border-color: #5f3434; color: #ffb4ab; background: transparent; min-height: 34px; padding: 6px 12px; }
     .danger-button:hover, .danger-button:focus-visible { border-color: #ff8a80; background: rgba(244, 67, 54, .14); color: #ffd4cf; outline: none; }
     .relay-grid { display: grid; grid-template-columns: repeat(8, minmax(120px, 1fr)); gap: 10px 14px; align-items: stretch; }
-    .relay-row { display: grid; grid-template-columns: minmax(58px, 1fr) auto auto; align-items: center; gap: 10px; color: var(--ha-text); min-height: 42px; border: 1px solid #333; border-radius: 8px; padding: 8px 10px; background: #1b1b1b; }
+    .relay-row { display: grid; grid-template-columns: minmax(58px, 1fr) auto auto; align-items: center; gap: 10px; color: var(--ha-text); min-height: 42px; border: 1px solid var(--ha-row-border); border-radius: 8px; padding: 8px 10px; background: var(--ha-row); }
     .relay-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .state-text { min-width: 30px; text-align: right; color: var(--ha-secondary); font-size: 12px; font-weight: 800; letter-spacing: .04em; }
     .state-text.on { color: #8be9fd; }
     .carrier-io-grid { display: grid; grid-template-columns: repeat(4, minmax(180px, 1fr)); gap: 16px; margin-top: 18px; }
-    .carrier-io-card { border: 1px solid var(--ha-card-border); border-radius: 12px; background: #202020; padding: 16px; min-width: 0; }
+    .carrier-io-card { border: 1px solid var(--ha-card-border); border-radius: 12px; background: var(--ha-surface); padding: 16px; min-width: 0; }
     .carrier-io-title { font-size: 17px; font-weight: 800; margin-bottom: 14px; }
-    .carrier-io-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; min-height: 42px; border: 1px solid #333; border-radius: 8px; padding: 8px 10px; background: #1b1b1b; }
+    .carrier-io-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; min-height: 42px; border: 1px solid var(--ha-row-border); border-radius: 8px; padding: 8px 10px; background: var(--ha-row); }
     .carrier-io-row + .carrier-io-row { margin-top: 10px; }
     .carrier-io-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .buzzer-panel {
@@ -445,7 +478,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       align-items: stretch;
       min-width: 0;
     }
-    .buzzer-group { border: 1px solid var(--ha-card-border); border-radius: 10px; background: #202020; padding: 16px; min-width: 0; }
+    .buzzer-group { border: 1px solid var(--ha-card-border); border-radius: 10px; background: var(--ha-surface); padding: 16px; min-width: 0; }
     .buzzer-group-title { color: var(--ha-secondary); font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 14px; }
     .buzzer-settings { display: grid; gap: 12px; }
     .buzzer-row { display: grid; grid-template-columns: minmax(100px, 150px) minmax(0, 1fr); align-items: center; gap: 14px; min-height: 40px; }
@@ -453,10 +486,10 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .buzzer-volume-label { color: var(--ha-text); font-size: 13px; font-weight: 700; }
     .buzzer-input-wrap { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; }
     .buzzer-input-wrap span { color: var(--ha-secondary); font-size: 12px; font-weight: 800; min-width: 26px; }
-    .buzzer-field input { width: 100%; height: 38px; border: 1px solid #4a4a4a; border-radius: 8px; background: var(--ha-field); color: var(--ha-text); padding: 0 10px; font-weight: 600; }
+    .buzzer-field input { width: 100%; height: 38px; border: 1px solid var(--ha-row-border); border-radius: 8px; background: var(--ha-field); color: var(--ha-text); padding: 0 10px; font-weight: 600; }
     .buzzer-volume-control { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) 44px; align-items: center; gap: 12px; }
     .buzzer-volume-control input { height: 38px; margin: 0; }
-    .buzzer-volume-control strong { color: #ffffff; text-align: right; font-size: 13px; }
+    .buzzer-volume-control strong { color: var(--ha-strong); text-align: right; font-size: 13px; }
     .buzzer-actions { display: grid; grid-template-rows: auto auto 1fr; gap: 12px; }
     .buzzer-actions button { width: 100%; height: 40px; }
     .buzzer-status { margin-top: 14px; color: var(--ha-secondary); font-size: 13px; overflow-wrap: anywhere; max-width: 980px; }
@@ -476,7 +509,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     button:not(.toggle):not(.mode-trigger):not(.mode-option):hover,
     button:not(.toggle):not(.mode-trigger):not(.mode-option):focus-visible {
       border-color: #4fc3f7;
-      background: rgba(3, 169, 244, .14);
+      background: var(--ha-action-hover);
       color: #b3e5fc;
       outline: none;
     }
@@ -490,17 +523,25 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       background: transparent;
       color: var(--ha-secondary);
     }
-    pre { display: none; min-height: 180px; max-height: 360px; overflow: auto; border: 1px solid var(--ha-card-border); border-radius: 8px; padding: 14px; background: #0b0b0b; color: var(--ha-text); font-size: 13px; }
+    pre { display: none; min-height: 180px; max-height: 360px; overflow: auto; border: 1px solid var(--ha-card-border); border-radius: 8px; padding: 14px; background: var(--ha-pre); color: #e5edf7; font-size: 13px; }
     pre.visible { display: block; }
     @media (max-width: 1300px) { .relay-grid { grid-template-columns: repeat(4, minmax(140px, 1fr)); } }
     @media (max-width: 1300px) { .overview-panel { grid-template-columns: 1fr; } .overview-identity { border-right: 0; border-bottom: 1px solid var(--ha-card-border); min-height: 240px; } }
     @media (max-width: 1100px) { .ports, .carrier-io-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .relay-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); } }
     @media (max-width: 900px) { .buzzer-panel { grid-template-columns: 1fr; } .buzzer-actions { grid-template-columns: repeat(2, minmax(120px, 1fr)); grid-template-rows: auto; } .buzzer-actions .buzzer-group-title { grid-column: 1 / -1; } }
-    @media (max-width: 620px) { body { padding: 10px; } .overview-identity { min-height: 220px; padding: 22px 18px; } .overview-title h1 { font-size: 30px; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+2) { border-right: 0; border-bottom: 1px solid var(--ha-card-border); } .overview-metric:last-child { border-bottom: 0; } .xport-panel { padding: 18px 14px; border-radius: 12px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .ports, .carrier-io-grid, .relay-grid { grid-template-columns: 1fr; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-row { grid-template-columns: 1fr; gap: 6px; } }
+    @media (max-width: 620px) { body { padding: 10px; } .app-toolbar { justify-content: stretch; } .theme-switcher { width: 100%; justify-content: space-between; } .theme-choice { flex: 1; } .overview-identity { min-height: 220px; padding: 22px 18px; } .overview-title h1 { font-size: 30px; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+2) { border-right: 0; border-bottom: 1px solid var(--ha-card-border); } .overview-metric:last-child { border-bottom: 0; } .xport-panel { padding: 18px 14px; border-radius: 12px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .ports, .carrier-io-grid, .relay-grid { grid-template-columns: 1fr; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-row { grid-template-columns: 1fr; gap: 6px; } }
   </style>
 </head>
 <body>
   <main>
+    <div class="app-toolbar">
+      <div class="theme-switcher" role="group" aria-label="Theme">
+        <span>Theme</span>
+        <button class="theme-choice" type="button" data-theme-choice="auto" onclick="setTheme('auto')">Auto</button>
+        <button class="theme-choice" type="button" data-theme-choice="light" onclick="setTheme('light')">Light</button>
+        <button class="theme-choice" type="button" data-theme-choice="dark" onclick="setTheme('dark')">Dark</button>
+      </div>
+    </div>
     <section class="extension-panel overview-panel">
       <div class="overview-identity">
         <div class="overview-badge-row">
@@ -518,7 +559,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           <dt>Hardware</dt>
           <dd id="carrier-identity-hardware">1.4 Rev.A</dd>
           <dt>Software</dt>
-          <dd id="carrier-identity-software">0.5.97</dd>
+          <dd id="carrier-identity-software">0.5.98</dd>
         </dl>
         <div class="overview-divider"></div>
         <dl class="overview-health">
@@ -708,6 +749,45 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       'PulseCounterInternalPullUp'
     ];
     let latestAppInfo = { uptime_seconds: 0 };
+    let selectedTheme = 'auto';
+    const themeMedia = window.matchMedia('(prefers-color-scheme: dark)');
+    function resolvedTheme(theme) {
+      return theme === 'auto' ? (themeMedia.matches ? 'dark' : 'light') : theme;
+    }
+    function applyTheme(theme) {
+      selectedTheme = ['auto', 'light', 'dark'].includes(theme) ? theme : 'auto';
+      document.documentElement.dataset.themeChoice = selectedTheme;
+      document.documentElement.dataset.theme = resolvedTheme(selectedTheme);
+      document.querySelectorAll('.theme-choice').forEach((button) => {
+        button.classList.toggle('active', button.dataset.themeChoice === selectedTheme);
+      });
+    }
+    async function loadTheme() {
+      try {
+        const payload = await requestJson('api/v1/ui/settings');
+        applyTheme(payload.theme);
+      } catch (error) {
+        applyTheme('auto');
+      }
+    }
+    async function setTheme(theme) {
+      applyTheme(theme);
+      try {
+        const payload = await requestJson('api/v1/ui/theme', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ theme })
+        });
+        applyTheme(payload.theme);
+      } catch (error) {
+        await loadTheme();
+      }
+    }
+    themeMedia.addEventListener('change', () => {
+      if (selectedTheme === 'auto') {
+        applyTheme('auto');
+      }
+    });
     function apiUrl(path) {
       const basePath = window.location.pathname.endsWith('/') ? window.location.pathname : window.location.pathname + '/';
       return new URL(path, window.location.origin + basePath);
@@ -962,7 +1042,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       document.getElementById('carrier-identity-model').textContent = identity.model || 'IntellegyHUB Controller';
       document.getElementById('carrier-identity-serial').textContent = identity.serial_number || 'IH1400-00001234';
       document.getElementById('carrier-identity-hardware').textContent = identity.hardware_revision || '1.4 Rev.A';
-      document.getElementById('carrier-identity-software').textContent = identity.software_version || '0.5.97';
+      document.getElementById('carrier-identity-software').textContent = identity.software_version || '0.5.98';
       document.getElementById('carrier-uptime').textContent = formatUptime(appInfo && appInfo.uptime_seconds);
       const monitoring = carrier && carrier.monitoring ? carrier.monitoring : {};
       const temperature = monitoring.temperature || {};
@@ -1406,6 +1486,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       socket.onmessage = (event) => {
         const message = JSON.parse(event.data);
         if (message.type === 'state') {
+          applyTheme(message.ui && message.ui.theme ? message.ui.theme : selectedTheme);
           paintCarrier(message.carrier, message.app);
           paintCarrierIO(message.carrier, message.outputs || {}, message.buttons || {});
           paintXPort(message.xport);
@@ -1439,6 +1520,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           renderOneWire();
         } else if (message.type === 'buzzer_changed') {
           paintBuzzer(message.buzzer);
+        } else if (message.type === 'ui_changed') {
+          applyTheme(message.ui && message.ui.theme ? message.ui.theme : 'auto');
         }
       };
       socket.onopen = () => console.info('IntellegyHUB WebSocket connected', url.href);
@@ -1533,6 +1616,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         document.querySelectorAll('.mode-select.open').forEach((item) => item.classList.remove('open'));
       }
     });
+    applyTheme('auto');
+    loadTheme();
     renderXPort();
     renderCarrierIO();
     renderExtensions();
@@ -1555,6 +1640,14 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     @app.get("/api/v1/state")
     async def get_state() -> dict:
         return await runtime_or_503().async_snapshot()
+
+    @app.get("/api/v1/ui/settings")
+    async def get_ui_settings() -> dict:
+        return runtime_or_503().ui_settings.snapshot()
+
+    @app.put("/api/v1/ui/theme")
+    async def put_ui_theme(payload: UiThemePayload) -> dict:
+        return await runtime_or_503().set_ui_theme(payload.theme)
 
     @app.get("/api/v1/xport")
     async def get_xport() -> dict:

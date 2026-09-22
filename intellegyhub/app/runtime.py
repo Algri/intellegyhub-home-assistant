@@ -12,6 +12,7 @@ from .buzzer import BuzzerManager
 from .carrier import CarrierManager
 from .extensions import ExtensionHardware, ExtensionManager
 from .onewire import OneWireHardware, OneWireManager
+from .ui_settings import UiSettings, UiSettingsStore, UiTheme
 from .xport import XPortManager
 
 LOGGER = logging.getLogger(__name__)
@@ -33,6 +34,8 @@ class AppRuntime:
         self.xport = XPortManager()
         self.extensions = ExtensionManager(hardware=ExtensionHardware(self.carrier))
         self.onewire = OneWireManager(hardware=OneWireHardware(self.carrier), poll_intervals=onewire_poll_intervals)
+        self.ui_store = UiSettingsStore()
+        self.ui_settings = UiSettings()
         self.state = HardwareState()
         self.ready = False
         self.error: str | None = "startup pending"
@@ -45,6 +48,8 @@ class AppRuntime:
 
     async def start(self) -> None:
         try:
+            await self.ui_store.initialize()
+            self.ui_settings = await self.ui_store.load()
             self.state = await self.backend.start(self.handle_button_changed)
             self.carrier.set_publisher(self.broadcast)
             self.xport.set_publisher(self.broadcast)
@@ -127,6 +132,7 @@ class AppRuntime:
             "extensions": self.extensions.snapshot(),
             "onewire": self.onewire.snapshot(),
             "buzzer": self.buzzer.status(),
+            "ui": self.ui_settings.snapshot(),
         }
 
     async def async_snapshot(self) -> dict[str, Any]:
@@ -174,6 +180,13 @@ class AppRuntime:
         status = await self.buzzer.set_settings(frequency, duration_ms, volume_percent)
         await self.broadcast({"type": "buzzer_changed", "buzzer": status})
         return status
+
+    async def set_ui_theme(self, theme: UiTheme) -> dict[str, str]:
+        self.ui_settings = UiSettings(theme=theme)
+        await self.ui_store.save(self.ui_settings)
+        payload = self.ui_settings.snapshot()
+        await self.broadcast({"type": "ui_changed", "ui": payload})
+        return payload
 
     async def handle_button_changed(self, button_id: str, pressed: bool) -> None:
         if button_id not in BUTTONS:

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.98
+
+- Add a persisted add-on theme switcher backed by the existing SQLite state database.
+- Support Auto, Light, and Dark add-on UI themes without using browser localStorage.
+
 ## 0.5.97
 
 - Fix X-Port service diagnostics by adding the missing shared X-Port paint function.
