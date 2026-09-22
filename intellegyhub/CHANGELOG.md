@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.117
+
+- Keep host entities on the Hardware Host device while exposing compact dashboard names without the repeated Hardware Host prefix.
+
 ## 0.5.116
 
 - Restore Home Assistant device-scoped entity naming and document explicit Lovelace tile names for compact dashboard cards.

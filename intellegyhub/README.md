@@ -65,9 +65,9 @@ integration`.
 
 ## Dashboard Cards
 
-Home Assistant entity names are device-scoped by design, so an automatically
-added tile can show names such as `Hardware Host Buzzer Volume`. For dashboard
-cards that should use a compact label, set the Lovelace card `name` explicitly.
+Host entities keep their `Hardware Host` device association, but expose compact
+entity names for dashboard tiles. Use explicit Lovelace `name` values when a
+card needs a custom label or a wider slider layout.
 
 Recommended buzzer volume tile:
 
