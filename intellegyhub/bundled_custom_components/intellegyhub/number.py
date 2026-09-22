@@ -67,6 +67,7 @@ class IntellegyHubBuzzerVolumeNumber(IntellegyHubGpioEntity, NumberEntity):
     _attr_translation_key = "buzzer_volume"
     _attr_unique_id = "intellegyhub_buzzer_volume"
     _attr_name = "Buzzer Volume"
+    _attr_icon = "mdi:volume-high"
     _attr_native_min_value = 0
     _attr_native_max_value = 100
     _attr_native_step = 1
@@ -86,6 +87,7 @@ class IntellegyHubBuzzerFrequencyNumber(IntellegyHubGpioEntity, NumberEntity):
     _attr_translation_key = "buzzer_frequency"
     _attr_unique_id = "intellegyhub_buzzer_frequency"
     _attr_name = "Buzzer Frequency"
+    _attr_icon = "mdi:sine-wave"
     _attr_native_min_value = 20
     _attr_native_max_value = 2800
     _attr_native_step = 10
@@ -105,6 +107,7 @@ class IntellegyHubBuzzerDurationNumber(IntellegyHubGpioEntity, NumberEntity):
     _attr_translation_key = "buzzer_duration"
     _attr_unique_id = "intellegyhub_buzzer_duration"
     _attr_name = "Buzzer Duration"
+    _attr_icon = "mdi:timer-outline"
     _attr_native_min_value = 10
     _attr_native_max_value = 5000
     _attr_native_step = 10

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.113
+
+- Add dashboard-friendly icons to Home Assistant buzzer number entities.
+
 ## 0.5.112
 
 - Limit buzzer PWM frequency to the verified stable range and map UI volume linearly into the calibrated physical duty range.
