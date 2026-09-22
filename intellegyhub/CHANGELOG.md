@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.123
+
+- Restore xDO-8 relay tile icons to the relay-style toggle variant shown by Home Assistant while keeping compact relay names.
+
 ## 0.5.122
 
 - Restore stateful switch-style icons for xDO relay outputs and xDI input states.
