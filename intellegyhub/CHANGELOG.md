@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.111
+
+- Fall back to sysfs PWM when pigpio is unavailable so the buzzer can still play if `pigpiod` fails to start.
+
 ## 0.5.110
 
 - Restore the previous `pigpiod` startup flags while keeping buzzer status polling from opening pigpio socket connections.

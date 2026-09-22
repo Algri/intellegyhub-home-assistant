@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import io
 import os
 import sys
 import time
@@ -101,16 +103,17 @@ class BuzzerManager:
         physical_duty = volume_percent_to_duty(volume)
         async with self._lock:
             await self._stop_locked()
+            backend = "disabled"
             if physical_duty > 0:
-                await asyncio.to_thread(self._start_pigpio_pwm, frequency, physical_duty)
-                self._active_backend = "pigpio_hardware_pwm"
+                backend = await asyncio.to_thread(self._start_hardware_pwm, frequency, physical_duty)
+                self._active_backend = backend
                 self._active_task = asyncio.create_task(self._auto_stop_after(duration_ms))
             self.frequency = int(frequency)
             self.duration_ms = int(duration_ms)
             self.volume_percent = int(volume)
             return {
                 "status": "ok",
-                "backend": "pigpio_hardware_pwm",
+                "backend": backend,
                 "duration_ms": duration_ms,
                 "volume_percent": self.volume_percent,
                 "physical_duty": physical_duty,
@@ -123,10 +126,11 @@ class BuzzerManager:
         physical_duty = volume_percent_to_duty(volume)
         async with self._lock:
             await self._stop_locked()
-            self._active_backend = "pigpio_hardware_pwm"
+            backend = "disabled"
             try:
                 if physical_duty > 0:
-                    await asyncio.to_thread(self._run_pigpio_pwm_once, frequency, duration_ms, physical_duty)
+                    backend = await asyncio.to_thread(self._run_hardware_pwm_once, frequency, duration_ms, physical_duty)
+                    self._active_backend = backend
             finally:
                 await asyncio.to_thread(self._disable_pwm)
                 self._active_backend = None
@@ -135,7 +139,7 @@ class BuzzerManager:
             self.volume_percent = int(volume)
         return {
             "status": "ok",
-            "backend": "pigpio_hardware_pwm",
+            "backend": backend,
             "duration_ms": duration_ms,
             "volume_percent": self.volume_percent,
             "physical_duty": physical_duty,
@@ -189,9 +193,32 @@ class BuzzerManager:
         except asyncio.CancelledError:
             raise
 
+    def _start_hardware_pwm(self, frequency: int, duty: float) -> str:
+        try:
+            self._start_pigpio_pwm(frequency, duty)
+            return "pigpio_hardware_pwm"
+        except Exception as pigpio_exc:
+            try:
+                self._start_sysfs_pwm(frequency, duty)
+                return "sysfs_pwm"
+            except Exception as sysfs_exc:
+                raise RuntimeError(f"pigpio failed: {pigpio_exc}; sysfs pwm failed: {sysfs_exc}") from sysfs_exc
+
+    def _run_hardware_pwm_once(self, frequency: int, duration_ms: int, duty: float) -> str:
+        try:
+            self._run_pigpio_pwm_once(frequency, duration_ms, duty)
+            return "pigpio_hardware_pwm"
+        except Exception as pigpio_exc:
+            try:
+                self._run_pwm_test(frequency, duration_ms, duty)
+                return "sysfs_pwm"
+            except Exception as sysfs_exc:
+                raise RuntimeError(f"pigpio failed: {pigpio_exc}; sysfs pwm failed: {sysfs_exc}") from sysfs_exc
+
     def _start_pigpio_pwm(self, frequency: int, duty: float) -> None:
         pigpio = self._import_pigpio()
-        pi = pigpio.pi(PIGPIO_HOST, PIGPIO_PORT)
+        with contextlib.redirect_stderr(io.StringIO()):
+            pi = pigpio.pi(PIGPIO_HOST, PIGPIO_PORT)
         try:
             if not pi.connected:
                 self._pigpio_connected = False
@@ -211,7 +238,8 @@ class BuzzerManager:
 
     def _run_pigpio_pwm_once(self, frequency: int, duration_ms: int, duty: float) -> None:
         pigpio = self._import_pigpio()
-        pi = pigpio.pi(PIGPIO_HOST, PIGPIO_PORT)
+        with contextlib.redirect_stderr(io.StringIO()):
+            pi = pigpio.pi(PIGPIO_HOST, PIGPIO_PORT)
         try:
             if not pi.connected:
                 self._pigpio_connected = False
@@ -237,6 +265,13 @@ class BuzzerManager:
     def _run_pwm_test(self, frequency: int, duration_ms: int, duty: float) -> None:
         if not self.pwmchip.exists():
             raise RuntimeError(f"{self.pwmchip} does not exist")
+        self._start_sysfs_pwm(frequency, duty)
+        time.sleep(duration_ms / 1000)
+        self._write_text(self._pwm_path() / "enable", "0")
+
+    def _start_sysfs_pwm(self, frequency: int, duty: float) -> None:
+        if not self.pwmchip.exists():
+            raise RuntimeError(f"{self.pwmchip} does not exist")
         self._export_pwm()
         pwm_path = self._pwm_path()
         period_ns = round(1_000_000_000 / frequency)
@@ -245,8 +280,6 @@ class BuzzerManager:
         self._write_text(pwm_path / "period", str(period_ns))
         self._write_text(pwm_path / "duty_cycle", str(duty_ns))
         self._write_text(pwm_path / "enable", "1")
-        time.sleep(duration_ms / 1000)
-        self._write_text(pwm_path / "enable", "0")
 
     def _run_gpio_test(self, frequency: int, duration_ms: int, duty: float) -> None:
         if sys.platform == "win32":
@@ -295,7 +328,8 @@ class BuzzerManager:
     def _disable_pigpio_pwm(self) -> None:
         try:
             pigpio = self._import_pigpio()
-            pi = pigpio.pi(PIGPIO_HOST, PIGPIO_PORT)
+            with contextlib.redirect_stderr(io.StringIO()):
+                pi = pigpio.pi(PIGPIO_HOST, PIGPIO_PORT)
             try:
                 if pi.connected:
                     self._pigpio_connected = True
