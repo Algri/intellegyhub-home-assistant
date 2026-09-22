@@ -93,8 +93,8 @@ def validate_config(config: AppConfig) -> None:
         raise ValueError(f"button_bias must be one of {sorted(VALID_BIASES)}")
     if not 0 <= config.button_debounce_ms <= 1000:
         raise ValueError("button_debounce_ms must be between 0 and 1000")
-    if not 20 <= config.startup_buzzer_frequency <= 20000:
-        raise ValueError("startup_buzzer_frequency must be between 20 and 20000")
+    if not 20 <= config.startup_buzzer_frequency <= 2800:
+        raise ValueError("startup_buzzer_frequency must be between 20 and 2800")
     if not 10 <= config.startup_buzzer_duration_ms <= 5000:
         raise ValueError("startup_buzzer_duration_ms must be between 10 and 5000")
     if not 1 <= config.carrier_monitoring_poll_interval_seconds <= 3600:

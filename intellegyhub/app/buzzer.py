@@ -12,7 +12,9 @@ from typing import Any
 
 PIGPIO_HOST = "127.0.0.1"
 PIGPIO_PORT = 8888
-MAX_PHYSICAL_DUTY = 0.375
+MIN_BUZZER_FREQUENCY_HZ = 20
+MAX_BUZZER_FREQUENCY_HZ = 2800
+MAX_PHYSICAL_DUTY = 0.22
 
 
 def volume_percent_to_duty(volume_percent: float) -> float:
@@ -69,6 +71,8 @@ class BuzzerManager:
             "frequency": self.frequency,
             "duration_ms": self.duration_ms,
             "volume_percent": self.volume_percent,
+            "min_frequency_hz": MIN_BUZZER_FREQUENCY_HZ,
+            "max_frequency_hz": MAX_BUZZER_FREQUENCY_HZ,
             "max_physical_duty": MAX_PHYSICAL_DUTY,
         }
 
@@ -356,8 +360,10 @@ class BuzzerManager:
 
     @staticmethod
     def _validate(frequency: int, duration_ms: int, volume_percent: int) -> None:
-        if frequency < 20 or frequency > 20_000:
-            raise ValueError("frequency must be between 20 and 20000 Hz")
+        if frequency < MIN_BUZZER_FREQUENCY_HZ or frequency > MAX_BUZZER_FREQUENCY_HZ:
+            raise ValueError(
+                f"frequency must be between {MIN_BUZZER_FREQUENCY_HZ} and {MAX_BUZZER_FREQUENCY_HZ} Hz"
+            )
         if duration_ms < 10 or duration_ms > 5000:
             raise ValueError("duration_ms must be between 10 and 5000")
         BuzzerManager._validate_volume(volume_percent)

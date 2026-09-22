@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.112
+
+- Limit buzzer PWM frequency to the verified stable range and map UI volume linearly into the calibrated physical duty range.
+
 ## 0.5.111
 
 - Fall back to sysfs PWM when pigpio is unavailable so the buzzer can still play if `pigpiod` fails to start.

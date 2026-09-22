@@ -87,7 +87,7 @@ class IntellegyHubBuzzerFrequencyNumber(IntellegyHubGpioEntity, NumberEntity):
     _attr_unique_id = "intellegyhub_buzzer_frequency"
     _attr_name = "Buzzer Frequency"
     _attr_native_min_value = 20
-    _attr_native_max_value = 20000
+    _attr_native_max_value = 2800
     _attr_native_step = 10
     _attr_native_unit_of_measurement = "Hz"
     _attr_mode = NumberMode.BOX

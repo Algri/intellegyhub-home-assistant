@@ -1,7 +1,7 @@
 name: IntellegyHUB
 slug: intellegyhub
 description: IntellegyHUB hardware runtime for Home Assistant native entities
-version: 0.5.111
+version: 0.5.112
 stage: experimental
 arch:
   - aarch64
@@ -49,7 +49,7 @@ schema:
   button_bias: list(pull_up|pull_down|disabled)
   button_debounce_ms: int(0,1000)
   startup_buzzer_enabled: bool
-  startup_buzzer_frequency: int(20,20000)
+  startup_buzzer_frequency: int(20,2800)
   startup_buzzer_duration_ms: int(10,5000)
   carrier_monitoring_poll_interval_seconds: int(1,3600)
   onewire_bridge1_poll_interval_seconds: int(1,3600)
