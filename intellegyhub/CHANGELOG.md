@@ -1,8 +1,12 @@
 # Changelog
 
+## 0.5.110
+
+- Restore the previous `pigpiod` startup flags while keeping buzzer status polling from opening pigpio socket connections.
+
 ## 0.5.109
 
-- Stop buzzer status polling from opening pigpio socket connections and start `pigpiod` without the stale `-f` flag.
+- Stop buzzer status polling from opening pigpio socket connections.
 
 ## 0.5.108
 
