@@ -20,6 +20,7 @@ from .xport_entities import setup_xport_dynamic_platform
 
 LOGGER = logging.getLogger(__name__)
 PARALLEL_UPDATES = 0
+XDO8_RELAY_ICON = "mdi:electric-switch"
 
 
 async def async_setup_entry(
@@ -177,6 +178,7 @@ class IntellegyHubOneWirePowerSwitch(IntellegyHubOneWirePowerEntity, SwitchEntit
 
 class IntellegyHubXDo8RelaySwitch(IntellegyHubXDo8Entity, SwitchEntity):
     _attr_translation_key = "xdo8_relay"
+    _attr_icon = XDO8_RELAY_ICON
 
     def __init__(self, manager, module_id: str, channel: int) -> None:
         super().__init__(manager, module_id, channel)

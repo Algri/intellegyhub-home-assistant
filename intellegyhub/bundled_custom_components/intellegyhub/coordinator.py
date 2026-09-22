@@ -11,6 +11,7 @@ from homeassistant.helpers import entity_registry as er
 
 from .api import IntellegyHubApiClient
 from .const import BUTTONS, CARRIER_OUTPUTS, DOMAIN, OUTPUTS
+from .registry_names import apply_compact_entity_dashboard_names
 from .xport_entities import XPORT_ENTITY_KINDS, xport_desired_unique_ids, xport_platform_value
 
 LOGGER = logging.getLogger(__name__)
@@ -536,6 +537,7 @@ class IntellegyHubGpioManager:
     def _notify(self) -> None:
         for listener in list(self._listeners):
             listener()
+        apply_compact_entity_dashboard_names(self.hass, self.entry_id)
 
     def _create_background_task(self, coro, name: str) -> asyncio.Task:
         create_background = getattr(self.hass, "async_create_background_task", None)

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.120
+
+- Remove repeated module prefixes from xDO/xDI dashboard picker entity names and use clearer extension module I/O icons.
+
 ## 0.5.119
 
 - Extend compact Home Assistant registry names to X-Port, xDO/xDI module, and 1-Wire entities for cleaner dashboard picker labels.

@@ -492,7 +492,7 @@ class CarrierManager:
                 "model": "IntellegyHUB Controller",
                 "serial_number": "IH1400-00001234",
                 "hardware_revision": "1.4 Rev.A",
-                "software_version": "0.5.119",
+                "software_version": "0.5.120",
             },
             "controller": {"bus": 10, "address": "0x20", "chip": "MCP23017"},
             "faults": [asdict(fault) for fault in self.faults.values()],
