@@ -1,8 +1,12 @@
 # Changelog
 
+## 0.5.108
+
+- Rebuild release archives after the X-Port mode-control UI polish and release checklist documentation updates.
+
 ## 0.5.107
 
-- Align X-Port mode controls with the shared row style, including counter reset placement and read-only DI indicators.
+- Align X-Port mode controls with the shared row style, including counter reset placement, read-only DI indicators, and compact PWM slider layout.
 
 ## 0.5.106
 

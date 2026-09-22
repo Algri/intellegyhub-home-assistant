@@ -63,6 +63,57 @@ After the add-on installs or updates the integration, restart Home Assistant
 Core so the integration appears under `Settings -> Devices & services -> Add
 integration`.
 
+## Version Bump And Release Archive Checklist
+
+Before building release archives, bump the same version in every packaged
+surface. Keep these files in sync:
+
+```text
+addon/config.yaml
+addon/Dockerfile
+custom_components/intellegyhub/manifest.json
+addon/app/main.py
+addon/app/carrier.py
+addon/CHANGELOG.md
+```
+
+Use the changelog entry to describe the user-visible change. Example:
+
+```text
+## 0.5.107
+
+- Align X-Port mode controls with the shared row style, including counter reset placement, read-only DI indicators, and compact PWM slider layout.
+```
+
+Run the local checks before packaging:
+
+```powershell
+python -m compileall addon custom_components tests
+python -m pytest tests/test_addon_api.py
+```
+
+Build all release archives from the repository root:
+
+```powershell
+python scripts/build_haos_deploy.py
+```
+
+The build script validates that the add-on config, Docker label, integration
+manifest, app version, and changelog all use the same version. It also rebuilds:
+
+```text
+dist/intellegyhub_haos_deploy.zip
+dist/intellegyhub_ha_repository.zip
+dist/intellegyhub_ha_integration.zip
+```
+
+Use a commit title that starts with the release version and names the change,
+for example:
+
+```text
+0.5.107: align X-Port mode controls
+```
+
 ## CM4 I2C Notes
 
 For Home Assistant OS on Raspberry Pi CM4, enable I2C in the boot partition `config.txt`:
