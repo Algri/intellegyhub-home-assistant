@@ -118,7 +118,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.99 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
+                "Starting v0.5.100 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -153,7 +153,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.99", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.100", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 
@@ -209,7 +209,13 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       color-scheme: dark;
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       --ha-primary: #03a9f4;
-      --ha-success: #00c853;
+      --ha-success: #00e676;
+      --ha-success-text: #8ff0a4;
+      --ha-success-border: #36543e;
+      --ha-success-bg: rgba(0, 200, 83, .08);
+      --ha-danger-text: #ffb4ab;
+      --ha-danger-border: #5f3434;
+      --ha-danger-bg: rgba(244, 67, 54, .10);
       --ha-page: #111111;
       --ha-card: #1c1c1c;
       --ha-card-border: #343434;
@@ -229,6 +235,13 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     html[data-theme="light"] {
       color-scheme: light;
       --ha-page: #f3f5f7;
+      --ha-success: #087f23;
+      --ha-success-text: #0b6f28;
+      --ha-success-border: #58a868;
+      --ha-success-bg: rgba(11, 111, 40, .10);
+      --ha-danger-text: #b3261e;
+      --ha-danger-border: #d48a84;
+      --ha-danger-bg: rgba(179, 38, 30, .08);
       --ha-card: #ffffff;
       --ha-card-border: #d6dde5;
       --ha-text: #111827;
@@ -259,8 +272,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .overview-identity { display: flex; flex-direction: column; min-height: 270px; padding: 22px 28px; border-right: 1px solid var(--ha-card-border); font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; }
     .overview-badge-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 14px; }
     .overview-logo { display: block; width: 42px; height: 42px; object-fit: contain; }
-    .overview-status-pill { min-height: 30px; padding: 6px 12px; border-radius: 999px; border: 1px solid #36543e; color: #8ff0a4; background: rgba(0, 200, 83, .08); font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
-    .overview-status-pill.offline { border-color: #5f3434; color: #ffb4ab; background: rgba(244, 67, 54, .10); }
+    .overview-status-pill { min-height: 30px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--ha-success-border); color: var(--ha-success-text); background: var(--ha-success-bg); font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+    .overview-status-pill.offline { border-color: var(--ha-danger-border); color: var(--ha-danger-text); background: var(--ha-danger-bg); }
     .overview-title h1 { font-size: 30px; line-height: 1; margin-bottom: 6px; font-weight: 800; }
     .overview-title .subtitle { color: var(--ha-text); font-size: 13px; margin-bottom: 0; }
     .overview-facts { display: grid; grid-template-columns: minmax(104px, .72fr) minmax(0, 1fr); gap: 5px 18px; margin-top: 14px; font-size: 12px; line-height: 1.25; }
@@ -272,7 +285,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .overview-health dd { margin: 0; color: var(--ha-text); font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
     .overview-health-value { display: inline-flex; align-items: center; gap: 8px; }
     .overview-sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #448aff; }
-    .overview-sync-dot.online { background: #00e676; }
+    .overview-sync-dot.online { background: var(--ha-success); }
     .overview-sync-dot.offline { background: #ff6b6b; }
     .overview-metrics { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); }
     .overview-metric { min-height: 135px; padding: 30px 24px; border-left: 0; border-top: 0; border-right: 1px solid var(--ha-card-border); border-bottom: 1px solid var(--ha-card-border); border-radius: 0; background: transparent; }
@@ -453,8 +466,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .module-card { border: 1px solid var(--ha-card-border); border-radius: 12px; background: var(--ha-surface); padding: 18px; }
     .module-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; margin-bottom: 18px; }
     .module-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
-    .status-pill { min-height: 30px; padding: 6px 10px; border-radius: 999px; border: 1px solid #36543e; color: #8ff0a4; background: rgba(0, 200, 83, .08); font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
-    .status-pill.offline { border-color: #5f3434; color: #ffb4ab; background: rgba(244, 67, 54, .10); }
+    .status-pill { min-height: 30px; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--ha-success-border); color: var(--ha-success-text); background: var(--ha-success-bg); font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+    .status-pill.offline { border-color: var(--ha-danger-border); color: var(--ha-danger-text); background: var(--ha-danger-bg); }
     .module-title { font-size: 17px; font-weight: 800; margin-bottom: 6px; }
     .module-meta { color: var(--ha-secondary); font-size: 13px; }
     .danger-button { border-color: #5f3434; color: #ffb4ab; background: transparent; min-height: 34px; padding: 6px 12px; }
@@ -559,7 +572,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           <dt>Hardware</dt>
           <dd id="carrier-identity-hardware">1.4 Rev.A</dd>
           <dt>Software</dt>
-          <dd id="carrier-identity-software">0.5.99</dd>
+          <dd id="carrier-identity-software">0.5.100</dd>
         </dl>
         <div class="overview-divider"></div>
         <dl class="overview-health">
@@ -1042,7 +1055,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       document.getElementById('carrier-identity-model').textContent = identity.model || 'IntellegyHUB Controller';
       document.getElementById('carrier-identity-serial').textContent = identity.serial_number || 'IH1400-00001234';
       document.getElementById('carrier-identity-hardware').textContent = identity.hardware_revision || '1.4 Rev.A';
-      document.getElementById('carrier-identity-software').textContent = identity.software_version || '0.5.99';
+      document.getElementById('carrier-identity-software').textContent = identity.software_version || '0.5.100';
       document.getElementById('carrier-uptime').textContent = formatUptime(appInfo && appInfo.uptime_seconds);
       const monitoring = carrier && carrier.monitoring ? carrier.monitoring : {};
       const temperature = monitoring.temperature || {};
@@ -1060,9 +1073,10 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       const days = Math.floor(total / 86400);
       const hours = Math.floor((total % 86400) / 3600);
       const minutes = Math.floor((total % 3600) / 60);
-      if (days > 0) return `${days}d ${String(hours).padStart(2, '0')}h ${String(minutes).padStart(2, '0')}m`;
-      if (hours > 0) return `${hours}h ${String(minutes).padStart(2, '0')}m`;
-      return `${minutes}m`;
+      const secs = Math.floor(total % 60);
+      const time = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+      if (days > 0) return `${days} ${days === 1 ? 'day' : 'days'}, ${time}`;
+      return time;
     }
     function paintMetric(elementId, metric, precision) {
       const value = document.getElementById(`metric-${elementId}`);

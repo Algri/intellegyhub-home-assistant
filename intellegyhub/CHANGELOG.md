@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.100
+
+- Improve light theme status contrast and make controller uptime text human-readable.
+
 ## 0.5.99
 
 - Bump packaged add-on and integration version after the persisted theme switcher change.
