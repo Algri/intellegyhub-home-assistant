@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.115
+
+- Clear stale Hardware Host name overrides from Home Assistant entity registry so dashboard tiles use the corrected short names.
+
 ## 0.5.114
 
 - Use dashboard-friendly Home Assistant entity names without the repeated Hardware Host prefix.
