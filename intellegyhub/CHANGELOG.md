@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.99
+
+- Bump packaged add-on and integration version after the persisted theme switcher change.
+
 ## 0.5.98
 
 - Add a persisted add-on theme switcher backed by the existing SQLite state database.
