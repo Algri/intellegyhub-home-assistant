@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.104
+
+- Refine the controller overview card labels, metric units, metric status text, and shared monitoring update time.
+
 ## 0.5.103
 
 - Skip reserved low I2C addresses during service-tool scans so false responses like `0x03` are not reported as devices.

@@ -118,7 +118,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.103 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
+                "Starting v0.5.104 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -153,7 +153,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.103", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.104", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 
@@ -276,24 +276,25 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .overview-status-pill.offline { border-color: var(--ha-danger-border); color: var(--ha-danger-text); background: var(--ha-danger-bg); }
     .overview-title h1 { font-size: 30px; line-height: 1; margin-bottom: 6px; font-weight: 800; }
     .overview-title .subtitle { color: var(--ha-text); font-size: 13px; margin-bottom: 0; }
-    .overview-facts { display: grid; grid-template-columns: minmax(104px, .72fr) minmax(0, 1fr); gap: 5px 18px; margin-top: 14px; font-size: 12px; line-height: 1.25; }
+    .overview-facts { display: grid; grid-template-columns: 82px minmax(0, 170px); gap: 5px 18px; margin-top: 14px; font-size: 12px; line-height: 1.25; }
     .overview-facts dt { color: var(--ha-text); font-weight: 800; }
     .overview-facts dd { margin: 0; color: var(--ha-text); font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
     .overview-divider { width: min(258px, 100%); height: 1px; background: var(--ha-card-border); margin: 18px 0 14px; }
-    .overview-health { display: grid; grid-template-columns: minmax(104px, .72fr) minmax(0, 1fr); gap: 5px 18px; font-size: 12px; line-height: 1.25; }
+    .overview-health { display: grid; grid-template-columns: 82px minmax(0, 170px); gap: 5px 18px; font-size: 12px; line-height: 1.25; }
     .overview-health dt { color: var(--ha-text); font-weight: 800; text-transform: uppercase; }
     .overview-health dd { margin: 0; color: var(--ha-text); font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
     .overview-health-value { display: inline-flex; align-items: center; gap: 8px; }
     .overview-sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #448aff; }
     .overview-sync-dot.online { background: var(--ha-success); }
     .overview-sync-dot.offline { background: #ff6b6b; }
-    .overview-metrics { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); }
+    .overview-metrics { position: relative; display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); padding-bottom: 24px; }
     .overview-metric { min-height: 135px; padding: 30px 24px; border-left: 0; border-top: 0; border-right: 1px solid var(--ha-card-border); border-bottom: 1px solid var(--ha-card-border); border-radius: 0; background: transparent; }
     .overview-metric:nth-child(2n) { border-right: 0; }
-    .overview-metric:nth-last-child(-n+2) { border-bottom: 0; }
+    .overview-metric:nth-last-child(-n+3) { border-bottom: 0; }
     .overview-metric-label { color: var(--ha-secondary); font-size: 12px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; margin-bottom: 18px; }
     .overview-metric-value { color: var(--ha-text); font-size: 27px; line-height: 1; font-weight: 800; margin-bottom: 12px; }
     .overview-metric-meta { color: var(--ha-secondary); font-size: 12px; overflow-wrap: anywhere; }
+    .overview-updated { position: absolute; right: 24px; bottom: 10px; color: var(--ha-secondary); font-size: 12px; }
     .xport-panel {
       border: 1px solid var(--ha-card-border);
       border-radius: 12px;
@@ -562,17 +563,17 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           <div id="carrier-overview-status" class="overview-status-pill">Loading</div>
         </div>
         <div class="overview-title">
-          <div class="eyebrow">Controller Overview</div>
+          <div class="eyebrow">Controller</div>
           <h1 id="carrier-identity-product">IHC-1400</h1>
           <div id="carrier-identity-model" class="subtitle">IntellegyHUB Controller</div>
         </div>
         <dl class="overview-facts">
-          <dt>Serial Number</dt>
+          <dt>Serial</dt>
           <dd id="carrier-identity-serial">IH1400-00001234</dd>
           <dt>Hardware</dt>
-          <dd id="carrier-identity-hardware">1.4 Rev.A</dd>
+          <dd id="carrier-identity-hardware">v1.4 Rev.A</dd>
           <dt>Software</dt>
-          <dd id="carrier-identity-software">0.5.103</dd>
+          <dd id="carrier-identity-software">v0.5.104</dd>
         </dl>
         <div class="overview-divider"></div>
         <dl class="overview-health">
@@ -587,7 +588,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       </div>
       <div class="overview-metrics">
         <article class="overview-metric">
-          <div class="overview-metric-label">Board Temperature</div>
+          <div class="overview-metric-label">Board Temp</div>
           <div id="metric-board-temperature" class="overview-metric-value">--</div>
           <div id="metric-board-temperature-meta" class="overview-metric-meta">Loading</div>
         </article>
@@ -606,6 +607,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           <div id="metric-vin" class="overview-metric-value">--</div>
           <div id="metric-vin-meta" class="overview-metric-meta">Loading</div>
         </article>
+        <div id="overview-updated" class="overview-updated">Updated --</div>
       </div>
     </section>
     <section class="xport-panel">
@@ -1053,8 +1055,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       document.getElementById('carrier-identity-product').textContent = identity.product || 'IHC-1400';
       document.getElementById('carrier-identity-model').textContent = identity.model || 'IntellegyHUB Controller';
       document.getElementById('carrier-identity-serial').textContent = identity.serial_number || 'IH1400-00001234';
-      document.getElementById('carrier-identity-hardware').textContent = identity.hardware_revision || '1.4 Rev.A';
-      document.getElementById('carrier-identity-software').textContent = identity.software_version || '0.5.103';
+      document.getElementById('carrier-identity-hardware').textContent = formatVersion(identity.hardware_revision || '1.4 Rev.A');
+      document.getElementById('carrier-identity-software').textContent = formatVersion(identity.software_version || '0.5.104');
       document.getElementById('carrier-uptime').textContent = formatUptime(appInfo && appInfo.uptime_seconds);
       const monitoring = carrier && carrier.monitoring ? carrier.monitoring : {};
       const temperature = monitoring.temperature || {};
@@ -1062,10 +1064,17 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       for (const rail of monitoring.rails || []) {
         rails[rail.id] = rail;
       }
-      paintMetric('board-temperature', temperature, 2);
-      paintMetric('5v', rails['5v'], 2);
-      paintMetric('3v3', rails['3v3'], 2);
-      paintMetric('vin', rails.vin, 2);
+      const updatedAt = [
+        paintMetric('board-temperature', temperature, 1, ' °C'),
+        paintMetric('5v', rails['5v'], 2, ' V'),
+        paintMetric('3v3', rails['3v3'], 2, ' V'),
+        paintMetric('vin', rails.vin, 2, ' V')
+      ].find(Boolean);
+      document.getElementById('overview-updated').textContent = updatedAt ? `Updated ${updatedAt}` : 'Updated --';
+    }
+    function formatVersion(value) {
+      const text = String(value || '').trim();
+      return text && !text.toLowerCase().startsWith('v') ? `v${text}` : text;
     }
     function formatUptime(seconds) {
       const total = Math.max(0, Number(seconds || 0));
@@ -1077,16 +1086,17 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       if (days > 0) return `${days} ${days === 1 ? 'day' : 'days'}, ${time}`;
       return time;
     }
-    function paintMetric(elementId, metric, precision) {
+    function paintMetric(elementId, metric, precision, unit) {
       const value = document.getElementById(`metric-${elementId}`);
       const meta = document.getElementById(`metric-${elementId}-meta`);
       if (!metric || !metric.available || metric.value === null || metric.value === undefined) {
         value.textContent = '--';
         meta.textContent = metric && metric.error ? `Error - ${metric.error}` : 'Unavailable';
-        return;
+        return '';
       }
-      value.textContent = Number(metric.value).toFixed(precision);
-      meta.textContent = `Good - ${metric.last_read_utc || 'just now'}`;
+      value.textContent = `${Number(metric.value).toFixed(precision)}${unit}`;
+      meta.textContent = 'Normal';
+      return metric.last_read_utc || '';
     }
     const carrierGroups = [
       {
