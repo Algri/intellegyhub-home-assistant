@@ -5,7 +5,7 @@ python -m app.integration_installer
 
 if command -v pigpiod >/dev/null 2>&1; then
   echo "[intellegyhub] starting pigpiod for GPIO18 hardware PWM"
-  pigpiod -g -f -n 127.0.0.1 -x 262144 &
+  pigpiod -g -n 127.0.0.1 -x 262144 &
   PIGPIOD_PID="$!"
   sleep 1
   if ! kill -0 "${PIGPIOD_PID}" 2>/dev/null; then

@@ -38,6 +38,8 @@ class BuzzerManager:
         self.frequency = 2000
         self.duration_ms = 300
         self.volume_percent = 50
+        self._pigpio_connected: bool | None = None
+        self._pigpio_error: str | None = None
 
     def status(self) -> dict[str, Any]:
         pwm_path = self._pwm_path()
@@ -192,7 +194,11 @@ class BuzzerManager:
         pi = pigpio.pi(PIGPIO_HOST, PIGPIO_PORT)
         try:
             if not pi.connected:
+                self._pigpio_connected = False
+                self._pigpio_error = "pigpio daemon is not connected"
                 raise RuntimeError("pigpio daemon is not connected")
+            self._pigpio_connected = True
+            self._pigpio_error = None
             duty_micros = round(duty * 1_000_000)
             result = pi.hardware_PWM(self.gpio_line, frequency, duty_micros)
             if result < 0:
@@ -208,7 +214,11 @@ class BuzzerManager:
         pi = pigpio.pi(PIGPIO_HOST, PIGPIO_PORT)
         try:
             if not pi.connected:
+                self._pigpio_connected = False
+                self._pigpio_error = "pigpio daemon is not connected"
                 raise RuntimeError("pigpio daemon is not connected")
+            self._pigpio_connected = True
+            self._pigpio_error = None
             duty_micros = round(duty * 1_000_000)
             result = pi.hardware_PWM(self.gpio_line, frequency, duty_micros)
             if result < 0:
@@ -288,7 +298,12 @@ class BuzzerManager:
             pi = pigpio.pi(PIGPIO_HOST, PIGPIO_PORT)
             try:
                 if pi.connected:
+                    self._pigpio_connected = True
+                    self._pigpio_error = None
                     pi.hardware_PWM(self.gpio_line, 0, 0)
+                else:
+                    self._pigpio_connected = False
+                    self._pigpio_error = "pigpio daemon is not connected"
             finally:
                 pi.stop()
         except Exception:
@@ -338,14 +353,12 @@ class BuzzerManager:
         return pigpio
 
     def _pigpio_status(self) -> dict[str, Any]:
-        status: dict[str, Any] = {"host": PIGPIO_HOST, "port": PIGPIO_PORT, "connected": False}
-        try:
-            pigpio = self._import_pigpio()
-            pi = pigpio.pi(PIGPIO_HOST, PIGPIO_PORT)
-            try:
-                status["connected"] = bool(pi.connected)
-            finally:
-                pi.stop()
-        except Exception as exc:
-            status["error"] = str(exc)
+        status: dict[str, Any] = {
+            "host": PIGPIO_HOST,
+            "port": PIGPIO_PORT,
+            "connected": bool(self._pigpio_connected),
+            "checked": self._pigpio_connected is not None,
+        }
+        if self._pigpio_error:
+            status["error"] = self._pigpio_error
         return status

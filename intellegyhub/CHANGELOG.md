@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.109
+
+- Stop buzzer status polling from opening pigpio socket connections and start `pigpiod` without the stale `-f` flag.
+
 ## 0.5.108
 
 - Rebuild release archives after the X-Port mode-control UI polish and release checklist documentation updates.
