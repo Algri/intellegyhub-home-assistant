@@ -461,8 +461,12 @@ class XPortManager:
             self.channels[channel] = state
             await self.store.save(state)
             if availability == Availability.AVAILABLE and state.desired_mode != XPortMode.DISABLED:
+                restored_value = state.value
                 try:
                     await self.configure(channel, XPortMode(state.desired_mode), state.revision)
+                    restored_state = self.channels[channel]
+                    if XPortMode(restored_state.confirmed_mode) in WRITABLE_MODES:
+                        await self.set_value(channel, restored_value)
                 except Exception as exc:
                     state.confirmed_mode = XPortMode.DISABLED
                     state.availability = Availability.FAULTED

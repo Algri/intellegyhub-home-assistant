@@ -546,6 +546,7 @@ class OneWireManager:
         self._lock = asyncio.Lock()
         self._publisher: Callable[[dict[str, Any]], Any] | None = None
         self._poll_tasks: dict[str, asyncio.Task] = {}
+        self._settle_scan_task: asyncio.Task[None] | None = None
 
     def set_publisher(self, publisher: Callable[[dict[str, Any]], Any]) -> None:
         self._publisher = publisher
@@ -571,6 +572,13 @@ class OneWireManager:
             self.error = str(exc)
 
     async def stop(self) -> None:
+        if self._settle_scan_task:
+            self._settle_scan_task.cancel()
+            try:
+                await self._settle_scan_task
+            except asyncio.CancelledError:
+                pass
+            self._settle_scan_task = None
         await self._cancel_poll_tasks()
         await self.store.save_power(self.power_on)
         await self.store.save_sensors(list(self.sensors.values()))
@@ -592,9 +600,12 @@ class OneWireManager:
             self.power_on = await self.hardware.set_power(on)
             await self.store.save_power(self.power_on)
             if self.power_on:
-                await asyncio.sleep(POWER_SETTLE_SECONDS)
-                await self._scan_locked()
+                self.bridges = self._configured_bridges()
+                self._schedule_settle_scan()
             else:
+                if self._settle_scan_task:
+                    self._settle_scan_task.cancel()
+                    self._settle_scan_task = None
                 self.bridges = self._configured_bridges()
                 self._mark_sensors_unavailable("BUS_POWER_OFF")
                 await self.store.save_sensors(list(self.sensors.values()))
@@ -766,6 +777,31 @@ class OneWireManager:
                     self._poll_bridge_loop(bridge_id),
                     name=f"intellegyhub_onewire_poll_{bridge_id}",
                 )
+
+    def _schedule_settle_scan(self) -> None:
+        if self._settle_scan_task:
+            self._settle_scan_task.cancel()
+        self._settle_scan_task = asyncio.create_task(
+            self._settle_scan_after_power_on(),
+            name="intellegyhub_onewire_settle_scan",
+        )
+
+    async def _settle_scan_after_power_on(self) -> None:
+        try:
+            await asyncio.sleep(POWER_SETTLE_SECONDS)
+            async with self._lock:
+                if not self.power_on:
+                    return
+                await self._scan_locked()
+                self.error = None
+                self._sync_poll_tasks()
+                await self._publish({"type": "onewire_changed", "onewire": self.snapshot()})
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            async with self._lock:
+                self.error = str(exc)
+                await self._publish({"type": "onewire_changed", "onewire": self.snapshot()})
 
     async def _cancel_poll_tasks(self) -> None:
         tasks = list(self._poll_tasks.values())

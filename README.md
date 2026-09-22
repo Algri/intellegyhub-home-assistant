@@ -501,6 +501,25 @@ intellegyhub/logo.png
 intellegyhub/requirements.txt
 ```
 
+To refresh the local GitHub checkout from the generated repository archive on
+Windows, use:
+
+```powershell
+python scripts\deploy_ha_repository_zip.py --dry-run
+python scripts\deploy_ha_repository_zip.py
+```
+
+The script replaces the contents of:
+
+```text
+C:\Users\Algri\Documents\GitHub\intellegyhub-home-assistant
+```
+
+with `dist/intellegyhub_ha_repository.zip`. It keeps the target `.git`
+directory by default so the folder remains a git checkout. Use `--delete-git`
+only when intentionally replacing the folder as plain files instead of keeping
+the repository history.
+
 Home Assistant Store installs only the add-on from that repository. The add-on
 package also contains a bundled copy of the custom integration and installs or
 updates it at startup through the mapped Home Assistant config directory:

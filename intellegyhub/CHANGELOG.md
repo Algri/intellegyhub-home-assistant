@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.101
+
+- Make 1-Wire bus power toggles return immediately while sensor scanning runs after power settles.
+- Restore persisted X-Port writable output values after add-on restart, including PWM duty and DO state.
+
 ## 0.5.100
 
 - Improve light theme status contrast and make controller uptime text human-readable.
