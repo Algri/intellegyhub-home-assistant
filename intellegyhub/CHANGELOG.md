@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.119
+
+- Extend compact Home Assistant registry names to X-Port, xDO/xDI module, and 1-Wire entities for cleaner dashboard picker labels.
+
 ## 0.5.118
 
 - Apply compact Home Assistant entity registry names for Hardware Host entities so dashboard pickers no longer show repeated Hardware Host prefixes.
