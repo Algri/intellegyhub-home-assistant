@@ -118,7 +118,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.104 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
+                "Starting v0.5.105 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -153,7 +153,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.104", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.105", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 
@@ -450,9 +450,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     .reset-button:hover,
     .reset-button:focus-visible {
-      border-color: #4fc3f7;
-      background: rgba(3, 169, 244, .14);
-      color: #b3e5fc;
+      border-color: var(--ha-primary);
+      background: var(--ha-action-hover);
+      color: var(--ha-primary);
       outline: none;
     }
     .diagnostics-output { margin-top: 16px; }
@@ -477,7 +477,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .relay-row { display: grid; grid-template-columns: minmax(58px, 1fr) auto auto; align-items: center; gap: 10px; color: var(--ha-text); min-height: 42px; border: 1px solid var(--ha-row-border); border-radius: 8px; padding: 8px 10px; background: var(--ha-row); }
     .relay-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .state-text { min-width: 30px; text-align: right; color: var(--ha-secondary); font-size: 12px; font-weight: 800; letter-spacing: .04em; }
-    .state-text.on { color: #8be9fd; }
+    .state-text.on { color: var(--ha-primary); }
     .carrier-io-grid { display: grid; grid-template-columns: repeat(4, minmax(180px, 1fr)); gap: 16px; margin-top: 18px; }
     .carrier-io-card { border: 1px solid var(--ha-card-border); border-radius: 12px; background: var(--ha-surface); padding: 16px; min-width: 0; }
     .carrier-io-title { font-size: 17px; font-weight: 800; margin-bottom: 14px; }
@@ -504,7 +504,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .buzzer-volume-control { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) 44px; align-items: center; gap: 12px; }
     .buzzer-volume-control input { height: 38px; margin: 0; }
     .buzzer-volume-control strong { color: var(--ha-strong); text-align: right; font-size: 13px; }
-    .buzzer-actions { display: grid; grid-template-rows: auto auto 1fr; gap: 12px; }
+    .buzzer-actions { display: grid; grid-template-rows: auto 40px 40px; gap: 12px; align-content: start; }
     .buzzer-actions button { width: 100%; height: 40px; }
     .buzzer-status { margin-top: 14px; color: var(--ha-secondary); font-size: 13px; overflow-wrap: anywhere; max-width: 980px; }
     .buzzer-detail-line { color: var(--ha-secondary); font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; }
@@ -522,9 +522,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     button:not(.toggle):not(.mode-trigger):not(.mode-option):hover,
     button:not(.toggle):not(.mode-trigger):not(.mode-option):focus-visible {
-      border-color: #4fc3f7;
+      border-color: var(--ha-primary);
       background: var(--ha-action-hover);
-      color: #b3e5fc;
+      color: var(--ha-primary);
       outline: none;
     }
     button:not(.toggle):not(.mode-trigger):not(.mode-option):disabled {
@@ -543,7 +543,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     @media (max-width: 1300px) { .overview-panel { grid-template-columns: 1fr; } .overview-identity { border-right: 0; border-bottom: 1px solid var(--ha-card-border); min-height: 240px; } }
     @media (max-width: 1100px) { .ports, .carrier-io-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .relay-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); } }
     @media (max-width: 900px) { .buzzer-panel { grid-template-columns: 1fr; } .buzzer-actions { grid-template-columns: repeat(2, minmax(120px, 1fr)); grid-template-rows: auto; } .buzzer-actions .buzzer-group-title { grid-column: 1 / -1; } }
-    @media (max-width: 620px) { body { padding: 10px; } .app-toolbar { justify-content: stretch; } .theme-switcher { width: 100%; justify-content: space-between; } .theme-choice { flex: 1; } .overview-identity { min-height: 220px; padding: 22px 18px; } .overview-title h1 { font-size: 30px; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+2) { border-right: 0; border-bottom: 1px solid var(--ha-card-border); } .overview-metric:last-child { border-bottom: 0; } .xport-panel { padding: 18px 14px; border-radius: 12px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .ports, .carrier-io-grid, .relay-grid { grid-template-columns: 1fr; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-row { grid-template-columns: 1fr; gap: 6px; } }
+    @media (max-width: 620px) { body { padding: 10px; } .app-toolbar { justify-content: stretch; } .theme-switcher { width: 100%; justify-content: space-between; } .theme-choice { flex: 1; } .overview-identity { min-height: 220px; padding: 22px 18px; } .overview-title h1 { font-size: 30px; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+3) { border-right: 0; border-bottom: 1px solid var(--ha-card-border); } .overview-metric:nth-of-type(4) { border-bottom: 0; } .xport-panel { padding: 18px 14px; border-radius: 12px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .ports, .carrier-io-grid, .relay-grid { grid-template-columns: 1fr; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-row { grid-template-columns: 1fr; gap: 6px; } }
   </style>
 </head>
 <body>
@@ -573,7 +573,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           <dt>Hardware</dt>
           <dd id="carrier-identity-hardware">v1.4 Rev.A</dd>
           <dt>Software</dt>
-          <dd id="carrier-identity-software">v0.5.104</dd>
+          <dd id="carrier-identity-software">v0.5.105</dd>
         </dl>
         <div class="overview-divider"></div>
         <dl class="overview-health">
@@ -610,7 +610,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         <div id="overview-updated" class="overview-updated">Updated --</div>
       </div>
     </section>
-    <section class="xport-panel">
+    <section class="extension-panel xport-panel">
       <div class="module-row">
         <div>
           <div class="eyebrow">Optional Module</div>
@@ -640,7 +640,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           <button id="extension-power-toggle" class="toggle" type="button" onclick="toggleExtensionPower()"><span>OFF</span></button>
         </div>
         <button class="bus-action" onclick="scanExtensions()">Scan modules</button>
-        <div class="bus-note">Power control: MCP23017 · I2C-10 · 0x20 · GPB7</div>
+        <div class="bus-note">Power control: MCP23017 / I2C-10 / 0x20 / GPB7</div>
       </div>
       <div id="modules" class="modules"></div>
     </section>
@@ -655,11 +655,14 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         <div class="transport">I2C-10</div>
       </div>
       <p class="notice">The 1-Wire sensor bus is powered through the controller GPIO extender MCP23017 at I2C-10 address 0x20, pin GPB6. DS2482S-100 bridges are scanned on I2C-10 at addresses 0x1A and 0x1B.</p>
-      <div class="extension-actions">
-        <span class="metric">Bus power: <strong id="onewire-power-label">OFF</strong></span>
-        <button id="onewire-power-toggle" class="toggle" type="button" onclick="toggleOneWirePower()"><span>OFF</span></button>
-        <button onclick="scanOneWire()">Scan sensors</button>
-        <button onclick="refreshOneWire()">Refresh temperatures</button>
+      <div class="extension-actions bus-toolbar">
+        <div class="bus-power-control">
+          <span class="metric">Bus power: <strong id="onewire-power-label">OFF</strong></span>
+          <button id="onewire-power-toggle" class="toggle" type="button" onclick="toggleOneWirePower()"><span>OFF</span></button>
+        </div>
+        <button class="bus-action" onclick="scanOneWire()">Scan sensors</button>
+        <button class="bus-action" onclick="refreshOneWire()">Refresh temperatures</button>
+        <div class="bus-note">Power control: MCP23017 / I2C-10 / 0x20 / GPB6</div>
       </div>
       <div id="onewire-modules" class="modules"></div>
     </section>
@@ -1056,7 +1059,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       document.getElementById('carrier-identity-model').textContent = identity.model || 'IntellegyHUB Controller';
       document.getElementById('carrier-identity-serial').textContent = identity.serial_number || 'IH1400-00001234';
       document.getElementById('carrier-identity-hardware').textContent = formatVersion(identity.hardware_revision || '1.4 Rev.A');
-      document.getElementById('carrier-identity-software').textContent = formatVersion(identity.software_version || '0.5.104');
+      document.getElementById('carrier-identity-software').textContent = formatVersion(identity.software_version || '0.5.105');
       document.getElementById('carrier-uptime').textContent = formatUptime(appInfo && appInfo.uptime_seconds);
       const monitoring = carrier && carrier.monitoring ? carrier.monitoring : {};
       const temperature = monitoring.temperature || {};

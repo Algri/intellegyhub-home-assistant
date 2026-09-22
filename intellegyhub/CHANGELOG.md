@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.105
+
+- Polish add-on UI consistency across action bars, hover states, 1-Wire controls, and buzzer command layout.
+
 ## 0.5.104
 
 - Refine the controller overview card labels, metric units, metric status text, and shared monitoring update time.
