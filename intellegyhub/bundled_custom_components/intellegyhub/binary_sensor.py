@@ -13,7 +13,8 @@ from .xport_entities import setup_xport_dynamic_platform
 
 BRIDGE_DEVICE_CLASS_CONNECTIVITY = getattr(BinarySensorDeviceClass, "CONNECTIVITY", "connectivity")
 FAULT_DEVICE_CLASS_PROBLEM = getattr(BinarySensorDeviceClass, "PROBLEM", "problem")
-XDI16_INPUT_ICON = "mdi:input"
+XDI16_INPUT_OPEN_ICON = "mdi:electric-switch"
+XDI16_INPUT_CLOSED_ICON = "mdi:electric-switch-closed"
 BUTTON_INPUT_ICON = "mdi:gesture-tap-button"
 
 
@@ -175,7 +176,6 @@ class IntellegyHubXPortDiSensor(IntellegyHubXPortEntity, BinarySensorEntity):
 
 class IntellegyHubXDi16InputSensor(IntellegyHubXDi16Entity, BinarySensorEntity):
     _attr_translation_key = "xdi16_input"
-    _attr_icon = XDI16_INPUT_ICON
 
     def __init__(self, manager, module_id: str, channel: int) -> None:
         super().__init__(manager, module_id, channel)
@@ -188,7 +188,7 @@ class IntellegyHubXDi16InputSensor(IntellegyHubXDi16Entity, BinarySensorEntity):
 
     @property
     def icon(self) -> str:
-        return XDI16_INPUT_ICON
+        return XDI16_INPUT_CLOSED_ICON if self.is_on else XDI16_INPUT_OPEN_ICON
 
     @property
     def is_on(self) -> bool:

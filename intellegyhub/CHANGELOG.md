@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.122
+
+- Restore stateful switch-style icons for xDO relay outputs and xDI input states.
+
 ## 0.5.121
 
 - Use relay and discrete-input icons for xDO/xDI extension module entities.

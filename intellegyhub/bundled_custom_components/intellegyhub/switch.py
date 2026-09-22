@@ -20,7 +20,8 @@ from .xport_entities import setup_xport_dynamic_platform
 
 LOGGER = logging.getLogger(__name__)
 PARALLEL_UPDATES = 0
-XDO8_RELAY_ICON = "mdi:relay"
+SWITCH_ON_ICON = "mdi:toggle-switch"
+SWITCH_OFF_ICON = "mdi:toggle-switch-off-outline"
 
 
 async def async_setup_entry(
@@ -178,7 +179,6 @@ class IntellegyHubOneWirePowerSwitch(IntellegyHubOneWirePowerEntity, SwitchEntit
 
 class IntellegyHubXDo8RelaySwitch(IntellegyHubXDo8Entity, SwitchEntity):
     _attr_translation_key = "xdo8_relay"
-    _attr_icon = XDO8_RELAY_ICON
 
     def __init__(self, manager, module_id: str, channel: int) -> None:
         super().__init__(manager, module_id, channel)
@@ -191,6 +191,10 @@ class IntellegyHubXDo8RelaySwitch(IntellegyHubXDo8Entity, SwitchEntity):
         if len(relays) < self.channel:
             return False
         return bool(relays[self.channel - 1])
+
+    @property
+    def icon(self) -> str:
+        return SWITCH_ON_ICON if self.is_on else SWITCH_OFF_ICON
 
     async def async_turn_on(self, **kwargs) -> None:
         await self.manager.async_set_extension_relay(self.module_id, self.channel, True)
