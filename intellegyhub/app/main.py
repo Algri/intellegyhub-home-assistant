@@ -118,7 +118,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.106 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
+                "Starting v0.5.107 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -153,7 +153,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.106", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.107", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 
@@ -392,10 +392,20 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       white-space: nowrap;
       vertical-align: bottom;
     }
+    .active-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; margin-top: 14px; }
+    .active-row .active-mode { margin-top: 0; min-width: 0; }
+    .xport-action-slot { min-width: 98px; min-height: 38px; display: flex; justify-content: flex-end; align-items: center; }
+    .xport-action-slot:empty { visibility: hidden; }
     .mode-body { color: var(--ha-secondary); font-size: 15px; line-height: 1.6; margin-top: 26px; min-height: 54px; }
     .metric strong, .active-mode strong { color: var(--ha-strong); font-weight: 700; }
     .mode-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
     .switch-row { justify-content: space-between; flex-wrap: nowrap; width: 100%; }
+    .control-cluster { display: inline-flex; align-items: center; gap: 10px; margin-left: auto; }
+    .xport-control-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; min-height: 42px; border: 1px solid var(--ha-row-border); border-radius: 8px; padding: 8px 10px; background: var(--ha-row); color: var(--ha-text); }
+    .xport-control-row.readout { grid-template-columns: minmax(0, 1fr) auto; }
+    .xport-control-row.pwm { display: block; }
+    .xport-control-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .xport-control-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .toggle {
       position: relative;
       width: 40px;
@@ -573,7 +583,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           <dt>Hardware</dt>
           <dd id="carrier-identity-hardware">v1.4 Rev.A</dd>
           <dt>Software</dt>
-          <dd id="carrier-identity-software">v0.5.106</dd>
+          <dd id="carrier-identity-software">v0.5.107</dd>
         </dl>
         <div class="overview-divider"></div>
         <dl class="overview-health">
@@ -862,6 +872,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       const label = document.createElement('label');
       label.textContent = 'Mode';
       const modeSelect = renderModeSelect(channel, modes);
+      const activeRow = document.createElement('div');
+      activeRow.className = 'active-row';
       const active = document.createElement('div');
       active.className = 'active-mode';
       const activeLabel = document.createElement('span');
@@ -869,9 +881,12 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       const activeValue = document.createElement('strong');
       activeValue.className = 'active-mode-value';
       active.append(activeLabel, activeValue);
+      const actionSlot = document.createElement('div');
+      actionSlot.className = 'xport-action-slot';
+      activeRow.append(active, actionSlot);
       const modeBody = document.createElement('div');
       modeBody.className = 'mode-body';
-      card.append(title, label, modeSelect, active, modeBody);
+      card.append(title, label, modeSelect, activeRow, modeBody);
       return card;
     }
     function updateXPortCard(card, channel, modes) {
@@ -889,6 +904,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         activeValue.textContent = confirmedLabel;
         activeValue.title = confirmedLabel;
       }
+      updateXPortAction(card, channel);
       const body = card.querySelector('.mode-body');
       const bodyKey = [
         channel.confirmed_mode,
@@ -900,6 +916,24 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         body.replaceChildren(renderModeBody(channel));
         body.dataset.bodyKey = bodyKey;
       }
+    }
+    function updateXPortAction(card, channel) {
+      const actionSlot = card.querySelector('.xport-action-slot');
+      if (!actionSlot) { return; }
+      const needsReset = channel.confirmed_mode === 'PulseCounterExternalVoltage' || channel.confirmed_mode === 'PulseCounterInternalPullUp';
+      if (!needsReset) {
+        actionSlot.replaceChildren();
+        return;
+      }
+      let reset = actionSlot.querySelector('button');
+      if (!reset) {
+        reset = document.createElement('button');
+        reset.className = 'reset-button';
+        reset.type = 'button';
+        reset.textContent = 'Reset';
+        actionSlot.replaceChildren(reset);
+      }
+      reset.onclick = () => resetCounter(channel.channel);
     }
     async function setMode(channel, mode) {
       const output = document.getElementById('output');
@@ -914,44 +948,72 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       }
     }
     function renderModeBody(channel) {
-      if (channel.error) { return metric(channel.error, ''); }
+      if (channel.error) { return readoutRow(channel.error, ''); }
       switch (channel.confirmed_mode) {
-        case 'AnalogInput': return metric('Measured voltage:', `${Number(channel.value || 0).toFixed(3)} V`);
+        case 'AnalogInput': return readoutRow('Measured voltage', `${Number(channel.value || 0).toFixed(3)} V`);
         case 'DigitalOutput': return digitalOutput(channel);
         case 'PwmOutput': return pwmOutput(channel);
         case 'DigitalInputExternalVoltage':
-        case 'DigitalInputInternalPullUp': return metric('Input:', channel.value ? 'CLOSED' : 'OPEN');
+        case 'DigitalInputInternalPullUp': return digitalInput(channel);
         case 'PulseCounterExternalVoltage':
         case 'PulseCounterInternalPullUp': return counterOutput(channel);
-        default: return metric('Port is disabled and held in a safe state', '');
+        default: return readoutRow('State', 'Disabled');
       }
     }
-    function metric(label, value) {
+    function readoutRow(label, value) {
       const row = document.createElement('div');
-      row.className = 'metric';
-      row.innerHTML = value ? `${label} <strong>${value}</strong>` : label;
+      row.className = 'xport-control-row readout';
+      const labelEl = document.createElement('span');
+      labelEl.textContent = label;
+      const valueEl = document.createElement('strong');
+      valueEl.textContent = value;
+      row.append(labelEl, valueEl);
       return row;
     }
     function digitalOutput(channel) {
       const row = document.createElement('div');
-      row.className = 'mode-row switch-row metric';
+      row.className = 'xport-control-row';
       const value = Number(channel.value || 0) > 0;
       const label = document.createElement('span');
-      label.innerHTML = `Discrete output: <strong>${value ? 'ON' : 'OFF'}</strong>`;
+      label.textContent = 'Discrete output';
+      const state = document.createElement('span');
+      state.className = `state-text ${value ? 'on' : ''}`;
+      state.textContent = value ? 'ON' : 'OFF';
       const toggle = document.createElement('button');
       toggle.className = `toggle ${value ? 'on' : ''}`;
       toggle.type = 'button';
       toggle.innerHTML = `<span>${value ? 'ON' : 'OFF'}</span>`;
       toggle.onclick = () => setValue(channel.channel, value ? 0 : 1);
-      row.append(label, toggle);
+      row.append(label, state, toggle);
+      return row;
+    }
+    function digitalInput(channel) {
+      const row = document.createElement('div');
+      row.className = 'xport-control-row';
+      const value = Boolean(channel.value);
+      const label = document.createElement('span');
+      label.textContent = 'Input';
+      const state = document.createElement('span');
+      state.className = `state-text ${value ? 'on' : ''}`;
+      state.textContent = value ? 'CLOSED' : 'OPEN';
+      const indicator = document.createElement('button');
+      indicator.className = `toggle readonly ${value ? 'on' : ''}`;
+      indicator.type = 'button';
+      indicator.tabIndex = -1;
+      indicator.innerHTML = `<span>${value ? 'CLOSED' : 'OPEN'}</span>`;
+      row.append(label, state, indicator);
       return row;
     }
     function pwmOutput(channel) {
       const wrap = document.createElement('div');
+      wrap.className = 'xport-control-row pwm';
       const percent = Math.round(Number(channel.value || 0) * 100);
-      const label = document.createElement('div');
-      label.className = 'metric';
-      label.innerHTML = `PWM power: <strong>${percent}%</strong>`;
+      const head = document.createElement('div');
+      head.className = 'xport-control-head';
+      const label = document.createElement('span');
+      label.textContent = 'PWM power';
+      const value = document.createElement('strong');
+      value.textContent = `${percent}%`;
       const sliderRow = document.createElement('div');
       sliderRow.className = 'slider-row';
       const slider = document.createElement('input');
@@ -961,19 +1023,18 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       slider.value = String(percent);
       slider.onchange = () => setValue(channel.channel, Number(slider.value) / 100);
       sliderRow.appendChild(slider);
-      wrap.append(label, sliderRow);
+      head.append(label, value);
+      wrap.append(head, sliderRow);
       return wrap;
     }
     function counterOutput(channel) {
       const row = document.createElement('div');
-      row.className = 'mode-row metric';
-      row.innerHTML = `Counted pulses: <strong>${Number(channel.counter || 0)}</strong>`;
-      const reset = document.createElement('button');
-      reset.className = 'reset-button';
-      reset.type = 'button';
-      reset.textContent = 'Reset';
-      reset.onclick = () => resetCounter(channel.channel);
-      row.appendChild(reset);
+      row.className = 'xport-control-row readout';
+      const label = document.createElement('span');
+      label.textContent = 'Counted pulses';
+      const value = document.createElement('strong');
+      value.textContent = String(Number(channel.counter || 0));
+      row.append(label, value);
       return row;
     }
     function renderModeSelect(channel, modes) {
@@ -1099,7 +1160,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       document.getElementById('carrier-identity-model').textContent = identity.model || 'IntellegyHUB Controller';
       document.getElementById('carrier-identity-serial').textContent = identity.serial_number || 'IH1400-00001234';
       document.getElementById('carrier-identity-hardware').textContent = formatVersion(identity.hardware_revision || '1.4 Rev.A');
-      document.getElementById('carrier-identity-software').textContent = formatVersion(identity.software_version || '0.5.106');
+      document.getElementById('carrier-identity-software').textContent = formatVersion(identity.software_version || '0.5.107');
       document.getElementById('carrier-uptime').textContent = formatUptime(appInfo && appInfo.uptime_seconds);
       const monitoring = carrier && carrier.monitoring ? carrier.monitoring : {};
       const temperature = monitoring.temperature || {};

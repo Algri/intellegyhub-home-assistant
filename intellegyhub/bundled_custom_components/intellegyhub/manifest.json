@@ -1,7 +1,7 @@
 {
   "domain": "intellegyhub",
   "name": "IntellegyHUB",
-  "version": "0.5.106",
+  "version": "0.5.107",
   "config_flow": true,
   "integration_type": "device",
   "single_config_entry": true,

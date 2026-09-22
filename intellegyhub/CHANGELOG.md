@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.107
+
+- Align X-Port mode controls with the shared row style, including counter reset placement and read-only DI indicators.
+
 ## 0.5.106
 
 - Keep X-Port cards stable while live telemetry updates so mode dropdowns stay open in AI and other modes.
