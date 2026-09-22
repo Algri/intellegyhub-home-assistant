@@ -9,7 +9,7 @@ from .coordinator import IntellegyHubGpioManager
 
 
 class IntellegyHubGpioEntity(Entity):
-    _attr_has_entity_name = True
+    _attr_has_entity_name = False
 
     def __init__(self, manager: IntellegyHubGpioManager) -> None:
         self.manager = manager
@@ -101,6 +101,8 @@ def _onewire_bridge_title(bridge: dict) -> str:
 
 
 class IntellegyHubXDo8Entity(IntellegyHubGpioEntity):
+    _attr_has_entity_name = True
+
     def __init__(self, manager: IntellegyHubGpioManager, module_id: str, channel: int) -> None:
         super().__init__(manager)
         self.module_id = module_id
@@ -132,6 +134,8 @@ class IntellegyHubXDo8Entity(IntellegyHubGpioEntity):
 
 
 class IntellegyHubXDi16Entity(IntellegyHubGpioEntity):
+    _attr_has_entity_name = True
+
     def __init__(self, manager: IntellegyHubGpioManager, module_id: str, channel: int) -> None:
         super().__init__(manager)
         self.module_id = module_id
@@ -163,6 +167,8 @@ class IntellegyHubXDi16Entity(IntellegyHubGpioEntity):
 
 
 class IntellegyHubOneWireBridgeEntity(IntellegyHubGpioEntity):
+    _attr_has_entity_name = True
+
     def __init__(self, manager: IntellegyHubGpioManager, bridge_id: str) -> None:
         super().__init__(manager)
         self.bridge_id = bridge_id

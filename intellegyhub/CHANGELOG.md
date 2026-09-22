@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.114
+
+- Use dashboard-friendly Home Assistant entity names without the repeated Hardware Host prefix.
+
 ## 0.5.113
 
 - Add dashboard-friendly icons to Home Assistant buzzer number entities.
