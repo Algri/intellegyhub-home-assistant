@@ -403,8 +403,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .control-cluster { display: inline-flex; align-items: center; gap: 10px; margin-left: auto; }
     .xport-control-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; min-height: 42px; border: 1px solid var(--ha-row-border); border-radius: 8px; padding: 8px 10px; background: var(--ha-row); color: var(--ha-text); }
     .xport-control-row.readout { grid-template-columns: minmax(0, 1fr) auto; }
-    .xport-control-row.pwm { display: block; }
-    .xport-control-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .xport-control-row.pwm { grid-template-columns: auto minmax(120px, 1fr) 5ch; padding-right: 12px; }
+    .xport-control-row.pwm strong { text-align: right; padding-right: 2px; }
     .xport-control-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .toggle {
       position: relative;
@@ -1008,23 +1008,17 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       const wrap = document.createElement('div');
       wrap.className = 'xport-control-row pwm';
       const percent = Math.round(Number(channel.value || 0) * 100);
-      const head = document.createElement('div');
-      head.className = 'xport-control-head';
       const label = document.createElement('span');
-      label.textContent = 'PWM power';
+      label.textContent = 'PWM';
       const value = document.createElement('strong');
       value.textContent = `${percent}%`;
-      const sliderRow = document.createElement('div');
-      sliderRow.className = 'slider-row';
       const slider = document.createElement('input');
       slider.type = 'range';
       slider.min = '0';
       slider.max = '100';
       slider.value = String(percent);
       slider.onchange = () => setValue(channel.channel, Number(slider.value) / 100);
-      sliderRow.appendChild(slider);
-      head.append(label, value);
-      wrap.append(head, sliderRow);
+      wrap.append(label, slider, value);
       return wrap;
     }
     function counterOutput(channel) {
