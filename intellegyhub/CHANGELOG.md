@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.118
+
+- Apply compact Home Assistant entity registry names for Hardware Host entities so dashboard pickers no longer show repeated Hardware Host prefixes.
+
 ## 0.5.117
 
 - Keep host entities on the Hardware Host device while exposing compact dashboard names without the repeated Hardware Host prefix.
