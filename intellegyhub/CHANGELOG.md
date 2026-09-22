@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.121
+
+- Use relay and discrete-input icons for xDO/xDI extension module entities.
+
 ## 0.5.120
 
 - Remove repeated module prefixes from xDO/xDI dashboard picker entity names and use clearer extension module I/O icons.

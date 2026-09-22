@@ -13,7 +13,7 @@ from .xport_entities import setup_xport_dynamic_platform
 
 BRIDGE_DEVICE_CLASS_CONNECTIVITY = getattr(BinarySensorDeviceClass, "CONNECTIVITY", "connectivity")
 FAULT_DEVICE_CLASS_PROBLEM = getattr(BinarySensorDeviceClass, "PROBLEM", "problem")
-XDI16_INPUT_ICON = "mdi:electric-switch"
+XDI16_INPUT_ICON = "mdi:input"
 BUTTON_INPUT_ICON = "mdi:gesture-tap-button"
 
 

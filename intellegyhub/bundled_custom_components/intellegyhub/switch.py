@@ -20,7 +20,7 @@ from .xport_entities import setup_xport_dynamic_platform
 
 LOGGER = logging.getLogger(__name__)
 PARALLEL_UPDATES = 0
-XDO8_RELAY_ICON = "mdi:electric-switch"
+XDO8_RELAY_ICON = "mdi:relay"
 
 
 async def async_setup_entry(
