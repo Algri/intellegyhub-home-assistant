@@ -1,7 +1,7 @@
 name: IntellegyHUB
 slug: intellegyhub
 description: IntellegyHUB hardware runtime for Home Assistant native entities
-version: 0.5.115
+version: 0.5.116
 stage: experimental
 arch:
   - aarch64

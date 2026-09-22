@@ -63,6 +63,53 @@ After the add-on installs or updates the integration, restart Home Assistant
 Core so the integration appears under `Settings -> Devices & services -> Add
 integration`.
 
+## Dashboard Cards
+
+Home Assistant entity names are device-scoped by design, so an automatically
+added tile can show names such as `Hardware Host Buzzer Volume`. For dashboard
+cards that should use a compact label, set the Lovelace card `name` explicitly.
+
+Recommended buzzer volume tile:
+
+```yaml
+type: tile
+entity: number.intellegyhub_buzzer_volume
+name: Buzzer Volume
+icon: mdi:volume-high
+features:
+  - type: numeric-input
+    style: slider
+features_position: inline
+grid_options:
+  columns: 12
+  rows: 1
+```
+
+Recommended compact buzzer setting tiles:
+
+```yaml
+type: grid
+columns: 2
+square: false
+cards:
+  - type: tile
+    entity: number.intellegyhub_buzzer_duration
+    name: Buzzer Duration
+    icon: mdi:timer-outline
+  - type: tile
+    entity: number.intellegyhub_buzzer_frequency
+    name: Buzzer Frequency
+    icon: mdi:sine-wave
+  - type: tile
+    entity: number.intellegyhub_buzzer_volume
+    name: Buzzer Volume
+    icon: mdi:volume-high
+    features:
+      - type: numeric-input
+        style: slider
+    features_position: inline
+```
+
 ## Version Bump And Release Archive Checklist
 
 Before building release archives, bump the same version in every packaged

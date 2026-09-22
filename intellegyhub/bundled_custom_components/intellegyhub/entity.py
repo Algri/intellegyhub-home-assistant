@@ -9,7 +9,7 @@ from .coordinator import IntellegyHubGpioManager
 
 
 class IntellegyHubGpioEntity(Entity):
-    _attr_has_entity_name = False
+    _attr_has_entity_name = True
 
     def __init__(self, manager: IntellegyHubGpioManager) -> None:
         self.manager = manager

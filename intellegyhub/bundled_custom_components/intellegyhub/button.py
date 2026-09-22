@@ -30,7 +30,7 @@ class IntellegyHubXPortCounterResetButton(IntellegyHubXPortEntity, ButtonEntity)
     def __init__(self, manager, channel: int) -> None:
         super().__init__(manager, channel)
         self._attr_unique_id = f"intellegyhub_xport_x{channel}_counter_reset"
-        self._attr_name = f"X{channel} Reset Counter"
+        self._attr_name = "Reset Counter"
 
     @property
     def available(self) -> bool:

@@ -163,7 +163,7 @@ class IntellegyHubXPortAiSensor(IntellegyHubXPortEntity, SensorEntity):
     def __init__(self, manager, channel: int) -> None:
         super().__init__(manager, channel)
         self._attr_unique_id = f"intellegyhub_xport_x{channel}_ai"
-        self._attr_name = f"X{channel} AI"
+        self._attr_name = "AI"
 
     @property
     def available(self) -> bool:
@@ -182,7 +182,7 @@ class IntellegyHubXPortCounterSensor(IntellegyHubXPortEntity, SensorEntity):
     def __init__(self, manager, channel: int) -> None:
         super().__init__(manager, channel)
         self._attr_unique_id = f"intellegyhub_xport_x{channel}_counter"
-        self._attr_name = f"X{channel} Counter"
+        self._attr_name = "Counter"
 
     @property
     def available(self) -> bool:

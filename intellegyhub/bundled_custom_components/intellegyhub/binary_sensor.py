@@ -162,7 +162,7 @@ class IntellegyHubXPortDiSensor(IntellegyHubXPortEntity, BinarySensorEntity):
     def __init__(self, manager, channel: int) -> None:
         super().__init__(manager, channel)
         self._attr_unique_id = f"intellegyhub_xport_x{channel}_di"
-        self._attr_name = f"X{channel} DI"
+        self._attr_name = "DI"
 
     @property
     def available(self) -> bool:

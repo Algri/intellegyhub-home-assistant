@@ -126,7 +126,7 @@ class IntellegyHubXPortDoSwitch(IntellegyHubXPortEntity, SwitchEntity):
     def __init__(self, manager, channel: int) -> None:
         super().__init__(manager, channel)
         self._attr_unique_id = f"intellegyhub_xport_x{channel}_do"
-        self._attr_name = f"X{channel} DO"
+        self._attr_name = "DO"
 
     @property
     def available(self) -> bool:
