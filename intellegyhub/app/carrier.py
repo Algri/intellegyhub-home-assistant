@@ -62,8 +62,8 @@ def _carrier_output(output_id: str, name: str, bit: int, port: str, pin: str) ->
 
 
 CARRIER_OUTPUTS: dict[str, CarrierOutputDefinition] = {
-    "rs485_ch1_termination": _carrier_output("rs485_ch1_termination", "RS-485 CH1 120О© Termination", 10, "GPIOB", "GPB2"),
-    "rs485_ch2_termination": _carrier_output("rs485_ch2_termination", "RS-485 CH2 120О© Termination", 13, "GPIOB", "GPB5"),
+    "rs485_ch1_termination": _carrier_output("rs485_ch1_termination", "RS-485 CH1 120РћВ© Termination", 10, "GPIOB", "GPB2"),
+    "rs485_ch2_termination": _carrier_output("rs485_ch2_termination", "RS-485 CH2 120РћВ© Termination", 13, "GPIOB", "GPB5"),
     "xmod1_reset": _carrier_output("xmod1_reset", "XMOD1 Reset", 8, "GPIOB", "GPB0"),
     "xmod1_flash_enable": _carrier_output("xmod1_flash_enable", "XMOD1 Flash / Enable", 9, "GPIOB", "GPB1"),
     "xmod2_reset": _carrier_output("xmod2_reset", "XMOD2 Reset", 11, "GPIOB", "GPB3"),
@@ -492,7 +492,7 @@ class CarrierManager:
                 "model": "IntellegyHUB Controller",
                 "serial_number": "IH1400-00001234",
                 "hardware_revision": "1.4 Rev.A",
-                "software_version": "0.5.127",
+                "software_version": "0.5.128",
             },
             "controller": {"bus": 10, "address": "0x20", "chip": "MCP23017"},
             "faults": [asdict(fault) for fault in self.faults.values()],

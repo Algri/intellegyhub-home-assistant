@@ -69,6 +69,7 @@ class IntellegyHubXPortPwmLight(IntellegyHubXPortEntity, LightEntity):
 class IntellegyHubBuzzerVolumeLight(IntellegyHubGpioEntity, LightEntity):
     _attr_translation_key = "buzzer_volume_light"
     _attr_unique_id = "intellegyhub_buzzer_volume_light"
+    _attr_suggested_object_id = "intellegyhub_buzzer_volume_light"
     _attr_name = "Buzzer Volume"
     _attr_supported_color_modes = {ColorMode.BRIGHTNESS}
     _attr_color_mode = ColorMode.BRIGHTNESS

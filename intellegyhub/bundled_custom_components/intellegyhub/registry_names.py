@@ -26,6 +26,10 @@ STATIC_ENTITY_DASHBOARD_NAMES: dict[str, str] = {
     "intellegyhub_buzzer_play": "Buzzer Play",
 }
 
+STATIC_ENTITY_IDS: dict[str, str] = {
+    "intellegyhub_buzzer_volume_light": "light.intellegyhub_buzzer_volume_light",
+}
+
 XPORT_ENTITY_SUFFIX_NAMES = {
     "mode": "Mode",
     "do": "DO",
@@ -53,10 +57,16 @@ def apply_compact_entity_dashboard_names(hass: HomeAssistant, entry_id: str) -> 
         entity_id = getattr(registry_entry, "entity_id", None)
         unique_id = getattr(registry_entry, "unique_id", None)
         desired_name = compact_dashboard_name(unique_id)
-        if entity_id is None or desired_name is None:
+        desired_entity_id = compact_entity_id(unique_id)
+        if entity_id is None:
             continue
-        if getattr(registry_entry, "name", None) != desired_name:
-            update_entity(entity_id, name=desired_name)
+        changes = {}
+        if desired_name is not None and getattr(registry_entry, "name", None) != desired_name:
+            changes["name"] = desired_name
+        if desired_entity_id is not None and entity_id != desired_entity_id:
+            changes["new_entity_id"] = desired_entity_id
+        if changes:
+            update_entity(entity_id, **changes)
 
 
 def compact_dashboard_name(unique_id: object) -> str | None:
@@ -88,3 +98,9 @@ def compact_dashboard_name(unique_id: object) -> str | None:
         return "Temperature"
 
     return None
+
+
+def compact_entity_id(unique_id: object) -> str | None:
+    if not isinstance(unique_id, str):
+        return None
+    return STATIC_ENTITY_IDS.get(unique_id)

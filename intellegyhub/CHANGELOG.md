@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.128
+
+- Force the Buzzer Volume light entity id to `light.intellegyhub_buzzer_volume_light` so dashboard YAML can reference it reliably.
+
 ## 0.5.127
 
 - Add a Home Assistant Buzzer Volume light entity so Tile cards can open the native fullscreen brightness/on-off control.

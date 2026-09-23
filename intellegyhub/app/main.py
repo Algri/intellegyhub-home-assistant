@@ -118,7 +118,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.127 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
+                "Starting v0.5.128 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -153,7 +153,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.127", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.128", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 
@@ -583,7 +583,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           <dt>Hardware</dt>
           <dd id="carrier-identity-hardware">v1.4 Rev.A</dd>
           <dt>Software</dt>
-          <dd id="carrier-identity-software">v0.5.127</dd>
+          <dd id="carrier-identity-software">v0.5.128</dd>
         </dl>
         <div class="overview-divider"></div>
         <dl class="overview-health">
@@ -1180,7 +1180,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       document.getElementById('carrier-identity-model').textContent = identity.model || 'IntellegyHUB Controller';
       document.getElementById('carrier-identity-serial').textContent = identity.serial_number || 'IH1400-00001234';
       document.getElementById('carrier-identity-hardware').textContent = formatVersion(identity.hardware_revision || '1.4 Rev.A');
-      document.getElementById('carrier-identity-software').textContent = formatVersion(identity.software_version || '0.5.127');
+      document.getElementById('carrier-identity-software').textContent = formatVersion(identity.software_version || '0.5.128');
       document.getElementById('carrier-uptime').textContent = formatUptime(appInfo && appInfo.uptime_seconds);
       const monitoring = carrier && carrier.monitoring ? carrier.monitoring : {};
       const temperature = monitoring.temperature || {};
@@ -1189,7 +1189,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         rails[rail.id] = rail;
       }
       const updatedAt = [
-        paintMetric('board-temperature', temperature, 1, ' Р’В°C'),
+        paintMetric('board-temperature', temperature, 1, ' Р вЂ™Р’В°C'),
         paintMetric('5v', rails['5v'], 2, ' V'),
         paintMetric('3v3', rails['3v3'], 2, ' V'),
         paintMetric('vin', rails.vin, 2, ' V')
@@ -1406,7 +1406,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         meta.className = 'module-meta';
         const isInputModule = module.kind === 'digital_input';
         const isRelayModule = module.kind === 'relay_output';
-        meta.textContent = `X-BUS Р’В· I2C-${module.bus} Р’В· Address ${module.address} Р’В· ${module.chip} Р’В· 8 relays`;
+        meta.textContent = `X-BUS Р вЂ™Р’В· I2C-${module.bus} Р вЂ™Р’В· Address ${module.address} Р вЂ™Р’В· ${module.chip} Р вЂ™Р’В· 8 relays`;
         const grid = document.createElement('div');
         grid.className = 'relay-grid';
         meta.textContent = `X-BUS - I2C-${module.bus} - Address ${module.address} - ${module.chip} - ${module.channels} ${isInputModule ? 'digital inputs' : 'relays'}`;
@@ -1548,7 +1548,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         const meta = document.createElement('div');
         meta.className = 'module-meta';
         const enabled = bridge.enabled !== false;
-        meta.textContent = `Bus I2C-${bridge.bus} Р вЂ™Р’В· Address ${bridge.address} Р вЂ™Р’В· ${bridge.chip}${bridge.available ? '' : ' Р вЂ™Р’В· unavailable'}`;
+        meta.textContent = `Bus I2C-${bridge.bus} Р В РІР‚в„ўР вЂ™Р’В· Address ${bridge.address} Р В РІР‚в„ўР вЂ™Р’В· ${bridge.chip}${bridge.available ? '' : ' Р В РІР‚в„ўР вЂ™Р’В· unavailable'}`;
         meta.textContent = `Bus I2C-${bridge.bus} - Address ${bridge.address} - ${bridge.chip}${enabled ? '' : ' - polling off'}${bridge.available ? '' : ' - unavailable'}`;
         const toggle = document.createElement('button');
         toggle.className = `toggle ${enabled ? 'on' : ''}`;
@@ -1573,8 +1573,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         title.textContent = sensor.name;
         const meta = document.createElement('div');
         meta.className = 'module-meta';
-        const value = sensor.temperature_c === null || sensor.temperature_c === undefined ? 'Unavailable' : `${Number(sensor.temperature_c).toFixed(3)} Р вЂ™Р’В°C`;
-        meta.textContent = `Bridge ${sensor.address} Р вЂ™Р’В· ROM ${sensor.rom} Р вЂ™Р’В· ${value}${sensor.available ? '' : ' Р вЂ™Р’В· unavailable'}`;
+        const value = sensor.temperature_c === null || sensor.temperature_c === undefined ? 'Unavailable' : `${Number(sensor.temperature_c).toFixed(3)} Р В РІР‚в„ўР вЂ™Р’В°C`;
+        meta.textContent = `Bridge ${sensor.address} Р В РІР‚в„ўР вЂ™Р’В· ROM ${sensor.rom} Р В РІР‚в„ўР вЂ™Р’В· ${value}${sensor.available ? '' : ' Р В РІР‚в„ўР вЂ™Р’В· unavailable'}`;
         const remove = document.createElement('button');
         remove.className = 'danger-button';
         const cleanValue = sensor.temperature_c === null || sensor.temperature_c === undefined ? 'Unavailable' : `${Number(sensor.temperature_c).toFixed(3)} C`;
@@ -1704,7 +1704,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       try {
         const payload = await requestJson('api/v1/buzzer/status');
         paintBuzzer(payload);
-        document.getElementById('buzzer-detail').textContent = `pigpio: ${payload.pigpio.connected ? 'connected' : 'offline'} Р’В· pwmchip: ${payload.pwm.available ? 'available' : 'missing'} Р’В· gpio18: ${payload.gpio.available ? 'available' : 'missing'}`;
+        document.getElementById('buzzer-detail').textContent = `pigpio: ${payload.pigpio.connected ? 'connected' : 'offline'} Р вЂ™Р’В· pwmchip: ${payload.pwm.available ? 'available' : 'missing'} Р вЂ™Р’В· gpio18: ${payload.gpio.available ? 'available' : 'missing'}`;
       } catch (error) {
         document.getElementById('buzzer-status').textContent = 'BUZZER: Error';
         document.getElementById('buzzer-detail').textContent = JSON.stringify(error);
@@ -1735,7 +1735,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           body: JSON.stringify(requested)
         });
         document.getElementById('buzzer-status').textContent = `BUZZER: running ${payload.backend}`;
-        detail.textContent = `duration: ${payload.duration_ms} ms Р’В· pigpio: ${payload.pigpio.connected ? 'connected' : 'offline'}`;
+        detail.textContent = `duration: ${payload.duration_ms} ms Р вЂ™Р’В· pigpio: ${payload.pigpio.connected ? 'connected' : 'offline'}`;
         window.setTimeout(renderBuzzerStatus, requested.duration_ms + 250);
       } catch (error) {
         document.getElementById('buzzer-status').textContent = 'BUZZER: Test failed';
@@ -1746,7 +1746,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       try {
         const payload = await requestJson('api/v1/buzzer/stop', { method: 'POST' });
         document.getElementById('buzzer-status').textContent = 'BUZZER: stopped';
-        document.getElementById('buzzer-detail').textContent = `pigpio: ${payload.pigpio.connected ? 'connected' : 'offline'} Р’В· pwmchip: ${payload.pwm.available ? 'available' : 'missing'}`;
+        document.getElementById('buzzer-detail').textContent = `pigpio: ${payload.pigpio.connected ? 'connected' : 'offline'} Р вЂ™Р’В· pwmchip: ${payload.pwm.available ? 'available' : 'missing'}`;
       } catch (error) {
         document.getElementById('buzzer-status').textContent = 'BUZZER: stop failed';
         document.getElementById('buzzer-detail').textContent = JSON.stringify(error);
