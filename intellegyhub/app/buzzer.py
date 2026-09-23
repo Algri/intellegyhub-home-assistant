@@ -4,17 +4,24 @@ import asyncio
 import contextlib
 import io
 import os
+import sqlite3
 import sys
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 
 PIGPIO_HOST = "127.0.0.1"
 PIGPIO_PORT = 8888
-MIN_BUZZER_FREQUENCY_HZ = 20
+MIN_BUZZER_FREQUENCY_HZ = 300
 MAX_BUZZER_FREQUENCY_HZ = 2800
+MIN_BUZZER_DURATION_MS = 10
+MAX_BUZZER_DURATION_MS = 1000
 MAX_PHYSICAL_DUTY = 0.22
+DEFAULT_FREQUENCY = 2000
+DEFAULT_DURATION_MS = 300
+DEFAULT_VOLUME_PERCENT = 50
 
 
 def volume_percent_to_duty(volume_percent: float) -> float:
@@ -22,6 +29,82 @@ def volume_percent_to_duty(volume_percent: float) -> float:
     if volume <= 0:
         return 0.0
     return MAX_PHYSICAL_DUTY * (volume / 100.0)
+
+
+@dataclass
+class BuzzerSettings:
+    frequency: int = DEFAULT_FREQUENCY
+    duration_ms: int = DEFAULT_DURATION_MS
+    volume_percent: int = DEFAULT_VOLUME_PERCENT
+    last_volume_percent: int = DEFAULT_VOLUME_PERCENT
+
+
+class BuzzerSettingsStore:
+    def __init__(self, path: Path | None = None) -> None:
+        self.path = path or _default_store_path()
+        self._lock = asyncio.Lock()
+
+    async def initialize(self) -> None:
+        await asyncio.to_thread(self._initialize_sync)
+
+    async def load(self) -> BuzzerSettings:
+        return await asyncio.to_thread(self._load_sync)
+
+    async def save(self, settings: BuzzerSettings) -> None:
+        async with self._lock:
+            await asyncio.to_thread(self._save_sync, settings)
+
+    def _connect(self) -> sqlite3.Connection:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        return sqlite3.connect(self.path)
+
+    def _initialize_sync(self) -> None:
+        with self._connect() as db:
+            db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS buzzer_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+                """
+            )
+
+    def _load_sync(self) -> BuzzerSettings:
+        with self._connect() as db:
+            rows = dict(db.execute("SELECT key,value FROM buzzer_settings").fetchall())
+
+        settings = BuzzerSettings(
+            frequency=_int_from_store(rows.get("frequency"), DEFAULT_FREQUENCY),
+            duration_ms=_int_from_store(rows.get("duration_ms"), DEFAULT_DURATION_MS),
+            volume_percent=_int_from_store(rows.get("volume_percent"), DEFAULT_VOLUME_PERCENT),
+            last_volume_percent=_int_from_store(rows.get("last_volume_percent"), DEFAULT_VOLUME_PERCENT),
+        )
+        try:
+            BuzzerManager._validate(settings.frequency, settings.duration_ms, settings.volume_percent)
+            BuzzerManager._validate_volume(settings.last_volume_percent)
+        except ValueError:
+            return BuzzerSettings()
+        if settings.volume_percent > 0:
+            settings.last_volume_percent = settings.volume_percent
+        elif settings.last_volume_percent <= 0:
+            settings.last_volume_percent = DEFAULT_VOLUME_PERCENT
+        return settings
+
+    def _save_sync(self, settings: BuzzerSettings) -> None:
+        BuzzerManager._validate(settings.frequency, settings.duration_ms, settings.volume_percent)
+        BuzzerManager._validate_volume(settings.last_volume_percent)
+        rows = {
+            "frequency": str(settings.frequency),
+            "duration_ms": str(settings.duration_ms),
+            "volume_percent": str(settings.volume_percent),
+            "last_volume_percent": str(settings.last_volume_percent),
+        }
+        with self._connect() as db:
+            db.executemany(
+                "INSERT INTO buzzer_settings(key,value) VALUES(?,?) "
+                "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                rows.items(),
+            )
 
 
 class BuzzerManager:
@@ -39,9 +122,10 @@ class BuzzerManager:
         self._lock = asyncio.Lock()
         self._active_task: asyncio.Task | None = None
         self._active_backend: str | None = None
-        self.frequency = 2000
-        self.duration_ms = 300
-        self.volume_percent = 50
+        self.frequency = DEFAULT_FREQUENCY
+        self.duration_ms = DEFAULT_DURATION_MS
+        self.volume_percent = DEFAULT_VOLUME_PERCENT
+        self.last_volume_percent = DEFAULT_VOLUME_PERCENT
         self._pigpio_connected: bool | None = None
         self._pigpio_error: str | None = None
 
@@ -71,10 +155,27 @@ class BuzzerManager:
             "frequency": self.frequency,
             "duration_ms": self.duration_ms,
             "volume_percent": self.volume_percent,
+            "last_volume_percent": self.last_volume_percent,
             "min_frequency_hz": MIN_BUZZER_FREQUENCY_HZ,
             "max_frequency_hz": MAX_BUZZER_FREQUENCY_HZ,
+            "min_duration_ms": MIN_BUZZER_DURATION_MS,
+            "max_duration_ms": MAX_BUZZER_DURATION_MS,
             "max_physical_duty": MAX_PHYSICAL_DUTY,
         }
+
+    def apply_settings(self, settings: BuzzerSettings) -> None:
+        self.frequency = int(settings.frequency)
+        self.duration_ms = int(settings.duration_ms)
+        self.volume_percent = int(settings.volume_percent)
+        self.last_volume_percent = int(settings.last_volume_percent)
+
+    def settings(self) -> BuzzerSettings:
+        return BuzzerSettings(
+            frequency=self.frequency,
+            duration_ms=self.duration_ms,
+            volume_percent=self.volume_percent,
+            last_volume_percent=self.last_volume_percent,
+        )
 
     async def stop(self) -> None:
         async with self._lock:
@@ -96,6 +197,8 @@ class BuzzerManager:
         self.frequency = next_frequency
         self.duration_ms = next_duration
         self.volume_percent = next_volume
+        if next_volume > 0:
+            self.last_volume_percent = next_volume
         return self.status()
 
     async def test_configured_pwm(self) -> dict[str, Any]:
@@ -115,6 +218,8 @@ class BuzzerManager:
             self.frequency = int(frequency)
             self.duration_ms = int(duration_ms)
             self.volume_percent = int(volume)
+            if volume > 0:
+                self.last_volume_percent = int(volume)
             return {
                 "status": "ok",
                 "backend": backend,
@@ -141,6 +246,8 @@ class BuzzerManager:
             self.frequency = int(frequency)
             self.duration_ms = int(duration_ms)
             self.volume_percent = int(volume)
+            if volume > 0:
+                self.last_volume_percent = int(volume)
         return {
             "status": "ok",
             "backend": backend,
@@ -164,6 +271,8 @@ class BuzzerManager:
             self.frequency = int(frequency)
             self.duration_ms = int(duration_ms)
             self.volume_percent = int(volume)
+            if volume > 0:
+                self.last_volume_percent = int(volume)
             return {
                 "status": "ok",
                 "backend": "software_gpio",
@@ -364,8 +473,10 @@ class BuzzerManager:
             raise ValueError(
                 f"frequency must be between {MIN_BUZZER_FREQUENCY_HZ} and {MAX_BUZZER_FREQUENCY_HZ} Hz"
             )
-        if duration_ms < 10 or duration_ms > 5000:
-            raise ValueError("duration_ms must be between 10 and 5000")
+        if duration_ms < MIN_BUZZER_DURATION_MS or duration_ms > MAX_BUZZER_DURATION_MS:
+            raise ValueError(
+                f"duration_ms must be between {MIN_BUZZER_DURATION_MS} and {MAX_BUZZER_DURATION_MS}"
+            )
         BuzzerManager._validate_volume(volume_percent)
 
     @staticmethod
@@ -402,3 +513,18 @@ class BuzzerManager:
         if self._pigpio_error:
             status["error"] = self._pigpio_error
         return status
+
+
+def _int_from_store(value: str | None, default: int) -> int:
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
+
+
+def _default_store_path() -> Path:
+    if sys.platform == "win32":
+        return Path(".data/intellegyhub.sqlite3")
+    return Path("/data/intellegyhub.sqlite3")

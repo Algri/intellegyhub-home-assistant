@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import WebSocket
 
 from .backends import BUTTONS, OUTPUTS, HardwareBackend, HardwareState
-from .buzzer import BuzzerManager
+from .buzzer import BuzzerManager, BuzzerSettingsStore
 from .carrier import CarrierManager
 from .extensions import ExtensionHardware, ExtensionManager
 from .onewire import OneWireHardware, OneWireManager
@@ -31,6 +31,7 @@ class AppRuntime:
         self.backend = backend
         self.carrier = CarrierManager(monitoring_interval_seconds=carrier_monitoring_poll_interval_seconds)
         self.buzzer = BuzzerManager()
+        self.buzzer_store = BuzzerSettingsStore()
         self.xport = XPortManager()
         self.extensions = ExtensionManager(hardware=ExtensionHardware(self.carrier))
         self.onewire = OneWireManager(hardware=OneWireHardware(self.carrier), poll_intervals=onewire_poll_intervals)
@@ -50,6 +51,8 @@ class AppRuntime:
         try:
             await self.ui_store.initialize()
             self.ui_settings = await self.ui_store.load()
+            await self.buzzer_store.initialize()
+            self.buzzer.apply_settings(await self.buzzer_store.load())
             self.state = await self.backend.start(self.handle_button_changed)
             self.carrier.set_publisher(self.broadcast)
             self.xport.set_publisher(self.broadcast)
@@ -178,6 +181,7 @@ class AppRuntime:
         volume_percent: int | None = None,
     ) -> dict:
         status = await self.buzzer.set_settings(frequency, duration_ms, volume_percent)
+        await self.buzzer_store.save(self.buzzer.settings())
         await self.broadcast({"type": "buzzer_changed", "buzzer": status})
         return status
 

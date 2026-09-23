@@ -89,7 +89,12 @@ class IntellegyHubBuzzerVolumeLight(IntellegyHubGpioEntity, LightEntity):
     async def async_turn_on(self, **kwargs) -> None:
         brightness = kwargs.get(ATTR_BRIGHTNESS)
         if brightness is None:
-            volume = int(self.manager.buzzer.get("volume_percent", 0))
+            volume = int(
+                self.manager.buzzer.get(
+                    "last_volume_percent",
+                    self.manager.buzzer.get("volume_percent", 50),
+                )
+            )
             if volume <= 0:
                 volume = 50
         else:

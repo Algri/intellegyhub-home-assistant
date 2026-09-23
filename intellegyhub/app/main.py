@@ -118,7 +118,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.128 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
+                "Starting v0.5.129 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -153,7 +153,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.128", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.129", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 
@@ -511,9 +511,11 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .buzzer-input-wrap { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; }
     .buzzer-input-wrap span { color: var(--ha-secondary); font-size: 12px; font-weight: 800; min-width: 26px; }
     .buzzer-field input { width: 100%; height: 38px; border: 1px solid var(--ha-row-border); border-radius: 8px; background: var(--ha-field); color: var(--ha-text); padding: 0 10px; font-weight: 600; }
-    .buzzer-volume-control { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) 44px; align-items: center; gap: 12px; }
+    .buzzer-volume-control { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) 72px; align-items: center; gap: 12px; }
     .buzzer-volume-control input { height: 38px; margin: 0; }
-    .buzzer-volume-control strong { color: var(--ha-strong); text-align: right; font-size: 13px; }
+    .buzzer-volume-control strong { color: var(--ha-strong); text-align: right; font-size: 13px; white-space: nowrap; }
+    .buzzer-toggle-control { display: flex; justify-content: flex-end; align-items: center; gap: 14px; min-height: 38px; }
+    .buzzer-toggle-control strong { min-width: 28px; color: var(--ha-strong); font-size: 12px; text-align: right; }
     .buzzer-actions { display: grid; grid-template-rows: auto 40px 40px; gap: 12px; align-content: start; }
     .buzzer-actions button { width: 100%; height: 40px; }
     .buzzer-status { margin-top: 14px; color: var(--ha-secondary); font-size: 13px; overflow-wrap: anywhere; max-width: 980px; }
@@ -583,7 +585,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           <dt>Hardware</dt>
           <dd id="carrier-identity-hardware">v1.4 Rev.A</dd>
           <dt>Software</dt>
-          <dd id="carrier-identity-software">v0.5.128</dd>
+          <dd id="carrier-identity-software">v0.5.129</dd>
         </dl>
         <div class="overview-divider"></div>
         <dl class="overview-health">
@@ -692,23 +694,30 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           <div class="buzzer-settings">
             <div class="buzzer-row">
               <label for="buzzer-frequency">Frequency</label>
-              <div class="buzzer-input-wrap buzzer-field">
-                <input id="buzzer-frequency" type="number" min="20" max="2800" value="2000">
-                <span>Hz</span>
+              <div class="buzzer-volume-control">
+                <input id="buzzer-frequency" type="range" min="300" max="2800" step="10" value="2000" oninput="updateBuzzerSettingLabels()">
+                <strong id="buzzer-frequency-value">2000 Hz</strong>
               </div>
             </div>
             <div class="buzzer-row">
               <label for="buzzer-duration">Duration</label>
-              <div class="buzzer-input-wrap buzzer-field">
-                <input id="buzzer-duration" type="number" min="10" max="5000" value="300">
-                <span>ms</span>
+              <div class="buzzer-volume-control">
+                <input id="buzzer-duration" type="range" min="10" max="1000" step="10" value="300" oninput="updateBuzzerSettingLabels()">
+                <strong id="buzzer-duration-value">300 ms</strong>
               </div>
             </div>
             <div class="buzzer-row">
               <span class="buzzer-volume-label">Volume</span>
               <div class="buzzer-volume-control">
-                <input id="buzzer-volume" type="range" min="0" max="100" step="1" value="50" oninput="updateBuzzerVolumeLabel()">
+                <input id="buzzer-volume" type="range" min="0" max="100" step="1" value="50" oninput="updateBuzzerSettingLabels()">
                 <strong id="buzzer-volume-value">50%</strong>
+              </div>
+            </div>
+            <div class="buzzer-row">
+              <span class="buzzer-volume-label">Enabled</span>
+              <div class="buzzer-toggle-control">
+                <strong id="buzzer-power-state">ON</strong>
+                <button id="buzzer-power-toggle" class="toggle on" type="button" onclick="toggleBuzzerPower()"><span>ON</span></button>
               </div>
             </div>
           </div>
@@ -1180,7 +1189,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       document.getElementById('carrier-identity-model').textContent = identity.model || 'IntellegyHUB Controller';
       document.getElementById('carrier-identity-serial').textContent = identity.serial_number || 'IH1400-00001234';
       document.getElementById('carrier-identity-hardware').textContent = formatVersion(identity.hardware_revision || '1.4 Rev.A');
-      document.getElementById('carrier-identity-software').textContent = formatVersion(identity.software_version || '0.5.128');
+      document.getElementById('carrier-identity-software').textContent = formatVersion(identity.software_version || '0.5.129');
       document.getElementById('carrier-uptime').textContent = formatUptime(appInfo && appInfo.uptime_seconds);
       const monitoring = carrier && carrier.monitoring ? carrier.monitoring : {};
       const temperature = monitoring.temperature || {};
@@ -1189,7 +1198,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         rails[rail.id] = rail;
       }
       const updatedAt = [
-        paintMetric('board-temperature', temperature, 1, ' Р вЂ™Р’В°C'),
+        paintMetric('board-temperature', temperature, 1, ' Р В РІР‚в„ўР вЂ™Р’В°C'),
         paintMetric('5v', rails['5v'], 2, ' V'),
         paintMetric('3v3', rails['3v3'], 2, ' V'),
         paintMetric('vin', rails.vin, 2, ' V')
@@ -1406,7 +1415,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         meta.className = 'module-meta';
         const isInputModule = module.kind === 'digital_input';
         const isRelayModule = module.kind === 'relay_output';
-        meta.textContent = `X-BUS Р вЂ™Р’В· I2C-${module.bus} Р вЂ™Р’В· Address ${module.address} Р вЂ™Р’В· ${module.chip} Р вЂ™Р’В· 8 relays`;
+        meta.textContent = `X-BUS Р В РІР‚в„ўР вЂ™Р’В· I2C-${module.bus} Р В РІР‚в„ўР вЂ™Р’В· Address ${module.address} Р В РІР‚в„ўР вЂ™Р’В· ${module.chip} Р В РІР‚в„ўР вЂ™Р’В· 8 relays`;
         const grid = document.createElement('div');
         grid.className = 'relay-grid';
         meta.textContent = `X-BUS - I2C-${module.bus} - Address ${module.address} - ${module.chip} - ${module.channels} ${isInputModule ? 'digital inputs' : 'relays'}`;
@@ -1548,7 +1557,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         const meta = document.createElement('div');
         meta.className = 'module-meta';
         const enabled = bridge.enabled !== false;
-        meta.textContent = `Bus I2C-${bridge.bus} Р В РІР‚в„ўР вЂ™Р’В· Address ${bridge.address} Р В РІР‚в„ўР вЂ™Р’В· ${bridge.chip}${bridge.available ? '' : ' Р В РІР‚в„ўР вЂ™Р’В· unavailable'}`;
+        meta.textContent = `Bus I2C-${bridge.bus} Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В· Address ${bridge.address} Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В· ${bridge.chip}${bridge.available ? '' : ' Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В· unavailable'}`;
         meta.textContent = `Bus I2C-${bridge.bus} - Address ${bridge.address} - ${bridge.chip}${enabled ? '' : ' - polling off'}${bridge.available ? '' : ' - unavailable'}`;
         const toggle = document.createElement('button');
         toggle.className = `toggle ${enabled ? 'on' : ''}`;
@@ -1573,8 +1582,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         title.textContent = sensor.name;
         const meta = document.createElement('div');
         meta.className = 'module-meta';
-        const value = sensor.temperature_c === null || sensor.temperature_c === undefined ? 'Unavailable' : `${Number(sensor.temperature_c).toFixed(3)} Р В РІР‚в„ўР вЂ™Р’В°C`;
-        meta.textContent = `Bridge ${sensor.address} Р В РІР‚в„ўР вЂ™Р’В· ROM ${sensor.rom} Р В РІР‚в„ўР вЂ™Р’В· ${value}${sensor.available ? '' : ' Р В РІР‚в„ўР вЂ™Р’В· unavailable'}`;
+        const value = sensor.temperature_c === null || sensor.temperature_c === undefined ? 'Unavailable' : `${Number(sensor.temperature_c).toFixed(3)} Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В°C`;
+        meta.textContent = `Bridge ${sensor.address} Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В· ROM ${sensor.rom} Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В· ${value}${sensor.available ? '' : ' Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В· unavailable'}`;
         const remove = document.createElement('button');
         remove.className = 'danger-button';
         const cleanValue = sensor.temperature_c === null || sensor.temperature_c === undefined ? 'Unavailable' : `${Number(sensor.temperature_c).toFixed(3)} C`;
@@ -1675,13 +1684,21 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         window.setTimeout(connectEvents, 2000);
       };
     }
+    let buzzerLastVolumePercent = 50;
     function buzzerPayload() {
-      const volume = Number(document.getElementById('buzzer-volume').value);
+      const frequency = clampNumber(document.getElementById('buzzer-frequency').value, 300, 2800);
+      const duration = clampNumber(document.getElementById('buzzer-duration').value, 10, 1000);
+      const volume = clampNumber(document.getElementById('buzzer-volume').value, 0, 100);
       return {
-        frequency: Number(document.getElementById('buzzer-frequency').value),
-        duration_ms: Number(document.getElementById('buzzer-duration').value),
+        frequency,
+        duration_ms: duration,
         volume_percent: volume
       };
+    }
+    function clampNumber(value, min, max) {
+      const parsed = Number(value);
+      if (Number.isNaN(parsed)) return min;
+      return Math.max(min, Math.min(max, parsed));
     }
     async function saveBuzzerSettings() {
       const requested = buzzerPayload();
@@ -1696,15 +1713,31 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         document.getElementById('buzzer-detail').textContent = JSON.stringify(error);
       }
     }
-    function updateBuzzerVolumeLabel() {
-      const value = Number(document.getElementById('buzzer-volume').value);
+    function updateBuzzerSettingLabels() {
+      const frequency = clampNumber(document.getElementById('buzzer-frequency').value, 300, 2800);
+      const duration = clampNumber(document.getElementById('buzzer-duration').value, 10, 1000);
+      const value = clampNumber(document.getElementById('buzzer-volume').value, 0, 100);
+      document.getElementById('buzzer-frequency-value').textContent = `${frequency} Hz`;
+      document.getElementById('buzzer-duration-value').textContent = `${duration} ms`;
       document.getElementById('buzzer-volume-value').textContent = `${value}%`;
+      if (value > 0) buzzerLastVolumePercent = value;
+      paintBuzzerPower(value, buzzerLastVolumePercent);
+    }
+    function paintBuzzerPower(volume, lastVolume) {
+      const enabled = Number(volume) > 0;
+      const state = document.getElementById('buzzer-power-state');
+      const toggle = document.getElementById('buzzer-power-toggle');
+      if (!state || !toggle) return;
+      state.textContent = enabled ? 'ON' : 'OFF';
+      toggle.className = `toggle ${enabled ? 'on' : ''}`;
+      toggle.innerHTML = `<span>${enabled ? 'ON' : 'OFF'}</span>`;
+      toggle.title = enabled ? 'Turn buzzer volume off' : `Restore buzzer volume to ${lastVolume || 50}%`;
     }
     async function renderBuzzerStatus() {
       try {
         const payload = await requestJson('api/v1/buzzer/status');
         paintBuzzer(payload);
-        document.getElementById('buzzer-detail').textContent = `pigpio: ${payload.pigpio.connected ? 'connected' : 'offline'} Р вЂ™Р’В· pwmchip: ${payload.pwm.available ? 'available' : 'missing'} Р вЂ™Р’В· gpio18: ${payload.gpio.available ? 'available' : 'missing'}`;
+        document.getElementById('buzzer-detail').textContent = `pigpio: ${payload.pigpio.connected ? 'connected' : 'offline'} | pwmchip: ${payload.pwm.available ? 'available' : 'missing'} | gpio18: ${payload.gpio.available ? 'available' : 'missing'}`;
       } catch (error) {
         document.getElementById('buzzer-status').textContent = 'BUZZER: Error';
         document.getElementById('buzzer-detail').textContent = JSON.stringify(error);
@@ -1719,10 +1752,27 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         document.getElementById('buzzer-duration').value = Number(payload.duration_ms);
       }
       const volume = Number(payload.volume_percent ?? 50);
+      buzzerLastVolumePercent = Number(payload.last_volume_percent ?? (volume > 0 ? volume : buzzerLastVolumePercent));
       document.getElementById('buzzer-volume').value = volume;
-      updateBuzzerVolumeLabel();
+      updateBuzzerSettingLabels();
+      paintBuzzerPower(volume, buzzerLastVolumePercent);
       const state = payload.active && payload.active.running ? `running ${payload.active.backend}` : 'stopped';
       document.getElementById('buzzer-status').textContent = `BUZZER: ${state}`;
+    }
+    async function toggleBuzzerPower() {
+      const current = clampNumber(document.getElementById('buzzer-volume').value, 0, 100);
+      const requested = current > 0 ? 0 : clampNumber(buzzerLastVolumePercent, 1, 100);
+      try {
+        const payload = await requestJson('api/v1/buzzer/volume', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ volume_percent: requested })
+        });
+        paintBuzzer(payload);
+      } catch (error) {
+        document.getElementById('buzzer-status').textContent = 'BUZZER: settings failed';
+        document.getElementById('buzzer-detail').textContent = JSON.stringify(error);
+      }
     }
     async function playBuzzer() {
       const detail = document.getElementById('buzzer-detail');
@@ -1735,7 +1785,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           body: JSON.stringify(requested)
         });
         document.getElementById('buzzer-status').textContent = `BUZZER: running ${payload.backend}`;
-        detail.textContent = `duration: ${payload.duration_ms} ms Р вЂ™Р’В· pigpio: ${payload.pigpio.connected ? 'connected' : 'offline'}`;
+        detail.textContent = `duration: ${payload.duration_ms} ms | pigpio: ${payload.pigpio.connected ? 'connected' : 'offline'}`;
         window.setTimeout(renderBuzzerStatus, requested.duration_ms + 250);
       } catch (error) {
         document.getElementById('buzzer-status').textContent = 'BUZZER: Test failed';
@@ -1746,7 +1796,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       try {
         const payload = await requestJson('api/v1/buzzer/stop', { method: 'POST' });
         document.getElementById('buzzer-status').textContent = 'BUZZER: stopped';
-        document.getElementById('buzzer-detail').textContent = `pigpio: ${payload.pigpio.connected ? 'connected' : 'offline'} Р вЂ™Р’В· pwmchip: ${payload.pwm.available ? 'available' : 'missing'}`;
+        document.getElementById('buzzer-detail').textContent = `pigpio: ${payload.pigpio.connected ? 'connected' : 'offline'} | pwmchip: ${payload.pwm.available ? 'available' : 'missing'}`;
       } catch (error) {
         document.getElementById('buzzer-status').textContent = 'BUZZER: stop failed';
         document.getElementById('buzzer-detail').textContent = JSON.stringify(error);

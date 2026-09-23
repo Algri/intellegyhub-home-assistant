@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.129
+
+- Persist diagnostic buzzer settings in the add-on database and restore the last non-zero volume when re-enabled.
+- Rework the diagnostic buzzer panel so frequency, duration, and volume use aligned sliders with an Enabled toggle.
+- Keep startup buzzer add-on configuration fields unchanged while applying the tighter diagnostic buzzer ranges.
+
 ## 0.5.128
 
 - Force the Buzzer Volume light entity id to `light.intellegyhub_buzzer_volume_light` so dashboard YAML can reference it reliably.

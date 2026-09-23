@@ -88,11 +88,11 @@ class IntellegyHubBuzzerFrequencyNumber(IntellegyHubGpioEntity, NumberEntity):
     _attr_unique_id = "intellegyhub_buzzer_frequency"
     _attr_name = "Buzzer Frequency"
     _attr_icon = "mdi:sine-wave"
-    _attr_native_min_value = 20
+    _attr_native_min_value = 300
     _attr_native_max_value = 2800
     _attr_native_step = 10
     _attr_native_unit_of_measurement = "Hz"
-    _attr_mode = NumberMode.BOX
+    _attr_mode = NumberMode.SLIDER
     _attr_entity_category = ENTITY_CATEGORY_CONFIG
 
     @property
@@ -109,10 +109,10 @@ class IntellegyHubBuzzerDurationNumber(IntellegyHubGpioEntity, NumberEntity):
     _attr_name = "Buzzer Duration"
     _attr_icon = "mdi:timer-outline"
     _attr_native_min_value = 10
-    _attr_native_max_value = 5000
+    _attr_native_max_value = 1000
     _attr_native_step = 10
     _attr_native_unit_of_measurement = "ms"
-    _attr_mode = NumberMode.BOX
+    _attr_mode = NumberMode.SLIDER
     _attr_entity_category = ENTITY_CATEGORY_CONFIG
 
     @property
