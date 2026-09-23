@@ -118,7 +118,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.132 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
+                "Starting v0.5.133 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -153,7 +153,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.132", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.133", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 
@@ -229,6 +229,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       --ha-strong: #ffffff;
       --ha-pre: #0b0b0b;
       --ha-action-hover: rgba(3, 169, 244, .14);
+      --wordmark-main: #ffffff;
+      --wordmark-accent: #4ea1ff;
       background: var(--ha-page);
       color: var(--ha-text);
     }
@@ -254,6 +256,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       --ha-strong: #0f172a;
       --ha-pre: #111827;
       --ha-action-hover: rgba(3, 169, 244, .12);
+      --wordmark-main: #111827;
+      --wordmark-accent: #1976d2;
     }
     * { box-sizing: border-box; }
     body {
@@ -268,23 +272,25 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .theme-switcher span { color: var(--ha-secondary); font-size: 12px; font-weight: 800; padding: 0 8px; text-transform: uppercase; letter-spacing: .08em; }
     .theme-choice { min-height: 30px !important; border-radius: 999px !important; padding: 4px 12px !important; border-color: transparent !important; color: var(--ha-secondary) !important; }
     .theme-choice.active { border-color: var(--ha-primary) !important; color: var(--ha-primary) !important; background: rgba(3, 169, 244, .12) !important; }
-    .overview-panel { display: grid; grid-template-columns: minmax(320px, .9fr) minmax(520px, 1.5fr); gap: 0; margin-top: 0; margin-bottom: 18px; padding: 0; overflow: hidden; }
-    .overview-identity { display: flex; flex-direction: column; min-height: 270px; padding: 22px 28px; border-right: 1px solid var(--ha-card-border); font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; }
-    .overview-badge-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 14px; }
-    .overview-logo { display: block; width: 42px; height: 42px; object-fit: contain; }
+    .overview-panel { display: grid; grid-template-columns: minmax(420px, .9fr) minmax(520px, 1.5fr); gap: 0; margin-top: 0; margin-bottom: 18px; padding: 0; overflow: hidden; }
+    .overview-identity { display: flex; flex-direction: column; min-height: 300px; padding: 24px 32px 26px; border-right: 1px solid var(--ha-card-border); }
+    .overview-badge-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; margin-bottom: 24px; }
+    .overview-wordmark { display: inline-flex; align-items: baseline; min-width: 0; color: var(--wordmark-main); font-size: 32px; line-height: 1; font-weight: 640; letter-spacing: .18em; white-space: nowrap; }
+    .overview-wordmark span { color: var(--wordmark-accent); }
     .overview-status-pill { min-height: 30px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--ha-success-border); color: var(--ha-success-text); background: var(--ha-success-bg); font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
     .overview-status-pill.offline { border-color: var(--ha-danger-border); color: var(--ha-danger-text); background: var(--ha-danger-bg); }
-    .overview-title h1 { font-size: 30px; line-height: 1; margin-bottom: 6px; font-weight: 800; }
-    .overview-title .subtitle { color: var(--ha-text); font-size: 13px; margin-bottom: 0; }
-    .overview-facts { display: grid; grid-template-columns: 92px minmax(0, 190px); gap: 5px 18px; margin-top: 14px; font-size: 12px; line-height: 1.25; }
-    .overview-facts dt { color: var(--ha-text); font-weight: 800; }
-    .overview-facts dd { margin: 0; color: var(--ha-text); font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
-    .overview-divider { width: min(258px, 100%); height: 1px; background: var(--ha-card-border); margin: 18px 0 14px; }
-    .overview-health { display: grid; grid-template-columns: 82px minmax(0, 170px); gap: 5px 18px; font-size: 12px; line-height: 1.25; }
-    .overview-health dt { color: var(--ha-text); font-weight: 800; text-transform: uppercase; }
-    .overview-health dd { margin: 0; color: var(--ha-text); font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
-    .overview-health-value { display: inline-flex; align-items: center; gap: 8px; }
-    .overview-sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #448aff; }
+    .overview-title { margin-bottom: 20px; }
+    .overview-title h1 { font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-size: 42px; line-height: 1; margin-bottom: 8px; font-weight: 800; }
+    .overview-title .subtitle { color: var(--ha-text); font-size: 15px; line-height: 1.3; margin-bottom: 0; font-weight: 700; }
+    .overview-facts { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 9px 20px; margin-top: 0; font-size: 14px; line-height: 1.25; }
+    .overview-facts dt { color: var(--ha-secondary); font-size: 12px; font-weight: 800; letter-spacing: .04em; }
+    .overview-facts dd { margin: 0; color: var(--ha-text); font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-size: 14px; font-weight: 800; min-width: 0; overflow-wrap: anywhere; }
+    .overview-divider { width: min(300px, 100%); height: 1px; background: var(--ha-card-border); margin: 24px 0 18px; }
+    .overview-health { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 8px 20px; font-size: 14px; line-height: 1.25; }
+    .overview-health dt { color: var(--ha-secondary); font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+    .overview-health dd { margin: 0; color: var(--ha-text); font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-size: 14px; font-weight: 800; min-width: 0; overflow-wrap: anywhere; }
+    .overview-health-value { display: inline-flex; align-items: center; gap: 9px; }
+    .overview-sync-dot { width: 9px; height: 9px; border-radius: 50%; background: #448aff; }
     .overview-sync-dot.online { background: var(--ha-success); }
     .overview-sync-dot.offline { background: #ff6b6b; }
     .overview-metrics { position: relative; display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); padding-bottom: 24px; }
@@ -552,10 +558,10 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     pre { display: none; min-height: 180px; max-height: 360px; overflow: auto; border: 1px solid var(--ha-card-border); border-radius: 8px; padding: 14px; background: var(--ha-pre); color: #e5edf7; font-size: 13px; }
     pre.visible { display: block; }
     @media (max-width: 1300px) { .relay-grid { grid-template-columns: repeat(4, minmax(140px, 1fr)); } }
-    @media (max-width: 1300px) { .overview-panel { grid-template-columns: 1fr; } .overview-identity { border-right: 0; border-bottom: 1px solid var(--ha-card-border); min-height: 240px; } }
+    @media (max-width: 1300px) { .overview-panel { grid-template-columns: 1fr; } .overview-identity { border-right: 0; border-bottom: 1px solid var(--ha-card-border); min-height: 260px; } }
     @media (max-width: 1100px) { .ports, .carrier-io-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .relay-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); } }
     @media (max-width: 900px) { .buzzer-panel { grid-template-columns: 1fr; } .buzzer-actions { grid-template-columns: repeat(2, minmax(120px, 1fr)); grid-template-rows: auto; } .buzzer-actions .buzzer-group-title { grid-column: 1 / -1; } }
-    @media (max-width: 620px) { body { padding: 10px; } .app-toolbar { justify-content: stretch; } .theme-switcher { width: 100%; justify-content: space-between; } .theme-choice { flex: 1; } .overview-identity { min-height: 220px; padding: 22px 18px; } .overview-title h1 { font-size: 30px; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+3) { border-right: 0; border-bottom: 1px solid var(--ha-card-border); } .overview-metric:nth-of-type(4) { border-bottom: 0; } .xport-panel { padding: 18px 14px; border-radius: 12px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .ports, .carrier-io-grid, .relay-grid { grid-template-columns: 1fr; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-row { grid-template-columns: 1fr; gap: 6px; } }
+    @media (max-width: 620px) { body { padding: 10px; } .app-toolbar { justify-content: stretch; } .theme-switcher { width: 100%; justify-content: space-between; } .theme-choice { flex: 1; } .overview-identity { min-height: 260px; padding: 22px 18px; } .overview-wordmark { font-size: 22px; letter-spacing: .12em; } .overview-title h1 { font-size: 34px; } .overview-facts, .overview-health { grid-template-columns: 88px minmax(0, 1fr); } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+3) { border-right: 0; border-bottom: 1px solid var(--ha-card-border); } .overview-metric:nth-of-type(4) { border-bottom: 0; } .xport-panel { padding: 18px 14px; border-radius: 12px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .ports, .carrier-io-grid, .relay-grid { grid-template-columns: 1fr; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-row { grid-template-columns: 1fr; gap: 6px; } }
   </style>
 </head>
 <body>
@@ -571,17 +577,14 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     <section class="extension-panel overview-panel">
       <div class="overview-identity">
         <div class="overview-badge-row">
-          <img class="overview-logo" src="logo.png" alt="IntellegyHUB">
+          <div class="overview-wordmark" aria-label="IntellegyHUB">INTELLEGY<span>HUB</span></div>
           <div id="carrier-overview-status" class="overview-status-pill">Loading</div>
         </div>
         <div class="overview-title">
-          <div class="eyebrow">Controller</div>
           <h1 id="carrier-identity-product">--</h1>
           <div id="carrier-identity-subtitle" class="subtitle">--</div>
         </div>
         <dl class="overview-facts">
-          <dt>Manufacturer</dt>
-          <dd id="carrier-identity-manufacturer">--</dd>
           <dt>Serial</dt>
           <dd id="carrier-identity-serial">--</dd>
           <dt>Hardware</dt>
@@ -593,7 +596,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         </dl>
         <div class="overview-divider"></div>
         <dl class="overview-health">
-          <dt>System Health</dt>
+          <dt>Health</dt>
           <dd class="overview-health-value">
             <span id="carrier-health-dot" class="overview-sync-dot"></span>
             <span id="carrier-health-state">Loading</span>
@@ -1192,8 +1195,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       const model = cleanIdentityValue(identity.model || identity.product);
       const manufacturer = cleanIdentityValue(identity.manufacturer);
       document.getElementById('carrier-identity-product').textContent = model;
-      document.getElementById('carrier-identity-subtitle').textContent = model === '--' ? '--' : `${model} Controller`;
-      document.getElementById('carrier-identity-manufacturer').textContent = manufacturer;
+      document.getElementById('carrier-identity-subtitle').textContent = manufacturer === '--' ? '--' : `${manufacturer} Controller`;
       document.getElementById('carrier-identity-serial').textContent = cleanIdentityValue(identity.serial_number);
       document.getElementById('carrier-identity-hardware').textContent = formatHardware(identity.hardware_version, identity.hardware_revision);
       document.getElementById('carrier-identity-software').textContent = formatVersion(identity.software_version);

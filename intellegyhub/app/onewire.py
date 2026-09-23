@@ -254,7 +254,7 @@ class OneWireHardware:
 
     async def initialize(self) -> bool:
         if _is_mock_platform():
-            return False
+            return True
         async with self._lock:
             if not self._probe_register(self.power_bus, self.power_address, self._mcp23017_iodirb, 1):
                 return False
@@ -268,7 +268,24 @@ class OneWireHardware:
             return on
 
     async def scan(self, power_on: bool, enabled_bridges: dict[str, bool]) -> tuple[list[OneWireBridge], list[OneWireSensor]]:
-        if _is_mock_platform() or not power_on:
+        if _is_mock_platform():
+            if not power_on:
+                return [], []
+            sensors = [
+                self._sensor(0x1A, bytes.fromhex("28ff641d7216035c"), True, None, 23.625),
+                self._sensor(0x1A, bytes.fromhex("28ff0c4a7216039b"), True, None, 24.125),
+                self._sensor(0x1B, bytes.fromhex("28ff7b91721604d1"), True, None, 21.875),
+            ]
+            bridge_sensors = {
+                self._bridge_id(0x1A): [sensor.id for sensor in sensors if sensor.address == "0x1a"],
+                self._bridge_id(0x1B): [sensor.id for sensor in sensors if sensor.address == "0x1b"],
+            }
+            bridges = [
+                self._bridge(0x1A, enabled_bridges.get(self._bridge_id(0x1A), True), enabled_bridges.get(self._bridge_id(0x1A), True), bridge_sensors[self._bridge_id(0x1A)], None),
+                self._bridge(0x1B, enabled_bridges.get(self._bridge_id(0x1B), True), enabled_bridges.get(self._bridge_id(0x1B), True), bridge_sensors[self._bridge_id(0x1B)], None),
+            ]
+            return bridges, sensors
+        if not power_on:
             return [], []
         async with self._lock:
             bridges: list[OneWireBridge] = []
@@ -294,7 +311,17 @@ class OneWireHardware:
             return bridges, sensors
 
     async def read_temperatures(self, sensors: list[OneWireSensor], power_on: bool) -> list[OneWireSensor]:
-        if _is_mock_platform() or not power_on:
+        if _is_mock_platform():
+            if not power_on:
+                return []
+            updated = []
+            for index, sensor in enumerate(sensors):
+                sensor.available = True
+                sensor.error = None
+                sensor.temperature_c = round(22.25 + index * 0.5, 3)
+                updated.append(sensor)
+            return updated
+        if not power_on:
             return []
         async with self._lock:
             updated: list[OneWireSensor] = []
@@ -558,6 +585,8 @@ class OneWireManager:
             self.bridges = self._configured_bridges()
             self.sensors = {sensor.id: sensor for sensor in await self.store.load_sensors()}
             desired_power = await self.store.load_power()
+            if _is_mock_platform() and type(self.hardware) is OneWireHardware:
+                desired_power = True
             await self.hardware.initialize()
             self.power_on = await self.hardware.set_power(desired_power)
             self.power_available = True

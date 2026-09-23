@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 I2C_SLAVE = 0x0703
-APP_VERSION = "0.5.132"
+APP_VERSION = "0.5.133"
 IDENTITY_EEPROM_ADDR = 0x50
 IDENTITY_EEPROM_OFFSET = 0x0000
 IDENTITY_REGION_SIZE = 1024
@@ -120,8 +120,8 @@ class CarrierHardware:
 
     async def initialize(self) -> bool:
         if _is_mock_platform():
-            self._available = False
-            return False
+            self._available = True
+            return True
         async with self._lock:
             self._available = await asyncio.to_thread(self._initialize_sync)
             return self._available
@@ -173,14 +173,14 @@ class CarrierHardware:
     async def fault_lines(self) -> list[FaultLineState]:
         if _is_mock_platform():
             return [
-                FaultLineState("onewire_power_fault", "1-Wire Power Fault", self.fault_onewire_gpio, False, False, "mock"),
-                FaultLineState("xbus_power_fault", "X-Bus Power Fault", self.fault_xbus_gpio, False, False, "mock"),
+                FaultLineState("onewire_power_fault", "1-Wire Power Fault", self.fault_onewire_gpio, False, True),
+                FaultLineState("xbus_power_fault", "X-Bus Power Fault", self.fault_xbus_gpio, False, True),
             ]
         return await asyncio.to_thread(self._read_fault_lines)
 
     async def monitoring_metrics(self) -> dict[str, Any]:
         if _is_mock_platform():
-            return self._monitoring_error_snapshot("mock")
+            return self._monitoring_mock_snapshot()
         return await asyncio.to_thread(self._read_monitoring_metrics)
 
     def _initialize_sync(self) -> bool:
@@ -261,6 +261,28 @@ class CarrierHardware:
                 asdict(CarrierMetricState("vin", "Input Voltage", None, "V", self.bus, f"0x{self.rails_address:02x}", 0, False, error)),
                 asdict(CarrierMetricState("5v", "+5 V Rail", None, "V", self.bus, f"0x{self.rails_address:02x}", 1, False, error)),
                 asdict(CarrierMetricState("3v3", "+3.3 V Rail", None, "V", self.bus, f"0x{self.rails_address:02x}", 2, False, error)),
+            ],
+        }
+
+    def _monitoring_mock_snapshot(self) -> dict[str, Any]:
+        now = _utc_timestamp()
+        return {
+            "temperature": asdict(
+                CarrierMetricState(
+                    "board_temperature",
+                    "Board Temperature",
+                    36.6,
+                    "C",
+                    self.bus,
+                    f"0x{self.temperature_address:02x}",
+                    available=True,
+                    last_read_utc=now,
+                )
+            ),
+            "rails": [
+                asdict(CarrierMetricState("vin", "Input Voltage", 11.5, "V", self.bus, f"0x{self.rails_address:02x}", 0, True, None, now)),
+                asdict(CarrierMetricState("5v", "+5 V Rail", 5.07, "V", self.bus, f"0x{self.rails_address:02x}", 1, True, None, now)),
+                asdict(CarrierMetricState("3v3", "+3.3 V Rail", 3.3, "V", self.bus, f"0x{self.rails_address:02x}", 2, True, None, now)),
             ],
         }
 
@@ -376,7 +398,20 @@ class CarrierHardware:
 
     def read_identity(self) -> IdentityReadResult:
         if _is_mock_platform():
-            return IdentityReadResult("mock", {})
+            return IdentityReadResult(
+                "mock",
+                {
+                    "manufacturer": "IntellegyHUB",
+                    "model": "IHC-1400",
+                    "serial_number": "IH202607070000001",
+                    "hardware_version": "1.4",
+                    "hardware_revision": "A",
+                    "board_id": "ihc-1400-main",
+                    "manufacturing_date": "2026-07-07",
+                    "production_lot": "IHC1400-20260707-01",
+                    "variant": "standard",
+                },
+            )
         try:
             region = self._i2c_read_eeprom(IDENTITY_EEPROM_ADDR, IDENTITY_EEPROM_OFFSET, IDENTITY_REGION_SIZE)
             return _parse_identity_region(region)

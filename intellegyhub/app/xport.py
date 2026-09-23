@@ -182,6 +182,10 @@ class XPortHardware:
 
     async def discover(self) -> tuple[XPortTopology, Availability, str | None]:
         if _is_mock_platform():
+            self._mcp_available = True
+            self._ads_available = True
+            self._pca_available = True
+            self._topology = XPortTopology.EXTENDED
             return XPortTopology.EXTENDED, Availability.AVAILABLE, None
         async with self._lock:
             devices = await asyncio.to_thread(self._scan_presence)
@@ -273,6 +277,12 @@ class XPortHardware:
     async def read_value(self, channel: int, mode: XPortMode) -> float:
         self._validate_channel(channel)
         if _is_mock_platform():
+            if mode == XPortMode.AI:
+                return round(1.25 * channel, 3)
+            if mode in COUNTER_MODES:
+                return channel * 100
+            if mode in INPUT_MODES:
+                return 1 if channel % 2 else 0
             return 0
         async with self._lock:
             if mode == XPortMode.AI:

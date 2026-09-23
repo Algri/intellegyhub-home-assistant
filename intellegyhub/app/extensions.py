@@ -217,7 +217,7 @@ class ExtensionHardware:
 
     async def initialize(self) -> bool:
         if _is_mock_platform():
-            return False
+            return True
         async with self._lock:
             if not self._probe(self.power_bus, self.power_address, self._mcp23017_iodirb, 1):
                 return False
@@ -268,7 +268,13 @@ class ExtensionHardware:
 
     async def scan_modules(self, power_on: bool) -> list[ExtensionModule]:
         if _is_mock_platform():
-            return []
+            if not power_on:
+                return []
+            return [
+                self._xdi16_module(0x20, True, None),
+                self._xdo8_module(0x21, True, None, relays={1: True, 2: False, 3: True}),
+                self._xdo8_module(0x22, True, None, relays={1: False, 2: True}),
+            ]
         if not power_on:
             return []
         async with self._lock:
@@ -561,11 +567,14 @@ class ExtensionManager:
             await self.store.initialize()
             self.modules = {module.id: module for module in await self.store.load_modules()}
             desired_power = await self.store.load_power()
+            demo_mock = _is_mock_platform() and type(self.hardware) is ExtensionHardware
+            if demo_mock:
+                desired_power = True
             await self.hardware.initialize()
             self.power_on = await self.hardware.set_power(desired_power)
             self.power_available = True
             self.error = None
-            if self.power_on and self.modules:
+            if self.power_on and (demo_mock or self.modules):
                 await asyncio.sleep(POWER_SETTLE_SECONDS)
                 await self._scan_locked()
             self._stopped.clear()

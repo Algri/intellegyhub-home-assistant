@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.133
+
+- Add complete mock data for the local add-on UI preview, including carrier monitoring, EEPROM identity, X-Port, expansion modules, and 1-Wire sensors.
+- Refine the controller overview layout with the IntellegyHUB wordmark, cleaner identity text, and a shorter health label.
+
 ## 0.5.132
 
 - Add a runtime EEPROM identity reader that uses the same `IHID` header, CRC, and JSON payload format as the factory writer.

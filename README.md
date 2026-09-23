@@ -279,11 +279,8 @@ python3 /mnt/data/write_controller_identity_eeprom.py write
 ```
 
 If the board reports `FOREIGN_DATA` because an old EEPROM payload already exists
-at the identity offset, intentionally convert it with:
-
-```bash
-python3 /mnt/data/write_controller_identity_eeprom.py write --force --expected-status foreign_data
-```
+at the identity offset, `write` treats it as first factory identity programming
+and replaces it after printing a warning.
 
 Read and verify after writing:
 
@@ -291,6 +288,13 @@ Read and verify after writing:
 python3 /mnt/data/write_controller_identity_eeprom.py read
 python3 /mnt/data/write_controller_identity_eeprom.py read --json
 python3 /mnt/data/write_controller_identity_eeprom.py verify
+```
+
+Erase the identity region when a board must be reset before re-programming:
+
+```bash
+python3 /mnt/data/write_controller_identity_eeprom.py erase
+python3 /mnt/data/write_controller_identity_eeprom.py read
 ```
 
 Expected verify result:
