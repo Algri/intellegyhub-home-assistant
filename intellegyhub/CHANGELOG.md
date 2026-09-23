@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.132
+
+- Add a runtime EEPROM identity reader that uses the same `IHID` header, CRC, and JSON payload format as the factory writer.
+- Expose EEPROM identity read status and errors in the carrier API instead of silently showing empty identity fields.
+- Add a guarded factory overwrite path for boards that intentionally need conversion from old non-`IHID` EEPROM data.
+- Align the overview identity panel with the agreed Product/Model, Manufacturer, Serial, Hardware, Software, and Variant fields.
+
 ## 0.5.131
 
 - Read controller identity from the factory EEPROM and show it on the add-on overview.

@@ -278,6 +278,13 @@ Write the default controller identity:
 python3 /mnt/data/write_controller_identity_eeprom.py write
 ```
 
+If the board reports `FOREIGN_DATA` because an old EEPROM payload already exists
+at the identity offset, intentionally convert it with:
+
+```bash
+python3 /mnt/data/write_controller_identity_eeprom.py write --force --expected-status foreign_data
+```
+
 Read and verify after writing:
 
 ```bash

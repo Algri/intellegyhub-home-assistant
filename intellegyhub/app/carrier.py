@@ -5,6 +5,7 @@ import binascii
 import errno
 import json
 import os
+import struct
 import sys
 import time
 from dataclasses import asdict, dataclass
@@ -12,7 +13,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 I2C_SLAVE = 0x0703
-APP_VERSION = "0.5.131"
+APP_VERSION = "0.5.132"
 IDENTITY_EEPROM_ADDR = 0x50
 IDENTITY_EEPROM_OFFSET = 0x0000
 IDENTITY_REGION_SIZE = 1024
@@ -20,6 +21,8 @@ IDENTITY_MAGIC = b"IHID"
 IDENTITY_CONTAINER_VERSION = 1
 IDENTITY_SCHEMA_VERSION = 1
 IDENTITY_HEADER_SIZE = 16
+IDENTITY_HEADER_PREFIX = struct.Struct(">4sBBHHH")
+IDENTITY_CRC = struct.Struct(">I")
 
 
 @dataclass
@@ -65,6 +68,13 @@ class CarrierOutputState:
     chip: str
     port: str
     pin: str
+
+
+@dataclass
+class IdentityReadResult:
+    status: str
+    identity: dict[str, str]
+    error: str | None = None
 
 
 def _carrier_output(output_id: str, name: str, bit: int, port: str, pin: str) -> CarrierOutputDefinition:
@@ -364,14 +374,14 @@ class CarrierHardware:
             os.write(device.fileno(), bytes([register]))
             return os.read(device.fileno(), length)
 
-    def read_identity(self) -> dict[str, str]:
+    def read_identity(self) -> IdentityReadResult:
         if _is_mock_platform():
-            return {}
+            return IdentityReadResult("mock", {})
         try:
             region = self._i2c_read_eeprom(IDENTITY_EEPROM_ADDR, IDENTITY_EEPROM_OFFSET, IDENTITY_REGION_SIZE)
             return _parse_identity_region(region)
-        except Exception:
-            return {}
+        except Exception as exc:
+            return IdentityReadResult("unavailable", {}, str(exc))
 
     def _i2c_read_eeprom(self, address: int, offset: int, length: int) -> bytes:
         import fcntl
@@ -390,6 +400,8 @@ class CarrierManager:
         self.error: str | None = "startup pending"
         self.faults: dict[str, FaultLineState] = {}
         self.identity: dict[str, str] = {}
+        self.identity_status = "startup pending"
+        self.identity_error: str | None = None
         self.monitoring: dict[str, Any] = _monitoring_error_snapshot("startup pending")
         self.outputs: dict[str, bool] = {output_id: False for output_id in CARRIER_OUTPUTS}
         self._publisher: Callable[[dict[str, Any]], Any] | None = None
@@ -406,7 +418,10 @@ class CarrierManager:
             self.available = await self.hardware.initialize()
             self.outputs = await self.hardware.outputs()
             self.faults = {fault.id: fault for fault in await self.hardware.fault_lines()}
-            self.identity = await asyncio.to_thread(self.hardware.read_identity)
+            identity_result = await asyncio.to_thread(self.hardware.read_identity)
+            self.identity = identity_result.identity
+            self.identity_status = identity_result.status
+            self.identity_error = identity_result.error
             self.monitoring = await self.hardware.monitoring_metrics()
             self.error = None if self.available else "carrier MCP23017 unavailable"
             self._fault_task = asyncio.create_task(self._monitor_faults(), name="intellegyhub_carrier_faults")
@@ -519,6 +534,8 @@ class CarrierManager:
         return {
             "available": self.available,
             "identity": identity,
+            "identity_status": self.identity_status,
+            "identity_error": self.identity_error,
             "controller": {"bus": 10, "address": "0x20", "chip": "MCP23017"},
             "faults": [asdict(fault) for fault in self.faults.values()],
             "outputs": [asdict(self._output_state(output_id, on)) for output_id, on in self.outputs.items()],
@@ -549,45 +566,45 @@ def _is_mock_platform() -> bool:
     )
 
 
-def _parse_identity_region(region: bytes) -> dict[str, str]:
+def _parse_identity_region(region: bytes) -> IdentityReadResult:
     if len(region) < IDENTITY_HEADER_SIZE:
-        return {}
+        return IdentityReadResult("invalid", {}, "identity region is shorter than header")
     if all(byte == 0xFF for byte in region):
-        return {}
+        return IdentityReadResult("blank", {})
     if region[:4] != IDENTITY_MAGIC:
-        return {}
+        return IdentityReadResult("foreign", {}, "identity magic IHID is missing")
 
-    container_version = region[4]
-    header_size = region[5]
-    schema_version = int.from_bytes(region[6:8], "big")
-    payload_length = int.from_bytes(region[8:10], "big")
-    flags = int.from_bytes(region[10:12], "big")
-    expected_crc = int.from_bytes(region[12:16], "big")
+    magic, container_version, header_size, schema_version, payload_length, flags = IDENTITY_HEADER_PREFIX.unpack(
+        region[: IDENTITY_HEADER_PREFIX.size]
+    )
+    expected_crc = IDENTITY_CRC.unpack(region[IDENTITY_HEADER_PREFIX.size : IDENTITY_HEADER_SIZE])[0]
     if (
-        container_version != IDENTITY_CONTAINER_VERSION
+        magic != IDENTITY_MAGIC
+        or container_version != IDENTITY_CONTAINER_VERSION
         or header_size != IDENTITY_HEADER_SIZE
         or schema_version != IDENTITY_SCHEMA_VERSION
         or flags != 0
         or payload_length < 1
         or payload_length > IDENTITY_REGION_SIZE - IDENTITY_HEADER_SIZE
     ):
-        return {}
+        return IdentityReadResult("invalid", {}, "identity header is not supported")
 
     end = IDENTITY_HEADER_SIZE + payload_length
     if len(region) < end:
-        return {}
+        return IdentityReadResult("invalid", {}, "identity payload is truncated")
     payload = region[IDENTITY_HEADER_SIZE:end]
     actual_crc = binascii.crc32(region[:12] + payload) & 0xFFFFFFFF
     if actual_crc != expected_crc:
-        return {}
+        return IdentityReadResult("invalid", {}, "identity CRC mismatch")
 
     try:
         decoded = json.loads(payload.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
-        return {}
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        return IdentityReadResult("invalid", {}, str(exc))
     if not isinstance(decoded, dict):
-        return {}
-    return {str(key): str(value) for key, value in decoded.items() if value is not None and str(value)}
+        return IdentityReadResult("invalid", {}, "identity payload is not an object")
+    identity = {str(key): str(value) for key, value in decoded.items() if value is not None and str(value)}
+    return IdentityReadResult("valid", identity)
 
 
 def _monitoring_error_snapshot(error: str) -> dict[str, Any]:

@@ -118,7 +118,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.131 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
+                "Starting v0.5.132 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -153,7 +153,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.131", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.132", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 
@@ -276,7 +276,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .overview-status-pill.offline { border-color: var(--ha-danger-border); color: var(--ha-danger-text); background: var(--ha-danger-bg); }
     .overview-title h1 { font-size: 30px; line-height: 1; margin-bottom: 6px; font-weight: 800; }
     .overview-title .subtitle { color: var(--ha-text); font-size: 13px; margin-bottom: 0; }
-    .overview-facts { display: grid; grid-template-columns: 82px minmax(0, 190px); gap: 5px 18px; margin-top: 14px; font-size: 12px; line-height: 1.25; }
+    .overview-facts { display: grid; grid-template-columns: 92px minmax(0, 190px); gap: 5px 18px; margin-top: 14px; font-size: 12px; line-height: 1.25; }
     .overview-facts dt { color: var(--ha-text); font-weight: 800; }
     .overview-facts dd { margin: 0; color: var(--ha-text); font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
     .overview-divider { width: min(258px, 100%); height: 1px; background: var(--ha-card-border); margin: 18px 0 14px; }
@@ -577,9 +577,11 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         <div class="overview-title">
           <div class="eyebrow">Controller</div>
           <h1 id="carrier-identity-product">--</h1>
-          <div id="carrier-identity-model" class="subtitle">--</div>
+          <div id="carrier-identity-subtitle" class="subtitle">--</div>
         </div>
         <dl class="overview-facts">
+          <dt>Manufacturer</dt>
+          <dd id="carrier-identity-manufacturer">--</dd>
           <dt>Serial</dt>
           <dd id="carrier-identity-serial">--</dd>
           <dt>Hardware</dt>
@@ -1187,8 +1189,11 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       healthDot.classList.toggle('offline', !online);
       document.getElementById('carrier-health-state').textContent = online ? 'Normal' : 'Offline';
       const identity = carrier && carrier.identity ? carrier.identity : {};
-      document.getElementById('carrier-identity-product').textContent = cleanIdentityValue(identity.model || identity.product);
-      document.getElementById('carrier-identity-model').textContent = cleanIdentityValue(identity.manufacturer ? `${identity.manufacturer} Controller` : '');
+      const model = cleanIdentityValue(identity.model || identity.product);
+      const manufacturer = cleanIdentityValue(identity.manufacturer);
+      document.getElementById('carrier-identity-product').textContent = model;
+      document.getElementById('carrier-identity-subtitle').textContent = model === '--' ? '--' : `${model} Controller`;
+      document.getElementById('carrier-identity-manufacturer').textContent = manufacturer;
       document.getElementById('carrier-identity-serial').textContent = cleanIdentityValue(identity.serial_number);
       document.getElementById('carrier-identity-hardware').textContent = formatHardware(identity.hardware_version, identity.hardware_revision);
       document.getElementById('carrier-identity-software').textContent = formatVersion(identity.software_version);
