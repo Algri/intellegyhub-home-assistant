@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.130
+
+- Rename Home Assistant devices to user-facing labels: `Controls`, `1-Wire Bus1`, `1-Wire Bus2`, and address-first xBUS module names.
+- Update existing Home Assistant device registry names so already-created devices stop showing stale `Hardware Host` and bridge names.
+
 ## 0.5.129
 
 - Persist diagnostic buzzer settings in the add-on database and restore the last non-zero volume when re-enabled.
