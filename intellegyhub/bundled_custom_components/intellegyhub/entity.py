@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from homeassistant.helpers.entity import DeviceInfo, Entity
 from homeassistant.helpers import device_registry as dr
 from homeassistant.exceptions import HomeAssistantError
@@ -23,9 +25,9 @@ class IntellegyHubGpioEntity(Entity):
     def device_info(self) -> DeviceInfo:
         return DeviceInfo(
             identifiers={(DOMAIN, DEVICE_IDENTIFIER)},
-            name="Hardware Host",
+            name="Controls",
             manufacturer="IntellegyHub",
-            model="Hardware Host",
+            model="IntellegyHUB Controller",
         )
 
     async def async_added_to_hass(self) -> None:
@@ -97,6 +99,9 @@ def _parent_device_id(entity: Entity, manager: IntellegyHubGpioManager) -> str |
 
 def _onewire_bridge_title(bridge: dict) -> str:
     name = bridge.get("name") or "1-Wire Bridge"
+    match = re.fullmatch(r"1-Wire Bridge\s+(\d+)", str(name))
+    if match:
+        return f"1-Wire Bus{match.group(1)}"
     return str(name)
 
 
@@ -126,7 +131,7 @@ class IntellegyHubXDo8Entity(IntellegyHubGpioEntity):
         address = module.get("address", "unknown")
         return DeviceInfo(
             identifiers={(DOMAIN, self.module_id)},
-            name=f"xDO-8 {address}",
+            name=f"{address} xDO-8",
             manufacturer="IntellegyHub",
             model="xDO-8",
             via_device_id=_parent_device_id(self, self.manager),
@@ -159,7 +164,7 @@ class IntellegyHubXDi16Entity(IntellegyHubGpioEntity):
         address = module.get("address", "unknown")
         return DeviceInfo(
             identifiers={(DOMAIN, self.module_id)},
-            name=f"xDI-16 {address}",
+            name=f"{address} xDI-16",
             manufacturer="IntellegyHub",
             model="xDI-16",
             via_device_id=_parent_device_id(self, self.manager),

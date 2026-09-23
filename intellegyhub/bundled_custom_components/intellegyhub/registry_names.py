@@ -1,11 +1,19 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
 from .const import BUTTONS, CARRIER_OUTPUTS, DOMAIN, OUTPUTS
+
+DEVICE_DASHBOARD_NAMES: dict[str, str] = {
+    "mainboard": "Controls",
+    "onewire_bus10_addr1a": "1-Wire Bus1",
+    "onewire_bus10_addr1b": "1-Wire Bus2",
+}
 
 STATIC_ENTITY_DASHBOARD_NAMES: dict[str, str] = {
     **{item["unique_id"]: item["name"] for item in OUTPUTS.values()},
@@ -43,6 +51,7 @@ XPORT_ENTITY_SUFFIX_NAMES = {
 
 
 def apply_compact_entity_dashboard_names(hass: HomeAssistant, entry_id: str) -> None:
+    apply_compact_device_dashboard_names(hass, entry_id)
     entity_registry = er.async_get(hass)
     update_entity = getattr(entity_registry, "async_update_entity", None)
     if update_entity is None:
@@ -67,6 +76,27 @@ def apply_compact_entity_dashboard_names(hass: HomeAssistant, entry_id: str) -> 
             changes["new_entity_id"] = desired_entity_id
         if changes:
             update_entity(entity_id, **changes)
+
+
+def apply_compact_device_dashboard_names(hass: HomeAssistant, entry_id: str) -> None:
+    device_registry = dr.async_get(hass)
+    if device_registry is None:
+        return
+    update_device = getattr(device_registry, "async_update_device", None)
+    if update_device is None:
+        return
+
+    devices = getattr(device_registry, "devices", {})
+    for device in list(getattr(devices, "values", lambda: [])()):
+        config_entries = getattr(device, "config_entries", {entry_id})
+        if config_entries and entry_id not in config_entries:
+            continue
+        device_id = getattr(device, "id", None)
+        if device_id is None:
+            continue
+        desired_name = compact_device_name(getattr(device, "identifiers", set()))
+        if desired_name is not None and getattr(device, "name", None) != desired_name:
+            update_device(device_id, name=desired_name)
 
 
 def compact_dashboard_name(unique_id: object) -> str | None:
@@ -97,6 +127,25 @@ def compact_dashboard_name(unique_id: object) -> str | None:
     if sensor_match:
         return "Temperature"
 
+    return None
+
+
+def compact_device_name(identifiers: object) -> str | None:
+    if isinstance(identifiers, (str, bytes)) or not isinstance(identifiers, Iterable):
+        return None
+    for item in identifiers:
+        if not isinstance(item, tuple) or len(item) != 2:
+            continue
+        domain, identifier = item
+        if domain != DOMAIN or not isinstance(identifier, str):
+            continue
+        if identifier in DEVICE_DASHBOARD_NAMES:
+            return DEVICE_DASHBOARD_NAMES[identifier]
+        xbus_match = re.fullmatch(r"(xdo8|xdi16)_bus\d+_addr([0-9a-fA-F]{2})", identifier)
+        if xbus_match:
+            kind, address = xbus_match.groups()
+            model = "xDO-8" if kind == "xdo8" else "xDI-16"
+            return f"0x{address.upper()} {model}"
     return None
 
 
