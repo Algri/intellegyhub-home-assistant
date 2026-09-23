@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.127
+
+- Add a Home Assistant Buzzer Volume light entity so Tile cards can open the native fullscreen brightness/on-off control.
+
 ## 0.5.126
 
 - Add Home Assistant X-Port PWM light entities so PWM channels can use native light brightness tiles and fullscreen on/off controls.

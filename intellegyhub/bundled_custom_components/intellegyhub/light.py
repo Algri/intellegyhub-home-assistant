@@ -7,12 +7,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, XPORT_MODE_PWM
-from .entity import IntellegyHubXPortEntity
+from .entity import IntellegyHubGpioEntity, IntellegyHubXPortEntity
 from .xport_entities import setup_xport_dynamic_platform
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     manager = hass.data[DOMAIN][entry.entry_id]
+    async_add_entities([IntellegyHubBuzzerVolumeLight(manager)])
     setup_xport_dynamic_platform(
         entry,
         manager,
@@ -63,3 +64,36 @@ class IntellegyHubXPortPwmLight(IntellegyHubXPortEntity, LightEntity):
     async def async_turn_off(self, **kwargs) -> None:
         self.assert_mode_available({XPORT_MODE_PWM})
         await self.manager.async_set_xport_value(self.channel, 0)
+
+
+class IntellegyHubBuzzerVolumeLight(IntellegyHubGpioEntity, LightEntity):
+    _attr_translation_key = "buzzer_volume_light"
+    _attr_unique_id = "intellegyhub_buzzer_volume_light"
+    _attr_name = "Buzzer Volume"
+    _attr_supported_color_modes = {ColorMode.BRIGHTNESS}
+    _attr_color_mode = ColorMode.BRIGHTNESS
+    _attr_icon = "mdi:volume-high"
+
+    @property
+    def is_on(self) -> bool:
+        return int(self.manager.buzzer.get("volume_percent", 0)) > 0
+
+    @property
+    def brightness(self) -> int | None:
+        volume = max(0, min(100, int(self.manager.buzzer.get("volume_percent", 0))))
+        if volume <= 0:
+            return None
+        return max(1, min(255, round(volume * 255 / 100)))
+
+    async def async_turn_on(self, **kwargs) -> None:
+        brightness = kwargs.get(ATTR_BRIGHTNESS)
+        if brightness is None:
+            volume = int(self.manager.buzzer.get("volume_percent", 0))
+            if volume <= 0:
+                volume = 50
+        else:
+            volume = max(1, min(100, round(int(brightness) * 100 / 255)))
+        await self.manager.async_set_buzzer_volume(volume)
+
+    async def async_turn_off(self, **kwargs) -> None:
+        await self.manager.async_set_buzzer_volume(0)

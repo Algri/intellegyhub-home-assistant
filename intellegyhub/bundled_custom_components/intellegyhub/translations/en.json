@@ -85,6 +85,9 @@
       }
     },
     "light": {
+      "buzzer_volume_light": {
+        "name": "Buzzer Volume"
+      },
       "xport_pwm": {
         "name": "PWM"
       }

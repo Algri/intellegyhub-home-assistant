@@ -22,6 +22,7 @@ STATIC_ENTITY_DASHBOARD_NAMES: dict[str, str] = {
     "intellegyhub_buzzer_frequency": "Buzzer Frequency",
     "intellegyhub_buzzer_duration": "Buzzer Duration",
     "intellegyhub_buzzer_volume": "Buzzer Volume",
+    "intellegyhub_buzzer_volume_light": "Buzzer Volume",
     "intellegyhub_buzzer_play": "Buzzer Play",
 }
 
