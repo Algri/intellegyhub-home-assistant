@@ -84,6 +84,11 @@
         "name": "PWM"
       }
     },
+    "light": {
+      "xport_pwm": {
+        "name": "PWM"
+      }
+    },
     "button": {
       "buzzer_play": {
         "name": "Buzzer Play"

@@ -24,6 +24,7 @@ XPORT_ENTITY_KINDS: tuple[tuple[Platform, str], ...] = (
     (Platform.SENSOR, "ai"),
     (Platform.SENSOR, "counter"),
     (Platform.NUMBER, "pwm"),
+    (Platform.LIGHT, "pwm_light"),
     (Platform.BUTTON, "counter_reset"),
 )
 
@@ -40,7 +41,10 @@ def xport_desired_entity_kinds(mode: str | None) -> set[tuple[str, str]]:
     if mode == XPORT_MODE_DO:
         return {(xport_platform_value(Platform.SWITCH), "do")}
     if mode == XPORT_MODE_PWM:
-        return {(xport_platform_value(Platform.NUMBER), "pwm")}
+        return {
+            (xport_platform_value(Platform.NUMBER), "pwm"),
+            (xport_platform_value(Platform.LIGHT), "pwm_light"),
+        }
     if mode == XPORT_MODE_AI:
         return {(xport_platform_value(Platform.SENSOR), "ai")}
     if mode in XPORT_MODE_DI:

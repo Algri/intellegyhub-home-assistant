@@ -118,7 +118,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.123 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
+                "Starting v0.5.126 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -153,7 +153,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.123", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.126", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 
@@ -394,7 +394,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     .active-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; margin-top: 14px; }
     .active-row .active-mode { margin-top: 0; min-width: 0; }
-    .xport-action-slot { min-width: 98px; min-height: 38px; display: flex; justify-content: flex-end; align-items: center; }
+    .xport-action-slot { min-width: 112px; min-height: 38px; display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
     .xport-action-slot:empty { visibility: hidden; }
     .mode-body { color: var(--ha-secondary); font-size: 15px; line-height: 1.6; margin-top: 26px; min-height: 54px; }
     .metric strong, .active-mode strong { color: var(--ha-strong); font-weight: 700; }
@@ -583,7 +583,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           <dt>Hardware</dt>
           <dd id="carrier-identity-hardware">v1.4 Rev.A</dd>
           <dt>Software</dt>
-          <dd id="carrier-identity-software">v0.5.123</dd>
+          <dd id="carrier-identity-software">v0.5.126</dd>
         </dl>
         <div class="overview-divider"></div>
         <dl class="overview-health">
@@ -921,8 +921,30 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       const actionSlot = card.querySelector('.xport-action-slot');
       if (!actionSlot) { return; }
       const needsReset = channel.confirmed_mode === 'PulseCounterExternalVoltage' || channel.confirmed_mode === 'PulseCounterInternalPullUp';
-      if (!needsReset) {
+      const needsPwmToggle = channel.confirmed_mode === 'PwmOutput';
+      if (!needsReset && !needsPwmToggle) {
         actionSlot.replaceChildren();
+        return;
+      }
+      if (needsPwmToggle) {
+        const enabled = Number(channel.value || 0) > 0;
+        let state = actionSlot.querySelector('.state-text');
+        let toggle = actionSlot.querySelector('button.toggle');
+        if (!state) {
+          state = document.createElement('span');
+          state.className = 'state-text';
+        }
+        if (!toggle) {
+          toggle = document.createElement('button');
+          toggle.type = 'button';
+        }
+        state.className = `state-text ${enabled ? 'on' : ''}`;
+        state.textContent = enabled ? 'ON' : 'OFF';
+        toggle.className = `toggle ${enabled ? 'on' : ''}`;
+        toggle.title = enabled ? 'Turn PWM off' : 'Turn PWM on';
+        toggle.innerHTML = `<span>${enabled ? 'ON' : 'OFF'}</span>`;
+        toggle.onclick = () => setPwmEnabled(channel, !enabled);
+        actionSlot.replaceChildren(state, toggle);
         return;
       }
       let reset = actionSlot.querySelector('button');
@@ -1078,6 +1100,10 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         output.classList.add('visible');
       }
     }
+    async function setPwmEnabled(channel, enabled) {
+      const current = Number(channel.value || 0);
+      await setValue(channel.channel, enabled ? (current > 0 ? current : 1) : 0);
+    }
     async function resetCounter(channel) {
       const output = document.getElementById('output');
       output.classList.remove('visible');
@@ -1154,7 +1180,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       document.getElementById('carrier-identity-model').textContent = identity.model || 'IntellegyHUB Controller';
       document.getElementById('carrier-identity-serial').textContent = identity.serial_number || 'IH1400-00001234';
       document.getElementById('carrier-identity-hardware').textContent = formatVersion(identity.hardware_revision || '1.4 Rev.A');
-      document.getElementById('carrier-identity-software').textContent = formatVersion(identity.software_version || '0.5.123');
+      document.getElementById('carrier-identity-software').textContent = formatVersion(identity.software_version || '0.5.126');
       document.getElementById('carrier-uptime').textContent = formatUptime(appInfo && appInfo.uptime_seconds);
       const monitoring = carrier && carrier.monitoring ? carrier.monitoring : {};
       const temperature = monitoring.temperature || {};
@@ -1163,7 +1189,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         rails[rail.id] = rail;
       }
       const updatedAt = [
-        paintMetric('board-temperature', temperature, 1, ' °C'),
+        paintMetric('board-temperature', temperature, 1, ' В°C'),
         paintMetric('5v', rails['5v'], 2, ' V'),
         paintMetric('3v3', rails['3v3'], 2, ' V'),
         paintMetric('vin', rails.vin, 2, ' V')
@@ -1380,7 +1406,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         meta.className = 'module-meta';
         const isInputModule = module.kind === 'digital_input';
         const isRelayModule = module.kind === 'relay_output';
-        meta.textContent = `X-BUS · I2C-${module.bus} · Address ${module.address} · ${module.chip} · 8 relays`;
+        meta.textContent = `X-BUS В· I2C-${module.bus} В· Address ${module.address} В· ${module.chip} В· 8 relays`;
         const grid = document.createElement('div');
         grid.className = 'relay-grid';
         meta.textContent = `X-BUS - I2C-${module.bus} - Address ${module.address} - ${module.chip} - ${module.channels} ${isInputModule ? 'digital inputs' : 'relays'}`;
@@ -1522,7 +1548,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         const meta = document.createElement('div');
         meta.className = 'module-meta';
         const enabled = bridge.enabled !== false;
-        meta.textContent = `Bus I2C-${bridge.bus} В· Address ${bridge.address} В· ${bridge.chip}${bridge.available ? '' : ' В· unavailable'}`;
+        meta.textContent = `Bus I2C-${bridge.bus} Р’В· Address ${bridge.address} Р’В· ${bridge.chip}${bridge.available ? '' : ' Р’В· unavailable'}`;
         meta.textContent = `Bus I2C-${bridge.bus} - Address ${bridge.address} - ${bridge.chip}${enabled ? '' : ' - polling off'}${bridge.available ? '' : ' - unavailable'}`;
         const toggle = document.createElement('button');
         toggle.className = `toggle ${enabled ? 'on' : ''}`;
@@ -1547,8 +1573,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         title.textContent = sensor.name;
         const meta = document.createElement('div');
         meta.className = 'module-meta';
-        const value = sensor.temperature_c === null || sensor.temperature_c === undefined ? 'Unavailable' : `${Number(sensor.temperature_c).toFixed(3)} В°C`;
-        meta.textContent = `Bridge ${sensor.address} В· ROM ${sensor.rom} В· ${value}${sensor.available ? '' : ' В· unavailable'}`;
+        const value = sensor.temperature_c === null || sensor.temperature_c === undefined ? 'Unavailable' : `${Number(sensor.temperature_c).toFixed(3)} Р’В°C`;
+        meta.textContent = `Bridge ${sensor.address} Р’В· ROM ${sensor.rom} Р’В· ${value}${sensor.available ? '' : ' Р’В· unavailable'}`;
         const remove = document.createElement('button');
         remove.className = 'danger-button';
         const cleanValue = sensor.temperature_c === null || sensor.temperature_c === undefined ? 'Unavailable' : `${Number(sensor.temperature_c).toFixed(3)} C`;
@@ -1678,7 +1704,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       try {
         const payload = await requestJson('api/v1/buzzer/status');
         paintBuzzer(payload);
-        document.getElementById('buzzer-detail').textContent = `pigpio: ${payload.pigpio.connected ? 'connected' : 'offline'} · pwmchip: ${payload.pwm.available ? 'available' : 'missing'} · gpio18: ${payload.gpio.available ? 'available' : 'missing'}`;
+        document.getElementById('buzzer-detail').textContent = `pigpio: ${payload.pigpio.connected ? 'connected' : 'offline'} В· pwmchip: ${payload.pwm.available ? 'available' : 'missing'} В· gpio18: ${payload.gpio.available ? 'available' : 'missing'}`;
       } catch (error) {
         document.getElementById('buzzer-status').textContent = 'BUZZER: Error';
         document.getElementById('buzzer-detail').textContent = JSON.stringify(error);
@@ -1709,7 +1735,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           body: JSON.stringify(requested)
         });
         document.getElementById('buzzer-status').textContent = `BUZZER: running ${payload.backend}`;
-        detail.textContent = `duration: ${payload.duration_ms} ms · pigpio: ${payload.pigpio.connected ? 'connected' : 'offline'}`;
+        detail.textContent = `duration: ${payload.duration_ms} ms В· pigpio: ${payload.pigpio.connected ? 'connected' : 'offline'}`;
         window.setTimeout(renderBuzzerStatus, requested.duration_ms + 250);
       } catch (error) {
         document.getElementById('buzzer-status').textContent = 'BUZZER: Test failed';
@@ -1720,7 +1746,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       try {
         const payload = await requestJson('api/v1/buzzer/stop', { method: 'POST' });
         document.getElementById('buzzer-status').textContent = 'BUZZER: stopped';
-        document.getElementById('buzzer-detail').textContent = `pigpio: ${payload.pigpio.connected ? 'connected' : 'offline'} · pwmchip: ${payload.pwm.available ? 'available' : 'missing'}`;
+        document.getElementById('buzzer-detail').textContent = `pigpio: ${payload.pigpio.connected ? 'connected' : 'offline'} В· pwmchip: ${payload.pwm.available ? 'available' : 'missing'}`;
       } catch (error) {
         document.getElementById('buzzer-status').textContent = 'BUZZER: stop failed';
         document.getElementById('buzzer-detail').textContent = JSON.stringify(error);

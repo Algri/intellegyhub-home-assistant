@@ -70,13 +70,31 @@ The boot partition `config.txt` must enable the CM4 I2C firmware parameters, for
 ```ini
 arm_64bit=1
 dtparam=i2c_arm=on
+
+[cm4]
+otg_mode=1
+
+[all]
+enable_uart=1
+dtoverlay=uart3
+dtoverlay=uart5
+dtparam=i2c1=on
 dtparam=i2c_vc=on
 dtparam=spi=off
+gpio=16=ip,np
+gpio=23=ip,np
+dtoverlay=gpio-shutdown,gpio_pin=17,active_low=1,gpio_pull=up,debounce=1000
+dtoverlay=pwm,pin=18,func=2
+dtparam=ant2
+dtoverlay=i2c-rtc,pcf85063a,i2c_csi_dsi
 ```
 
 After changing boot files, run `ha host reboot` and verify with:
 
 ```sh
+hwclock -w
 ls -la /dev/i2c*
 lsmod | grep -i i2c
+hwclock -r
+cat /sys/class/rtc/rtc0/hctosys
 ```

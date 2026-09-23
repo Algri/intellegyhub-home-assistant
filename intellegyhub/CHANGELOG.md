@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.126
+
+- Add Home Assistant X-Port PWM light entities so PWM channels can use native light brightness tiles and fullscreen on/off controls.
+
+## 0.5.125
+
+- Mark the PCF85063A RTC system integration as covered now that HAOS boot scripts enable the RTC overlay and print setup/verification steps.
+
+## 0.5.124
+
+- Update HAOS boot preparation scripts for the PCF85063A RTC overlay, remove the duplicate SPI-off line, and print RTC setup/verification commands.
+
 ## 0.5.123
 
 - Restore xDO-8 relay tile icons to the relay-style toggle variant shown by Home Assistant while keeping compact relay names.

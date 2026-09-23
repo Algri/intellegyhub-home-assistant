@@ -19,6 +19,7 @@ ENTITY_PLATFORMS: tuple[Platform, ...] = (
     Platform.SELECT,
     Platform.SENSOR,
     Platform.NUMBER,
+    Platform.LIGHT,
     Platform.BUTTON,
 )
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

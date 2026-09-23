@@ -32,6 +32,7 @@ XPORT_ENTITY_SUFFIX_NAMES = {
     "ai": "AI",
     "counter": "Counter",
     "pwm": "PWM",
+    "pwm_light": "PWM",
     "counter_reset": "Reset Counter",
 }
 
@@ -86,4 +87,3 @@ def compact_dashboard_name(unique_id: object) -> str | None:
         return "Temperature"
 
     return None
-

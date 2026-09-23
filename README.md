@@ -93,7 +93,6 @@ For the tested CM4 setup, the relevant `config.txt` lines are:
 ```ini
 arm_64bit=1
 dtparam=i2c_arm=on
-dtparam=spi=off
 
 [cm4]
 otg_mode=1
@@ -104,11 +103,13 @@ dtoverlay=uart3
 dtoverlay=uart5
 dtparam=i2c1=on
 dtparam=i2c_vc=on
+dtparam=spi=off
 gpio=16=ip,np
 gpio=23=ip,np
 dtoverlay=gpio-shutdown,gpio_pin=17,active_low=1,gpio_pull=up,debounce=1000
 dtoverlay=pwm,pin=18,func=2
 dtparam=ant2
+dtoverlay=i2c-rtc,pcf85063a,i2c_csi_dsi
 ```
 
 HAOS also needs this file on the boot partition:
@@ -186,6 +187,9 @@ After changing boot files, boot HAOS and import the boot `CONFIG` folder:
 ```sh
 ha os import
 ha host reboot
+hwclock -w
+hwclock -r
+cat /sys/class/rtc/rtc0/hctosys
 ```
 
 If the Supervisor is not reachable immediately after import, use host SSH or a
