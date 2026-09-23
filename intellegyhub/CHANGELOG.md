@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.131
+
+- Read controller identity from the factory EEPROM and show it on the add-on overview.
+- Show `--` for missing EEPROM identity fields instead of stale factory placeholders.
+- Fix broken temperature/unit text encoding in the overview and clean related UI metadata strings.
+
 ## 0.5.130
 
 - Rename Home Assistant devices to user-facing labels: `Controls`, `1-Wire Bus1`, `1-Wire Bus2`, and address-first xBUS module names.

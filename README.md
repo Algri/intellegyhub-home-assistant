@@ -250,6 +250,51 @@ On the tested CM4 hardware, the useful buses are:
 
 Do not assume that "I2C0" appears as `/dev/i2c-0`; with the CM4 device tree it can appear as `/dev/i2c-10`.
 
+## Controller Identity EEPROM
+
+The controller identity EEPROM is a 24LC32 on `/dev/i2c-10` at address `0x50`.
+Normal add-on/runtime code must treat it as read-only. Factory writes are done
+with the standalone script:
+
+```text
+scripts/write_controller_identity_eeprom.py
+```
+
+Copy it to HAOS, for example:
+
+```bash
+cp scripts/write_controller_identity_eeprom.py /mnt/data/write_controller_identity_eeprom.py
+```
+
+Preview without writing:
+
+```bash
+python3 /mnt/data/write_controller_identity_eeprom.py write --dry-run
+```
+
+Write the default controller identity:
+
+```bash
+python3 /mnt/data/write_controller_identity_eeprom.py write
+```
+
+Read and verify after writing:
+
+```bash
+python3 /mnt/data/write_controller_identity_eeprom.py read
+python3 /mnt/data/write_controller_identity_eeprom.py read --json
+python3 /mnt/data/write_controller_identity_eeprom.py verify
+```
+
+Expected verify result:
+
+```text
+VERIFY OK
+```
+
+Full EEPROM format, safety policy, status meanings, and factory checklist are in
+[`docs/21-EEPROM-IDENTITY.md`](docs/21-EEPROM-IDENTITY.md).
+
 ## Deploy The Add-on To HAOS
 
 The confirmed local path is using the Home Assistant Studio Code Server add-on.

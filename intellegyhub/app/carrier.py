@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import binascii
 import errno
+import json
 import os
 import sys
 import time
@@ -10,6 +12,14 @@ from pathlib import Path
 from typing import Any, Callable
 
 I2C_SLAVE = 0x0703
+APP_VERSION = "0.5.131"
+IDENTITY_EEPROM_ADDR = 0x50
+IDENTITY_EEPROM_OFFSET = 0x0000
+IDENTITY_REGION_SIZE = 1024
+IDENTITY_MAGIC = b"IHID"
+IDENTITY_CONTAINER_VERSION = 1
+IDENTITY_SCHEMA_VERSION = 1
+IDENTITY_HEADER_SIZE = 16
 
 
 @dataclass
@@ -62,8 +72,8 @@ def _carrier_output(output_id: str, name: str, bit: int, port: str, pin: str) ->
 
 
 CARRIER_OUTPUTS: dict[str, CarrierOutputDefinition] = {
-    "rs485_ch1_termination": _carrier_output("rs485_ch1_termination", "RS-485 CH1 120РћВ© Termination", 10, "GPIOB", "GPB2"),
-    "rs485_ch2_termination": _carrier_output("rs485_ch2_termination", "RS-485 CH2 120РћВ© Termination", 13, "GPIOB", "GPB5"),
+    "rs485_ch1_termination": _carrier_output("rs485_ch1_termination", "RS-485 CH1 120 Ohm Termination", 10, "GPIOB", "GPB2"),
+    "rs485_ch2_termination": _carrier_output("rs485_ch2_termination", "RS-485 CH2 120 Ohm Termination", 13, "GPIOB", "GPB5"),
     "xmod1_reset": _carrier_output("xmod1_reset", "XMOD1 Reset", 8, "GPIOB", "GPB0"),
     "xmod1_flash_enable": _carrier_output("xmod1_flash_enable", "XMOD1 Flash / Enable", 9, "GPIOB", "GPB1"),
     "xmod2_reset": _carrier_output("xmod2_reset", "XMOD2 Reset", 11, "GPIOB", "GPB3"),
@@ -354,6 +364,23 @@ class CarrierHardware:
             os.write(device.fileno(), bytes([register]))
             return os.read(device.fileno(), length)
 
+    def read_identity(self) -> dict[str, str]:
+        if _is_mock_platform():
+            return {}
+        try:
+            region = self._i2c_read_eeprom(IDENTITY_EEPROM_ADDR, IDENTITY_EEPROM_OFFSET, IDENTITY_REGION_SIZE)
+            return _parse_identity_region(region)
+        except Exception:
+            return {}
+
+    def _i2c_read_eeprom(self, address: int, offset: int, length: int) -> bytes:
+        import fcntl
+
+        with Path(f"/dev/i2c-{self.bus}").open("rb+", buffering=0) as device:
+            fcntl.ioctl(device, I2C_SLAVE, address)
+            os.write(device.fileno(), bytes([(offset >> 8) & 0xFF, offset & 0xFF]))
+            return os.read(device.fileno(), length)
+
 
 class CarrierManager:
     def __init__(self, hardware: CarrierHardware | None = None, monitoring_interval_seconds: int = 30) -> None:
@@ -362,6 +389,7 @@ class CarrierManager:
         self.available = False
         self.error: str | None = "startup pending"
         self.faults: dict[str, FaultLineState] = {}
+        self.identity: dict[str, str] = {}
         self.monitoring: dict[str, Any] = _monitoring_error_snapshot("startup pending")
         self.outputs: dict[str, bool] = {output_id: False for output_id in CARRIER_OUTPUTS}
         self._publisher: Callable[[dict[str, Any]], Any] | None = None
@@ -378,6 +406,7 @@ class CarrierManager:
             self.available = await self.hardware.initialize()
             self.outputs = await self.hardware.outputs()
             self.faults = {fault.id: fault for fault in await self.hardware.fault_lines()}
+            self.identity = await asyncio.to_thread(self.hardware.read_identity)
             self.monitoring = await self.hardware.monitoring_metrics()
             self.error = None if self.available else "carrier MCP23017 unavailable"
             self._fault_task = asyncio.create_task(self._monitor_faults(), name="intellegyhub_carrier_faults")
@@ -485,15 +514,11 @@ class CarrierManager:
             await result
 
     def snapshot(self) -> dict[str, Any]:
+        identity = dict(self.identity)
+        identity["software_version"] = APP_VERSION
         return {
             "available": self.available,
-            "identity": {
-                "product": "IHC-1400",
-                "model": "IntellegyHUB Controller",
-                "serial_number": "IH1400-00001234",
-                "hardware_revision": "1.4 Rev.A",
-                "software_version": "0.5.130",
-            },
+            "identity": identity,
             "controller": {"bus": 10, "address": "0x20", "chip": "MCP23017"},
             "faults": [asdict(fault) for fault in self.faults.values()],
             "outputs": [asdict(self._output_state(output_id, on)) for output_id, on in self.outputs.items()],
@@ -522,6 +547,47 @@ def _is_mock_platform() -> bool:
         or os.environ.get("INTELLEGY_GPIO_MOCK", "").lower() in {"1", "true", "yes"}
         or os.environ.get("INTELLEGY_MOCK_GPIO", "").lower() in {"1", "true", "yes"}
     )
+
+
+def _parse_identity_region(region: bytes) -> dict[str, str]:
+    if len(region) < IDENTITY_HEADER_SIZE:
+        return {}
+    if all(byte == 0xFF for byte in region):
+        return {}
+    if region[:4] != IDENTITY_MAGIC:
+        return {}
+
+    container_version = region[4]
+    header_size = region[5]
+    schema_version = int.from_bytes(region[6:8], "big")
+    payload_length = int.from_bytes(region[8:10], "big")
+    flags = int.from_bytes(region[10:12], "big")
+    expected_crc = int.from_bytes(region[12:16], "big")
+    if (
+        container_version != IDENTITY_CONTAINER_VERSION
+        or header_size != IDENTITY_HEADER_SIZE
+        or schema_version != IDENTITY_SCHEMA_VERSION
+        or flags != 0
+        or payload_length < 1
+        or payload_length > IDENTITY_REGION_SIZE - IDENTITY_HEADER_SIZE
+    ):
+        return {}
+
+    end = IDENTITY_HEADER_SIZE + payload_length
+    if len(region) < end:
+        return {}
+    payload = region[IDENTITY_HEADER_SIZE:end]
+    actual_crc = binascii.crc32(region[:12] + payload) & 0xFFFFFFFF
+    if actual_crc != expected_crc:
+        return {}
+
+    try:
+        decoded = json.loads(payload.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return {}
+    if not isinstance(decoded, dict):
+        return {}
+    return {str(key): str(value) for key, value in decoded.items() if value is not None and str(value)}
 
 
 def _monitoring_error_snapshot(error: str) -> dict[str, Any]:

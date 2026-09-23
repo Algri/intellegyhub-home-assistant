@@ -118,7 +118,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.130 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
+                "Starting v0.5.131 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -153,7 +153,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.130", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.131", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 
@@ -276,7 +276,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .overview-status-pill.offline { border-color: var(--ha-danger-border); color: var(--ha-danger-text); background: var(--ha-danger-bg); }
     .overview-title h1 { font-size: 30px; line-height: 1; margin-bottom: 6px; font-weight: 800; }
     .overview-title .subtitle { color: var(--ha-text); font-size: 13px; margin-bottom: 0; }
-    .overview-facts { display: grid; grid-template-columns: 82px minmax(0, 170px); gap: 5px 18px; margin-top: 14px; font-size: 12px; line-height: 1.25; }
+    .overview-facts { display: grid; grid-template-columns: 82px minmax(0, 190px); gap: 5px 18px; margin-top: 14px; font-size: 12px; line-height: 1.25; }
     .overview-facts dt { color: var(--ha-text); font-weight: 800; }
     .overview-facts dd { margin: 0; color: var(--ha-text); font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
     .overview-divider { width: min(258px, 100%); height: 1px; background: var(--ha-card-border); margin: 18px 0 14px; }
@@ -576,16 +576,18 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         </div>
         <div class="overview-title">
           <div class="eyebrow">Controller</div>
-          <h1 id="carrier-identity-product">IHC-1400</h1>
-          <div id="carrier-identity-model" class="subtitle">IntellegyHUB Controller</div>
+          <h1 id="carrier-identity-product">--</h1>
+          <div id="carrier-identity-model" class="subtitle">--</div>
         </div>
         <dl class="overview-facts">
           <dt>Serial</dt>
-          <dd id="carrier-identity-serial">IH1400-00001234</dd>
+          <dd id="carrier-identity-serial">--</dd>
           <dt>Hardware</dt>
-          <dd id="carrier-identity-hardware">v1.4 Rev.A</dd>
+          <dd id="carrier-identity-hardware">--</dd>
           <dt>Software</dt>
-          <dd id="carrier-identity-software">v0.5.130</dd>
+          <dd id="carrier-identity-software">--</dd>
+          <dt>Variant</dt>
+          <dd id="carrier-identity-variant">--</dd>
         </dl>
         <div class="overview-divider"></div>
         <dl class="overview-health">
@@ -1185,11 +1187,12 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       healthDot.classList.toggle('offline', !online);
       document.getElementById('carrier-health-state').textContent = online ? 'Normal' : 'Offline';
       const identity = carrier && carrier.identity ? carrier.identity : {};
-      document.getElementById('carrier-identity-product').textContent = identity.product || 'IHC-1400';
-      document.getElementById('carrier-identity-model').textContent = identity.model || 'IntellegyHUB Controller';
-      document.getElementById('carrier-identity-serial').textContent = identity.serial_number || 'IH1400-00001234';
-      document.getElementById('carrier-identity-hardware').textContent = formatVersion(identity.hardware_revision || '1.4 Rev.A');
-      document.getElementById('carrier-identity-software').textContent = formatVersion(identity.software_version || '0.5.130');
+      document.getElementById('carrier-identity-product').textContent = cleanIdentityValue(identity.model || identity.product);
+      document.getElementById('carrier-identity-model').textContent = cleanIdentityValue(identity.manufacturer ? `${identity.manufacturer} Controller` : '');
+      document.getElementById('carrier-identity-serial').textContent = cleanIdentityValue(identity.serial_number);
+      document.getElementById('carrier-identity-hardware').textContent = formatHardware(identity.hardware_version, identity.hardware_revision);
+      document.getElementById('carrier-identity-software').textContent = formatVersion(identity.software_version);
+      document.getElementById('carrier-identity-variant').textContent = cleanIdentityValue(identity.variant);
       document.getElementById('carrier-uptime').textContent = formatUptime(appInfo && appInfo.uptime_seconds);
       const monitoring = carrier && carrier.monitoring ? carrier.monitoring : {};
       const temperature = monitoring.temperature || {};
@@ -1198,7 +1201,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         rails[rail.id] = rail;
       }
       const updatedAt = [
-        paintMetric('board-temperature', temperature, 1, ' Р В РІР‚в„ўР вЂ™Р’В°C'),
+        paintMetric('board-temperature', temperature, 1, ' \u00B0C'),
         paintMetric('5v', rails['5v'], 2, ' V'),
         paintMetric('3v3', rails['3v3'], 2, ' V'),
         paintMetric('vin', rails.vin, 2, ' V')
@@ -1207,7 +1210,21 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     function formatVersion(value) {
       const text = String(value || '').trim();
-      return text && !text.toLowerCase().startsWith('v') ? `v${text}` : text;
+      if (!text) return '--';
+      return !text.toLowerCase().startsWith('v') ? `v${text}` : text;
+    }
+    function formatHardware(version, revision) {
+      const versionText = formatVersion(version);
+      const revisionText = String(revision || '').trim();
+      const formattedRevision = revisionText
+        ? (revisionText.toLowerCase().startsWith('rev.') ? revisionText : `Rev.${revisionText}`)
+        : '';
+      if (versionText === '--' && !formattedRevision) return '--';
+      return [versionText === '--' ? '' : versionText, formattedRevision].filter(Boolean).join(' ');
+    }
+    function cleanIdentityValue(value) {
+      const text = String(value || '').trim();
+      return text || '--';
     }
     function formatUptime(seconds) {
       const total = Math.max(0, Number(seconds || 0));
@@ -1415,7 +1432,6 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         meta.className = 'module-meta';
         const isInputModule = module.kind === 'digital_input';
         const isRelayModule = module.kind === 'relay_output';
-        meta.textContent = `X-BUS Р В РІР‚в„ўР вЂ™Р’В· I2C-${module.bus} Р В РІР‚в„ўР вЂ™Р’В· Address ${module.address} Р В РІР‚в„ўР вЂ™Р’В· ${module.chip} Р В РІР‚в„ўР вЂ™Р’В· 8 relays`;
         const grid = document.createElement('div');
         grid.className = 'relay-grid';
         meta.textContent = `X-BUS - I2C-${module.bus} - Address ${module.address} - ${module.chip} - ${module.channels} ${isInputModule ? 'digital inputs' : 'relays'}`;
@@ -1557,7 +1573,6 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         const meta = document.createElement('div');
         meta.className = 'module-meta';
         const enabled = bridge.enabled !== false;
-        meta.textContent = `Bus I2C-${bridge.bus} Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В· Address ${bridge.address} Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В· ${bridge.chip}${bridge.available ? '' : ' Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В· unavailable'}`;
         meta.textContent = `Bus I2C-${bridge.bus} - Address ${bridge.address} - ${bridge.chip}${enabled ? '' : ' - polling off'}${bridge.available ? '' : ' - unavailable'}`;
         const toggle = document.createElement('button');
         toggle.className = `toggle ${enabled ? 'on' : ''}`;
@@ -1582,8 +1597,6 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         title.textContent = sensor.name;
         const meta = document.createElement('div');
         meta.className = 'module-meta';
-        const value = sensor.temperature_c === null || sensor.temperature_c === undefined ? 'Unavailable' : `${Number(sensor.temperature_c).toFixed(3)} Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В°C`;
-        meta.textContent = `Bridge ${sensor.address} Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В· ROM ${sensor.rom} Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В· ${value}${sensor.available ? '' : ' Р В Р’В Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В· unavailable'}`;
         const remove = document.createElement('button');
         remove.className = 'danger-button';
         const cleanValue = sensor.temperature_c === null || sensor.temperature_c === undefined ? 'Unavailable' : `${Number(sensor.temperature_c).toFixed(3)} C`;
