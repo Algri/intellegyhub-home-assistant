@@ -2,39 +2,42 @@ configuration:
   network:
     name: Network
     8098/tcp: Internal API port
-  carrier_monitoring_poll_interval_seconds:
-    name: Controller diagnostics polling interval, seconds
-    description: How often voltage rails, power fault status, and board temperature are refreshed.
-  onewire_bus1_poll_interval_seconds:
-    name: 1-Wire Bus 1 polling interval, seconds
-    description: How often temperature sensors on 1-Wire Bus 1 are refreshed.
-  onewire_bus2_poll_interval_seconds:
-    name: 1-Wire Bus 2 polling interval, seconds
-    description: How often temperature sensors on 1-Wire Bus 2 are refreshed.
-  power_button_shutdown_enabled:
-    name: Power button shutdown
-    description: Enable graceful host shutdown from the physical Power button.
-  power_button_shutdown_hold_seconds:
-    name: Power button hold time, seconds
-    description: How long the Power button must be held before shutdown starts.
-  startup_buzzer_enabled:
-    name: Startup buzzer
-    description: Play a short beep after the add-on starts.
-  startup_buzzer_frequency:
-    name: Startup buzzer frequency, Hz
-    description: Frequency used for the startup beep.
-  startup_buzzer_duration_ms:
-    name: Startup buzzer duration, ms
-    description: Duration used for the startup beep.
-  shutdown_buzzer_enabled:
-    name: Shutdown buzzer
-    description: Play a confirmation beep before host shutdown.
-  shutdown_buzzer_frequency:
-    name: Shutdown buzzer frequency, Hz
-    description: Frequency used for the shutdown beep.
-  shutdown_buzzer_duration_ms:
-    name: Shutdown buzzer duration, ms
-    description: Duration used for the shutdown beep.
-  shutdown_buzzer_volume_percent:
-    name: Shutdown buzzer volume, %
-    description: Volume used for the shutdown beep.
+  diagnostics:
+    name: Diagnostics
+    description: Configure how often controller health data is refreshed.
+    carrier_monitoring_poll_interval_seconds:
+      name: Polling interval, seconds
+      description: How often voltage rails, power fault status, and board temperature are refreshed.
+  onewire:
+    name: 1-Wire
+    description: Configure temperature polling for the two 1-Wire buses.
+    bus1_poll_interval_seconds:
+      name: Bus 1 polling interval, seconds
+      description: How often temperature sensors on 1-Wire Bus 1 are refreshed.
+    bus2_poll_interval_seconds:
+      name: Bus 2 polling interval, seconds
+      description: How often temperature sensors on 1-Wire Bus 2 are refreshed.
+  power_button:
+    name: Power button
+    description: Configure graceful host shutdown from the physical Power button.
+    shutdown_enabled:
+      name: Shutdown
+      description: Enable graceful host shutdown from the physical Power button.
+    shutdown_hold_seconds:
+      name: Hold time, seconds
+      description: How long the Power button must be held before shutdown starts.
+  buzzer:
+    name: Buzzer
+    description: Configure GPIO18 buzzer notifications.
+    startup_enabled:
+      name: Startup buzzer
+      description: Play a short beep after the add-on starts.
+    shutdown_enabled:
+      name: Shutdown buzzer
+      description: Play a confirmation beep before host shutdown. Shutdown beep volume is fixed at 80%.
+    frequency:
+      name: Frequency, Hz
+      description: Frequency used for startup and shutdown beeps.
+    duration_ms:
+      name: Duration, ms
+      description: Duration used for startup and shutdown beeps.

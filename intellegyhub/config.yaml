@@ -1,7 +1,7 @@
 name: IntellegyHUB
 slug: intellegyhub
 description: IntellegyHUB hardware runtime for Home Assistant native entities
-version: 0.5.143
+version: 0.5.144
 stage: experimental
 arch:
   - aarch64
@@ -29,28 +29,30 @@ map:
     read_only: false
     path: /ha_config
 options:
-  carrier_monitoring_poll_interval_seconds: 30
-  onewire_bus1_poll_interval_seconds: 30
-  onewire_bus2_poll_interval_seconds: 30
-  power_button_shutdown_enabled: true
-  power_button_shutdown_hold_seconds: 1.0
-  startup_buzzer_enabled: false
-  startup_buzzer_frequency: 2000
-  startup_buzzer_duration_ms: 200
-  shutdown_buzzer_enabled: true
-  shutdown_buzzer_frequency: 2000
-  shutdown_buzzer_duration_ms: 200
-  shutdown_buzzer_volume_percent: 50
+  diagnostics:
+    carrier_monitoring_poll_interval_seconds: 30
+  onewire:
+    bus1_poll_interval_seconds: 30
+    bus2_poll_interval_seconds: 30
+  power_button:
+    shutdown_enabled: true
+    shutdown_hold_seconds: 1.0
+  buzzer:
+    startup_enabled: false
+    shutdown_enabled: true
+    frequency: 2000
+    duration_ms: 200
 schema:
-  carrier_monitoring_poll_interval_seconds: int(1,3600)
-  onewire_bus1_poll_interval_seconds: int(1,3600)
-  onewire_bus2_poll_interval_seconds: int(1,3600)
-  power_button_shutdown_enabled: bool
-  power_button_shutdown_hold_seconds: float(0.1,1.5)
-  startup_buzzer_enabled: bool
-  startup_buzzer_frequency: int(20,2800)
-  startup_buzzer_duration_ms: int(10,5000)
-  shutdown_buzzer_enabled: bool
-  shutdown_buzzer_frequency: int(300,2800)
-  shutdown_buzzer_duration_ms: int(10,1000)
-  shutdown_buzzer_volume_percent: int(0,100)
+  diagnostics:
+    carrier_monitoring_poll_interval_seconds: int(1,3600)
+  onewire:
+    bus1_poll_interval_seconds: int(1,3600)
+    bus2_poll_interval_seconds: int(1,3600)
+  power_button:
+    shutdown_enabled: bool
+    shutdown_hold_seconds: float(0.1,1.5)
+  buzzer:
+    startup_enabled: bool
+    shutdown_enabled: bool
+    frequency: int(20,2800)
+    duration_ms: int(10,5000)

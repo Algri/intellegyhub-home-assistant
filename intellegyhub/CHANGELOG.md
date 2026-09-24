@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.144
+
+- Group add-on options into Diagnostics, 1-Wire, Power button, and Buzzer sections.
+- Use the shared buzzer frequency and duration for startup and shutdown beeps, with shutdown volume fixed at 80%.
+- Keep backward compatibility with old flat option names while presenting the cleaned grouped configuration.
+
 ## 0.5.143
 
 - Simplify add-on options for IHC-1400 by hiding fixed low-level GPIO settings.

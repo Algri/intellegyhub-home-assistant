@@ -8,33 +8,34 @@ Install it from the local repository folder that contains root `repository.yaml`
 Default options:
 
 ```yaml
-carrier_monitoring_poll_interval_seconds: 30
-onewire_bus1_poll_interval_seconds: 30
-onewire_bus2_poll_interval_seconds: 30
-power_button_shutdown_enabled: true
-power_button_shutdown_hold_seconds: 1.0
-startup_buzzer_enabled: false
-startup_buzzer_frequency: 2000
-startup_buzzer_duration_ms: 200
-shutdown_buzzer_enabled: true
-shutdown_buzzer_frequency: 2000
-shutdown_buzzer_duration_ms: 200
-shutdown_buzzer_volume_percent: 50
+diagnostics:
+  carrier_monitoring_poll_interval_seconds: 30
+onewire:
+  bus1_poll_interval_seconds: 30
+  bus2_poll_interval_seconds: 30
+power_button:
+  shutdown_enabled: true
+  shutdown_hold_seconds: 1.0
+buzzer:
+  startup_enabled: false
+  shutdown_enabled: true
+  frequency: 2000
+  duration_ms: 200
 ```
 
-When `startup_buzzer_enabled` is true, the add-on emits one short GPIO18
+When `buzzer.startup_enabled` is true, the add-on emits one short GPIO18
 hardware PWM beep after the runtime starts successfully.
 
-When `shutdown_buzzer_enabled` is true, a confirmed Power button shutdown plays
-the configured GPIO18 shutdown beep first, waits until it finishes, and only then
-sends the host shutdown command.
+When `buzzer.shutdown_enabled` is true, a confirmed Power button shutdown plays
+the same configured GPIO18 beep first at fixed 80% volume, waits until it
+finishes, and only then sends the host shutdown command.
 
 The 1-Wire polling toggles in the Ingress UI enable or disable periodic
 temperature polling per 1-Wire bus. The interval for each bus is configured with
-`onewire_bus1_poll_interval_seconds` and `onewire_bus2_poll_interval_seconds`.
+`onewire.bus1_poll_interval_seconds` and `onewire.bus2_poll_interval_seconds`.
 
-When `power_button_shutdown_enabled` is true, holding the physical Power input
-on GPIO17 for `power_button_shutdown_hold_seconds` requests a graceful HAOS host
+When `power_button.shutdown_enabled` is true, holding the physical Power input
+on GPIO17 for `power_button.shutdown_hold_seconds` requests a graceful HAOS host
 shutdown through the Home Assistant Supervisor API. The hold time is configurable
 from `0.1` to `1.5` seconds and defaults to `1.0` second.
 

@@ -5,10 +5,10 @@ Startup reads `/data/options.json`, validates GPIO offsets, rejects identical LE
 The button edge listener runs outside the main asyncio loop. On each edge it waits for the configured debounce interval, samples the final logical button state, and emits one state transition if the stable value changed.
 
 The fixed Power input on GPIO17 is also exposed as a button state. If
-`power_button_shutdown_enabled` is enabled, pressing it starts a cancellable hold
-timer. Releasing it before `power_button_shutdown_hold_seconds` does nothing;
+`power_button.shutdown_enabled` is enabled, pressing it starts a cancellable hold
+timer. Releasing it before `power_button.shutdown_hold_seconds` does nothing;
 holding it for the configured `0.1` to `1.5` seconds optionally plays the
-separate `shutdown_buzzer_*` GPIO18 beep, waits for it to finish, and then sends
+configured GPIO18 buzzer beep at fixed 80% volume, waits for it to finish, and then sends
 `POST http://supervisor/host/shutdown` with the add-on `SUPERVISOR_TOKEN`.
 
 `GET /health` returns `200 {"status":"ok"}` when ready and `503` while startup or hardware initialization has failed.
@@ -21,7 +21,7 @@ in mock mode from the repository root:
 ```powershell
 python -m pip install -r requirements-local-ui.txt
 $env:INTELLEGY_GPIO_MOCK="1"
-$env:INTELLEGY_ADDON_OPTIONS='{"carrier_monitoring_poll_interval_seconds":30,"onewire_bus1_poll_interval_seconds":30,"onewire_bus2_poll_interval_seconds":30}'
+$env:INTELLEGY_ADDON_OPTIONS='{"diagnostics":{"carrier_monitoring_poll_interval_seconds":30},"onewire":{"bus1_poll_interval_seconds":30,"bus2_poll_interval_seconds":30}}'
 python -m uvicorn addon.app.main:app --host 127.0.0.1 --port 8098 --reload
 ```
 
