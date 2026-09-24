@@ -630,7 +630,6 @@ class OneWireManager:
             await self.store.save_power(self.power_on)
             if self.power_on:
                 self.bridges = self._configured_bridges()
-                self._schedule_settle_scan()
             else:
                 if self._settle_scan_task:
                     self._settle_scan_task.cancel()

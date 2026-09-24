@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.139
+
+- Fix mock xDO-8 relay state so toggling one relay no longer resets another relay.
+- Make Service Tools return realistic mock health, device, and I2C diagnostics instead of empty local data.
+- Stop 1-Wire bus power-on from automatically scanning sensors; scans now run only from the explicit scan action.
+
 ## 0.5.138
 
 - Keep the startup buzzer using add-on config values without overwriting persisted diagnostic buzzer settings after restart.

@@ -15,6 +15,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 
 from .backends import MockGpioBackend, RealGpiodBackend
+from .carrier import APP_VERSION
 from .config import load_config
 from .runtime import AppRuntime
 from .xport import XPortMode
@@ -80,6 +81,11 @@ class UiThemePayload(BaseModel):
 
 
 def collect_device_diagnostics() -> dict[str, list[str]]:
+    if is_mock_enabled():
+        return {
+            "gpio": ["/dev/gpiochip0", "/dev/gpiomem"],
+            "i2c": ["/dev/i2c-1", "/dev/i2c-10"],
+        }
     return {
         "gpio": sorted(glob.glob("/dev/gpio*")),
         "i2c": sorted(glob.glob("/dev/i2c*")),
@@ -89,6 +95,18 @@ def collect_device_diagnostics() -> dict[str, list[str]]:
 def scan_i2c_bus(bus: int) -> dict:
     if bus < 0 or bus > 255:
         raise ValueError("bus must be between 0 and 255")
+    if is_mock_enabled():
+        mock_devices = {
+            1: ["0x20", "0x21", "0x22"],
+            10: ["0x18", "0x1a", "0x1b", "0x20", "0x21", "0x48", "0x49", "0x50", "0x51", "0x62"],
+        }
+        return {
+            "bus": bus,
+            "device": f"/dev/i2c-{bus}",
+            "mock": True,
+            "addresses": mock_devices.get(bus, []),
+            "errors": {},
+        }
 
     path = Path(f"/dev/i2c-{bus}")
     if not path.exists():
@@ -112,13 +130,63 @@ def scan_i2c_bus(bus: int) -> dict:
     return {"bus": bus, "device": str(path), "addresses": found, "errors": errors}
 
 
+def is_mock_enabled() -> bool:
+    return (
+        os.environ.get("INTELLEGY_GPIO_MOCK", "").lower() in {"1", "true", "yes"}
+        or os.environ.get("INTELLEGY_MOCK_GPIO", "").lower() in {"1", "true", "yes"}
+    )
+
+
+def _health_payload(current: AppRuntime) -> dict:
+    snapshot = current.snapshot()
+    carrier = snapshot.get("carrier", {})
+    xport = snapshot.get("xport", {})
+    extensions = snapshot.get("extensions", {})
+    onewire = snapshot.get("onewire", {})
+    buzzer = snapshot.get("buzzer", {})
+    return {
+        "status": "ok" if current.ready else "error",
+        "ready": current.ready,
+        "error": current.error,
+        "version": APP_VERSION,
+        "mock": is_mock_enabled(),
+        "uptime_seconds": snapshot.get("app", {}).get("uptime_seconds", 0),
+        "carrier": {
+            "available": carrier.get("available", False),
+            "identity_status": carrier.get("identity_status"),
+            "model": carrier.get("identity", {}).get("model") or carrier.get("identity", {}).get("product"),
+            "serial_number": carrier.get("identity", {}).get("serial_number"),
+        },
+        "xport": {
+            "topology": xport.get("topology"),
+            "availability": xport.get("availability"),
+            "channels": len(xport.get("channels", [])),
+        },
+        "xbus": {
+            "power": extensions.get("power", {}).get("on", False),
+            "modules": len(extensions.get("modules", [])),
+        },
+        "onewire": {
+            "power": onewire.get("power", {}).get("on", False),
+            "bridges": len(onewire.get("bridges", [])),
+            "sensors": len(onewire.get("sensors", [])),
+        },
+        "buzzer": {
+            "frequency": buzzer.get("frequency"),
+            "duration_ms": buzzer.get("duration_ms"),
+            "volume_percent": buzzer.get("volume_percent"),
+            "backend": buzzer.get("active", {}).get("backend"),
+        },
+    }
+
+
 def create_app(options_path: Path | None = None, runtime: AppRuntime | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.138 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
+                "Starting v0.5.139 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -153,7 +221,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.138", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.139", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 
@@ -164,11 +232,11 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         return current
 
     @app.get("/health")
-    async def health() -> dict[str, str]:
+    async def health() -> dict:
         current: AppRuntime = app.state.runtime
-        if current.ready:
-            return {"status": "ok"}
-        raise HTTPException(status_code=503, detail={"status": "error", "error": current.error or "not ready"})
+        if not current.ready:
+            raise HTTPException(status_code=503, detail={"status": "error", "error": current.error or "not ready"})
+        return _health_payload(current)
 
     @app.get("/api/v1/integration/status")
     async def integration_status() -> dict:

@@ -133,20 +133,21 @@ class BuzzerManager:
         pwm_path = self._pwm_path()
         export_path = self.pwmchip / "export"
         pigpio_status = self._pigpio_status()
+        mock = _is_mock_platform()
         return {
             "pigpio": pigpio_status,
             "pwm": {
                 "chip": str(self.pwmchip),
                 "channel": self.pwm_channel,
-                "available": self.pwmchip.exists(),
-                "exported": pwm_path.exists(),
+                "available": mock or self.pwmchip.exists(),
+                "exported": mock or pwm_path.exists(),
                 "npwm": self._read_text(self.pwmchip / "npwm"),
-                "export_writable": os.access(export_path, os.W_OK),
+                "export_writable": mock or os.access(export_path, os.W_OK),
             },
             "gpio": {
                 "chip": self.gpiochip,
                 "line": self.gpio_line,
-                "available": Path(self.gpiochip).exists(),
+                "available": mock or Path(self.gpiochip).exists(),
             },
             "active": {
                 "running": self._active_task is not None,
@@ -212,7 +213,11 @@ class BuzzerManager:
             await self._stop_locked()
             backend = "disabled"
             if physical_duty > 0:
-                backend = await asyncio.to_thread(self._start_hardware_pwm, frequency, physical_duty)
+                backend = "mock_pwm" if _is_mock_platform() else await asyncio.to_thread(
+                    self._start_hardware_pwm,
+                    frequency,
+                    physical_duty,
+                )
                 self._active_backend = backend
                 self._active_task = asyncio.create_task(self._auto_stop_after(duration_ms))
             self.frequency = int(frequency)
@@ -238,7 +243,16 @@ class BuzzerManager:
             backend = "disabled"
             try:
                 if physical_duty > 0:
-                    backend = await asyncio.to_thread(self._run_hardware_pwm_once, frequency, duration_ms, physical_duty)
+                    if _is_mock_platform():
+                        await asyncio.sleep(duration_ms / 1000)
+                        backend = "mock_pwm"
+                    else:
+                        backend = await asyncio.to_thread(
+                            self._run_hardware_pwm_once,
+                            frequency,
+                            duration_ms,
+                            physical_duty,
+                        )
                     self._active_backend = backend
             finally:
                 await asyncio.to_thread(self._disable_pwm)
@@ -504,6 +518,14 @@ class BuzzerManager:
         return pigpio
 
     def _pigpio_status(self) -> dict[str, Any]:
+        if _is_mock_platform():
+            return {
+                "host": PIGPIO_HOST,
+                "port": PIGPIO_PORT,
+                "connected": True,
+                "checked": True,
+                "mock": True,
+            }
         status: dict[str, Any] = {
             "host": PIGPIO_HOST,
             "port": PIGPIO_PORT,
@@ -528,3 +550,10 @@ def _default_store_path() -> Path:
     if sys.platform == "win32":
         return Path(".data/intellegyhub.sqlite3")
     return Path("/data/intellegyhub.sqlite3")
+
+
+def _is_mock_platform() -> bool:
+    return (
+        os.environ.get("INTELLEGY_GPIO_MOCK", "").lower() in {"1", "true", "yes"}
+        or os.environ.get("INTELLEGY_MOCK_GPIO", "").lower() in {"1", "true", "yes"}
+    )

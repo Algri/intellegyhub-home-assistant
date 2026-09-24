@@ -270,10 +270,12 @@ class ExtensionHardware:
         if _is_mock_platform():
             if not power_on:
                 return []
+            self._relay_shadows.setdefault(0x21, (1 << 0) | (1 << 2))
+            self._relay_shadows.setdefault(0x22, 1 << 1)
             return [
                 self._xdi16_module(0x20, True, None),
-                self._xdo8_module(0x21, True, None, relays={1: True, 2: False, 3: True}),
-                self._xdo8_module(0x22, True, None, relays={1: False, 2: True}),
+                self._xdo8_module(0x21, True, None),
+                self._xdo8_module(0x22, True, None),
             ]
         if not power_on:
             return []
@@ -301,7 +303,10 @@ class ExtensionHardware:
         if address not in self.xdo_addresses:
             raise ValueError("xDO-8 address is outside supported range 0x20-0x27")
         if _is_mock_platform():
-            return self._xdo8_module(address, True, None, relays={channel: on})
+            shadow = self._relay_shadows.get(address, 0)
+            bit = 1 << (channel - 1)
+            self._relay_shadows[address] = (shadow | bit) if on else (shadow & ~bit)
+            return self._xdo8_module(address, True, None)
         async with self._lock:
             shadow = self._relay_shadows.get(address, 0)
             bit = 1 << (channel - 1)
