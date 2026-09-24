@@ -23,11 +23,15 @@ class IntellegyHubGpioEntity(Entity):
 
     @property
     def device_info(self) -> DeviceInfo:
+        identity = self.manager.carrier.get("identity", {})
         return DeviceInfo(
             identifiers={(DOMAIN, DEVICE_IDENTIFIER)},
-            name="Controls",
-            manufacturer="IntellegyHub",
-            model="IntellegyHUB Controller",
+            name=_identity_text(identity, "model", "product", fallback="IHC-1400"),
+            manufacturer=_identity_text(identity, "manufacturer", fallback="IntellegyHUB"),
+            model="Automation Controller",
+            serial_number=_identity_text(identity, "serial_number"),
+            hw_version=_hardware_version(identity),
+            sw_version=_identity_text(identity, "software_version"),
         )
 
     async def async_added_to_hass(self) -> None:
@@ -103,6 +107,22 @@ def _onewire_bridge_title(bridge: dict) -> str:
     if match:
         return f"1-Wire Bus{match.group(1)}"
     return str(name)
+
+
+def _identity_text(identity: dict, *keys: str, fallback: str | None = None) -> str | None:
+    for key in keys:
+        value = identity.get(key)
+        if value not in (None, "", "--"):
+            return str(value)
+    return fallback
+
+
+def _hardware_version(identity: dict) -> str | None:
+    version = _identity_text(identity, "hardware_version")
+    revision = _identity_text(identity, "hardware_revision")
+    if version and revision:
+        return f"v{version.lstrip('v')} Rev.{revision.removeprefix('Rev.').removeprefix('Rev')}"
+    return version or revision
 
 
 def _xbus_slot(address: object) -> str:

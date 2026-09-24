@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.136
+
+- Show the controller identity passport in Home Assistant device metadata, including model, manufacturer, serial, hardware, and software versions.
+- Use lightbulb icons for X-Port PWM controls and DC icons for controller voltage diagnostics.
+
 ## 0.5.135
 
 - Update Home Assistant X-Port icons for AI, PWM, DI, and counter modes.

@@ -115,6 +115,7 @@ class IntellegyHubCarrierTemperatureSensor(IntellegyHubGpioEntity, SensorEntity)
 class IntellegyHubCarrierRailSensor(IntellegyHubGpioEntity, SensorEntity):
     _attr_translation_key = "carrier_rail_voltage"
     _attr_device_class = SensorDeviceClass.VOLTAGE
+    _attr_icon = "mdi:current-dc"
     _attr_native_unit_of_measurement = UnitOfElectricPotential.VOLT
     _attr_suggested_display_precision = 2
     _attr_state_class = SensorStateClass.MEASUREMENT

@@ -28,7 +28,7 @@ class IntellegyHubXPortPwmLight(IntellegyHubXPortEntity, LightEntity):
     _attr_translation_key = "xport_pwm"
     _attr_supported_color_modes = {ColorMode.BRIGHTNESS}
     _attr_color_mode = ColorMode.BRIGHTNESS
-    _attr_icon = "mdi:floor-lamp-outline"
+    _attr_icon = "mdi:lightbulb"
 
     def __init__(self, manager, channel: int) -> None:
         super().__init__(manager, channel)
