@@ -8,6 +8,10 @@ from pathlib import Path
 
 DEFAULT_OPTIONS_PATH = Path("/data/options.json")
 VALID_BIASES = {"pull_up", "pull_down", "disabled"}
+FIXED_LED_GPIO = 22
+FIXED_BUTTON_GPIO = 26
+FIXED_BUTTON_BIAS = "pull_up"
+FIXED_BUTTON_DEBOUNCE_MS = 50
 FIXED_OUTPUT_GPIOS = {
     "ste_gpio": 19,
     "err_gpio": 20,
@@ -29,6 +33,10 @@ class AppConfig:
     startup_buzzer_enabled: bool = False
     startup_buzzer_frequency: int = 2000
     startup_buzzer_duration_ms: int = 200
+    shutdown_buzzer_enabled: bool = True
+    shutdown_buzzer_frequency: int = 2000
+    shutdown_buzzer_duration_ms: int = 200
+    shutdown_buzzer_volume_percent: int = 50
     carrier_monitoring_poll_interval_seconds: int = 30
     onewire_bridge1_poll_interval_seconds: int = 30
     onewire_bridge2_poll_interval_seconds: int = 30
@@ -61,6 +69,15 @@ def _bool_option(options: dict, name: str, default: bool) -> bool:
     return bool(value)
 
 
+def _option(options: dict, name: str, default, *legacy_names: str):
+    if name in options:
+        return options[name]
+    for legacy_name in legacy_names:
+        if legacy_name in options:
+            return options[legacy_name]
+    return default
+
+
 def load_config(path: Path | None = None) -> AppConfig:
     inline_options = os.environ.get("INTELLEGY_ADDON_OPTIONS")
     options = json.loads(inline_options) if inline_options else _read_options(path or DEFAULT_OPTIONS_PATH)
@@ -71,18 +88,26 @@ def load_config(path: Path | None = None) -> AppConfig:
         or os.environ.get("INTELLEGY_MOCK_GPIO", "").lower() in {"1", "true", "yes"}
     )
     config = AppConfig(
-        led_gpio=int(options.get("led_gpio", 22)),
-        led_active_low=_bool_option(options, "led_active_low", False),
-        button_gpio=int(options.get("button_gpio", 26)),
-        button_active_low=_bool_option(options, "button_active_low", True),
-        button_bias=str(options.get("button_bias", "pull_up")),
-        button_debounce_ms=int(options.get("button_debounce_ms", 50)),
+        led_gpio=FIXED_LED_GPIO,
+        led_active_low=False,
+        button_gpio=FIXED_BUTTON_GPIO,
+        button_active_low=True,
+        button_bias=FIXED_BUTTON_BIAS,
+        button_debounce_ms=FIXED_BUTTON_DEBOUNCE_MS,
         startup_buzzer_enabled=_bool_option(options, "startup_buzzer_enabled", False),
         startup_buzzer_frequency=int(options.get("startup_buzzer_frequency", 2000)),
         startup_buzzer_duration_ms=int(options.get("startup_buzzer_duration_ms", 200)),
+        shutdown_buzzer_enabled=_bool_option(options, "shutdown_buzzer_enabled", True),
+        shutdown_buzzer_frequency=int(options.get("shutdown_buzzer_frequency", 2000)),
+        shutdown_buzzer_duration_ms=int(options.get("shutdown_buzzer_duration_ms", 200)),
+        shutdown_buzzer_volume_percent=int(options.get("shutdown_buzzer_volume_percent", 50)),
         carrier_monitoring_poll_interval_seconds=int(options.get("carrier_monitoring_poll_interval_seconds", 30)),
-        onewire_bridge1_poll_interval_seconds=int(options.get("onewire_bridge1_poll_interval_seconds", 30)),
-        onewire_bridge2_poll_interval_seconds=int(options.get("onewire_bridge2_poll_interval_seconds", 30)),
+        onewire_bridge1_poll_interval_seconds=int(
+            _option(options, "onewire_bus1_poll_interval_seconds", 30, "onewire_bridge1_poll_interval_seconds")
+        ),
+        onewire_bridge2_poll_interval_seconds=int(
+            _option(options, "onewire_bus2_poll_interval_seconds", 30, "onewire_bridge2_poll_interval_seconds")
+        ),
         power_button_shutdown_enabled=_bool_option(options, "power_button_shutdown_enabled", True),
         power_button_shutdown_hold_seconds=float(options.get("power_button_shutdown_hold_seconds", 1.0)),
         mock=mock,
@@ -114,11 +139,17 @@ def validate_config(config: AppConfig) -> None:
         raise ValueError("startup_buzzer_frequency must be between 20 and 2800")
     if not 10 <= config.startup_buzzer_duration_ms <= 5000:
         raise ValueError("startup_buzzer_duration_ms must be between 10 and 5000")
+    if not 300 <= config.shutdown_buzzer_frequency <= 2800:
+        raise ValueError("shutdown_buzzer_frequency must be between 300 and 2800")
+    if not 10 <= config.shutdown_buzzer_duration_ms <= 1000:
+        raise ValueError("shutdown_buzzer_duration_ms must be between 10 and 1000")
+    if not 0 <= config.shutdown_buzzer_volume_percent <= 100:
+        raise ValueError("shutdown_buzzer_volume_percent must be between 0 and 100")
     if not 1 <= config.carrier_monitoring_poll_interval_seconds <= 3600:
         raise ValueError("carrier_monitoring_poll_interval_seconds must be between 1 and 3600")
     if not 1 <= config.onewire_bridge1_poll_interval_seconds <= 3600:
-        raise ValueError("onewire_bridge1_poll_interval_seconds must be between 1 and 3600")
+        raise ValueError("onewire_bus1_poll_interval_seconds must be between 1 and 3600")
     if not 1 <= config.onewire_bridge2_poll_interval_seconds <= 3600:
-        raise ValueError("onewire_bridge2_poll_interval_seconds must be between 1 and 3600")
+        raise ValueError("onewire_bus2_poll_interval_seconds must be between 1 and 3600")
     if not 0.1 <= config.power_button_shutdown_hold_seconds <= 1.5:
         raise ValueError("power_button_shutdown_hold_seconds must be between 0.1 and 1.5")

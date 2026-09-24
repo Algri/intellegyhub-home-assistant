@@ -2,36 +2,39 @@ configuration:
   network:
     name: Network
     8098/tcp: Internal API port
-  led_gpio:
-    name: LED GPIO
-    description: GPIO line used by the onboard LED output.
-  led_active_low:
-    name: LED active low
-    description: Invert the onboard LED output logic.
-  button_gpio:
-    name: Button GPIO
-    description: GPIO line used by the physical button input.
-  button_active_low:
-    name: Button active low
-    description: Treat a low input level as a pressed button.
-  button_bias:
-    name: Button bias
-    description: Internal input bias for the physical button line.
-  button_debounce_ms:
-    name: Button debounce, ms
-    description: Debounce time for the physical button input.
+  carrier_monitoring_poll_interval_seconds:
+    name: Controller diagnostics polling interval, seconds
+    description: How often voltage rails, power fault status, and board temperature are refreshed.
+  onewire_bus1_poll_interval_seconds:
+    name: 1-Wire Bus 1 polling interval, seconds
+    description: How often temperature sensors on 1-Wire Bus 1 are refreshed.
+  onewire_bus2_poll_interval_seconds:
+    name: 1-Wire Bus 2 polling interval, seconds
+    description: How often temperature sensors on 1-Wire Bus 2 are refreshed.
+  power_button_shutdown_enabled:
+    name: Power button shutdown
+    description: Enable graceful host shutdown from the physical Power button.
+  power_button_shutdown_hold_seconds:
+    name: Power button hold time, seconds
+    description: How long the Power button must be held before shutdown starts.
   startup_buzzer_enabled:
     name: Startup buzzer
-    description: Play a short GPIO18 hardware PWM beep after the add-on starts.
+    description: Play a short beep after the add-on starts.
   startup_buzzer_frequency:
     name: Startup buzzer frequency, Hz
     description: Frequency used for the startup beep.
   startup_buzzer_duration_ms:
     name: Startup buzzer duration, ms
     description: Duration used for the startup beep.
-  onewire_bridge1_poll_interval_seconds:
-    name: 1-Wire Bridge 1 polling interval, seconds
-    description: DS18B20 polling interval for the DS2482S-100 bridge on I2C-10 address 0x1A.
-  onewire_bridge2_poll_interval_seconds:
-    name: 1-Wire Bridge 2 polling interval, seconds
-    description: DS18B20 polling interval for the DS2482S-100 bridge on I2C-10 address 0x1B.
+  shutdown_buzzer_enabled:
+    name: Shutdown buzzer
+    description: Play a confirmation beep before host shutdown.
+  shutdown_buzzer_frequency:
+    name: Shutdown buzzer frequency, Hz
+    description: Frequency used for the shutdown beep.
+  shutdown_buzzer_duration_ms:
+    name: Shutdown buzzer duration, ms
+    description: Duration used for the shutdown beep.
+  shutdown_buzzer_volume_percent:
+    name: Shutdown buzzer volume, %
+    description: Volume used for the shutdown beep.

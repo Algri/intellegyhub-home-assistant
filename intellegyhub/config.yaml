@@ -1,7 +1,7 @@
 name: IntellegyHUB
 slug: intellegyhub
 description: IntellegyHUB hardware runtime for Home Assistant native entities
-version: 0.5.142
+version: 0.5.143
 stage: experimental
 arch:
   - aarch64
@@ -29,32 +29,28 @@ map:
     read_only: false
     path: /ha_config
 options:
-  led_gpio: 22
-  led_active_low: false
-  button_gpio: 26
-  button_active_low: true
-  button_bias: pull_up
-  button_debounce_ms: 50
+  carrier_monitoring_poll_interval_seconds: 30
+  onewire_bus1_poll_interval_seconds: 30
+  onewire_bus2_poll_interval_seconds: 30
+  power_button_shutdown_enabled: true
+  power_button_shutdown_hold_seconds: 1.0
   startup_buzzer_enabled: false
   startup_buzzer_frequency: 2000
   startup_buzzer_duration_ms: 200
-  carrier_monitoring_poll_interval_seconds: 30
-  onewire_bridge1_poll_interval_seconds: 30
-  onewire_bridge2_poll_interval_seconds: 30
-  power_button_shutdown_enabled: true
-  power_button_shutdown_hold_seconds: 1.0
+  shutdown_buzzer_enabled: true
+  shutdown_buzzer_frequency: 2000
+  shutdown_buzzer_duration_ms: 200
+  shutdown_buzzer_volume_percent: 50
 schema:
-  led_gpio: int(0,53)
-  led_active_low: bool
-  button_gpio: int(0,53)
-  button_active_low: bool
-  button_bias: list(pull_up|pull_down|disabled)
-  button_debounce_ms: int(0,1000)
+  carrier_monitoring_poll_interval_seconds: int(1,3600)
+  onewire_bus1_poll_interval_seconds: int(1,3600)
+  onewire_bus2_poll_interval_seconds: int(1,3600)
+  power_button_shutdown_enabled: bool
+  power_button_shutdown_hold_seconds: float(0.1,1.5)
   startup_buzzer_enabled: bool
   startup_buzzer_frequency: int(20,2800)
   startup_buzzer_duration_ms: int(10,5000)
-  carrier_monitoring_poll_interval_seconds: int(1,3600)
-  onewire_bridge1_poll_interval_seconds: int(1,3600)
-  onewire_bridge2_poll_interval_seconds: int(1,3600)
-  power_button_shutdown_enabled: bool
-  power_button_shutdown_hold_seconds: float(0.1,1.5)
+  shutdown_buzzer_enabled: bool
+  shutdown_buzzer_frequency: int(300,2800)
+  shutdown_buzzer_duration_ms: int(10,1000)
+  shutdown_buzzer_volume_percent: int(0,100)

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.143
+
+- Simplify add-on options for IHC-1400 by hiding fixed low-level GPIO settings.
+- Rename visible 1-Wire polling options from bridge terminology to Bus 1 and Bus 2.
+- Improve option labels and descriptions for diagnostics, Power shutdown, and buzzer behavior.
+
 ## 0.5.142
 
 - Play the configured diagnostic buzzer and wait for it to finish before sending the Power button shutdown command.

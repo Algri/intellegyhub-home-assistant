@@ -7,7 +7,8 @@ The button edge listener runs outside the main asyncio loop. On each edge it wai
 The fixed Power input on GPIO17 is also exposed as a button state. If
 `power_button_shutdown_enabled` is enabled, pressing it starts a cancellable hold
 timer. Releasing it before `power_button_shutdown_hold_seconds` does nothing;
-holding it for the configured `0.1` to `1.5` seconds sends
+holding it for the configured `0.1` to `1.5` seconds optionally plays the
+separate `shutdown_buzzer_*` GPIO18 beep, waits for it to finish, and then sends
 `POST http://supervisor/host/shutdown` with the add-on `SUPERVISOR_TOKEN`.
 
 `GET /health` returns `200 {"status":"ok"}` when ready and `503` while startup or hardware initialization has failed.
@@ -20,7 +21,7 @@ in mock mode from the repository root:
 ```powershell
 python -m pip install -r requirements-local-ui.txt
 $env:INTELLEGY_GPIO_MOCK="1"
-$env:INTELLEGY_ADDON_OPTIONS='{"led_gpio":22,"led_active_low":false,"button_gpio":26,"button_active_low":true,"button_bias":"pull_up","button_debounce_ms":50}'
+$env:INTELLEGY_ADDON_OPTIONS='{"carrier_monitoring_poll_interval_seconds":30,"onewire_bus1_poll_interval_seconds":30,"onewire_bus2_poll_interval_seconds":30}'
 python -m uvicorn addon.app.main:app --host 127.0.0.1 --port 8098 --reload
 ```
 

@@ -44,7 +44,7 @@ python -m pytest
 ```powershell
 python -m pip install -r requirements-local-ui.txt
 $env:INTELLEGY_GPIO_MOCK="1"
-$env:INTELLEGY_ADDON_OPTIONS='{"led_gpio":22,"led_active_low":false,"button_gpio":26,"button_active_low":true,"button_bias":"pull_up","button_debounce_ms":50}'
+$env:INTELLEGY_ADDON_OPTIONS='{"carrier_monitoring_poll_interval_seconds":30,"onewire_bus1_poll_interval_seconds":30,"onewire_bus2_poll_interval_seconds":30}'
 python -m uvicorn addon.app.main:app --host 127.0.0.1 --port 8098 --reload
 ```
 
@@ -355,16 +355,22 @@ Open the three-dot menu and choose:
 Check for updates
 ```
 
-Find `IntellegyHUB` under local add-ons and install it. Open the add-on
-configuration tab and set:
+Find `IntellegyHUB` under local add-ons and install it. The default add-on
+configuration is ready for IHC-1400 hardware. Optional user-facing settings are:
 
 ```yaml
-led_gpio: 22
-led_active_low: false
-button_gpio: 26
-button_active_low: true
-button_bias: pull_up
-button_debounce_ms: 50
+carrier_monitoring_poll_interval_seconds: 30
+onewire_bus1_poll_interval_seconds: 30
+onewire_bus2_poll_interval_seconds: 30
+power_button_shutdown_enabled: true
+power_button_shutdown_hold_seconds: 1.0
+startup_buzzer_enabled: false
+startup_buzzer_frequency: 2000
+startup_buzzer_duration_ms: 200
+shutdown_buzzer_enabled: true
+shutdown_buzzer_frequency: 2000
+shutdown_buzzer_duration_ms: 200
+shutdown_buzzer_volume_percent: 50
 ```
 
 8. Start the add-on.

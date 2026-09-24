@@ -8,29 +8,30 @@ Install it from the local repository folder that contains root `repository.yaml`
 Default options:
 
 ```yaml
-led_gpio: 22
-led_active_low: false
-button_gpio: 26
-button_active_low: true
-button_bias: pull_up
-button_debounce_ms: 50
+carrier_monitoring_poll_interval_seconds: 30
+onewire_bus1_poll_interval_seconds: 30
+onewire_bus2_poll_interval_seconds: 30
+power_button_shutdown_enabled: true
+power_button_shutdown_hold_seconds: 1.0
 startup_buzzer_enabled: false
 startup_buzzer_frequency: 2000
 startup_buzzer_duration_ms: 200
-carrier_monitoring_poll_interval_seconds: 30
-onewire_bridge1_poll_interval_seconds: 30
-onewire_bridge2_poll_interval_seconds: 30
-power_button_shutdown_enabled: true
-power_button_shutdown_hold_seconds: 1.0
+shutdown_buzzer_enabled: true
+shutdown_buzzer_frequency: 2000
+shutdown_buzzer_duration_ms: 200
+shutdown_buzzer_volume_percent: 50
 ```
 
 When `startup_buzzer_enabled` is true, the add-on emits one short GPIO18
 hardware PWM beep after the runtime starts successfully.
 
-The 1-Wire bridge polling toggles in the Ingress UI enable or disable periodic
-DS18B20 temperature polling per DS2482S-100 bridge. The interval for each bridge
-is configured with `onewire_bridge1_poll_interval_seconds` and
-`onewire_bridge2_poll_interval_seconds`.
+When `shutdown_buzzer_enabled` is true, a confirmed Power button shutdown plays
+the configured GPIO18 shutdown beep first, waits until it finishes, and only then
+sends the host shutdown command.
+
+The 1-Wire polling toggles in the Ingress UI enable or disable periodic
+temperature polling per 1-Wire bus. The interval for each bus is configured with
+`onewire_bus1_poll_interval_seconds` and `onewire_bus2_poll_interval_seconds`.
 
 When `power_button_shutdown_enabled` is true, holding the physical Power input
 on GPIO17 for `power_button_shutdown_hold_seconds` requests a graceful HAOS host

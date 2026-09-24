@@ -27,6 +27,10 @@ class AppRuntime:
         startup_buzzer_enabled: bool = False,
         startup_buzzer_frequency: int = 2000,
         startup_buzzer_duration_ms: int = 200,
+        shutdown_buzzer_enabled: bool = True,
+        shutdown_buzzer_frequency: int = 2000,
+        shutdown_buzzer_duration_ms: int = 200,
+        shutdown_buzzer_volume_percent: int = 50,
         carrier_monitoring_poll_interval_seconds: int = 30,
         onewire_poll_intervals: dict[str, int] | None = None,
         power_button_shutdown_enabled: bool = True,
@@ -50,6 +54,10 @@ class AppRuntime:
         self._startup_buzzer_enabled = startup_buzzer_enabled
         self._startup_buzzer_frequency = startup_buzzer_frequency
         self._startup_buzzer_duration_ms = startup_buzzer_duration_ms
+        self._shutdown_buzzer_enabled = shutdown_buzzer_enabled
+        self._shutdown_buzzer_frequency = shutdown_buzzer_frequency
+        self._shutdown_buzzer_duration_ms = shutdown_buzzer_duration_ms
+        self._shutdown_buzzer_volume_percent = shutdown_buzzer_volume_percent
         self._started_at = time.monotonic()
         self._power_button_shutdown_enabled = power_button_shutdown_enabled
         self._power_button_shutdown_hold_seconds = power_button_shutdown_hold_seconds
@@ -101,23 +109,21 @@ class AppRuntime:
             self.buzzer.apply_settings(saved_settings)
 
     async def _play_power_shutdown_buzzer(self) -> None:
-        if not self._startup_buzzer_enabled:
+        if not self._shutdown_buzzer_enabled or self._shutdown_buzzer_volume_percent <= 0:
             return
         saved_settings = self.buzzer.settings()
-        if saved_settings.volume_percent <= 0:
-            return
         try:
             await self.buzzer.play_pwm_once(
-                saved_settings.frequency,
-                saved_settings.duration_ms,
-                volume_percent=saved_settings.volume_percent,
+                self._shutdown_buzzer_frequency,
+                self._shutdown_buzzer_duration_ms,
+                volume_percent=self._shutdown_buzzer_volume_percent,
             )
             await self.broadcast({"type": "power_button_shutdown_buzzer_played"})
             LOGGER.info(
                 "Power button shutdown buzzer played: frequency=%sHz duration_ms=%s volume=%s%%",
-                saved_settings.frequency,
-                saved_settings.duration_ms,
-                saved_settings.volume_percent,
+                self._shutdown_buzzer_frequency,
+                self._shutdown_buzzer_duration_ms,
+                self._shutdown_buzzer_volume_percent,
             )
         except Exception as exc:
             LOGGER.warning("Power button shutdown buzzer failed: %s", exc)
@@ -177,6 +183,10 @@ class AppRuntime:
                 "power_button_shutdown_enabled": self._power_button_shutdown_enabled,
                 "power_button_shutdown_hold_seconds": self._power_button_shutdown_hold_seconds,
                 "power_button_shutdown_requested": self._power_shutdown_requested,
+                "shutdown_buzzer_enabled": self._shutdown_buzzer_enabled,
+                "shutdown_buzzer_frequency": self._shutdown_buzzer_frequency,
+                "shutdown_buzzer_duration_ms": self._shutdown_buzzer_duration_ms,
+                "shutdown_buzzer_volume_percent": self._shutdown_buzzer_volume_percent,
             },
             "xport": self.xport.snapshot(),
             "extensions": self.extensions.snapshot(),
