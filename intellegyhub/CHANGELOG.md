@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.134
+
+- Refine the controller overview identity card layout with the restored logo mark, Automation Controller subtitle, and full-width identity divider.
+
 ## 0.5.133
 
 - Add complete mock data for the local add-on UI preview, including carrier monitoring, EEPROM identity, X-Port, expansion modules, and 1-Wire sensors.
