@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 I2C_SLAVE = 0x0703
-APP_VERSION = "0.5.139"
+APP_VERSION = "0.5.140"
 IDENTITY_EEPROM_ADDR = 0x50
 IDENTITY_EEPROM_OFFSET = 0x0000
 IDENTITY_REGION_SIZE = 1024
@@ -82,12 +82,12 @@ def _carrier_output(output_id: str, name: str, bit: int, port: str, pin: str) ->
 
 
 CARRIER_OUTPUTS: dict[str, CarrierOutputDefinition] = {
-    "rs485_ch1_termination": _carrier_output("rs485_ch1_termination", "RS-485 CH1 120 Ohm Termination", 10, "GPIOB", "GPB2"),
-    "rs485_ch2_termination": _carrier_output("rs485_ch2_termination", "RS-485 CH2 120 Ohm Termination", 13, "GPIOB", "GPB5"),
-    "xmod1_reset": _carrier_output("xmod1_reset", "XMOD1 Reset", 8, "GPIOB", "GPB0"),
-    "xmod1_flash_enable": _carrier_output("xmod1_flash_enable", "XMOD1 Flash / Enable", 9, "GPIOB", "GPB1"),
-    "xmod2_reset": _carrier_output("xmod2_reset", "XMOD2 Reset", 11, "GPIOB", "GPB3"),
-    "xmod2_flash_enable": _carrier_output("xmod2_flash_enable", "XMOD2 Flash / Enable", 12, "GPIOB", "GPB4"),
+    "rs485_ch1_termination": _carrier_output("rs485_ch1_termination", "RS-485 CH1 120R", 10, "GPIOB", "GPB2"),
+    "rs485_ch2_termination": _carrier_output("rs485_ch2_termination", "RS-485 CH2 120R", 13, "GPIOB", "GPB5"),
+    "xmod1_reset": _carrier_output("xmod1_reset", "X-Mod1 Reset", 8, "GPIOB", "GPB0"),
+    "xmod1_flash_enable": _carrier_output("xmod1_flash_enable", "X-Mod1 Flash/Enable", 9, "GPIOB", "GPB1"),
+    "xmod2_reset": _carrier_output("xmod2_reset", "X-Mod2 Reset", 11, "GPIOB", "GPB3"),
+    "xmod2_flash_enable": _carrier_output("xmod2_flash_enable", "X-Mod2 Flash/Enable", 12, "GPIOB", "GPB4"),
     "usb12_reset": _carrier_output("usb12_reset", "USB1/2 Reset", 1, "GPIOA", "GPA1"),
     "usb3_reset": _carrier_output("usb3_reset", "USB3 Reset", 2, "GPIOA", "GPA2"),
     "usb4_reset": _carrier_output("usb4_reset", "USB4 Reset", 3, "GPIOA", "GPA3"),

@@ -19,6 +19,7 @@ OUTPUTS = {
     "user_led": {"name": "USR LED", "gpio": 22, "active_low": False},
 }
 BUTTONS = {
+    "power": {"name": "Power", "gpio": 17, "active_low": True},
     "fn1": {"name": "FN1", "gpio": 27, "active_low": True},
     "fn2": {"name": "FN2", "gpio": 26, "active_low": True},
 }

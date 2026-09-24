@@ -16,6 +16,7 @@ FAULT_DEVICE_CLASS_PROBLEM = getattr(BinarySensorDeviceClass, "PROBLEM", "proble
 XDI16_INPUT_OPEN_ICON = "mdi:electric-switch"
 XDI16_INPUT_CLOSED_ICON = "mdi:electric-switch-closed"
 BUTTON_INPUT_ICON = "mdi:gesture-tap-button"
+POWER_INPUT_ICON = "mdi:power"
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
@@ -113,6 +114,8 @@ class IntellegyHubButtonSensor(IntellegyHubGpioEntity, BinarySensorEntity):
         self.button_id = button_id
         self._attr_unique_id = BUTTONS[button_id]["unique_id"]
         self._attr_name = BUTTONS[button_id]["name"]
+        if button_id == "power":
+            self._attr_icon = POWER_INPUT_ICON
 
     @property
     def is_on(self) -> bool:

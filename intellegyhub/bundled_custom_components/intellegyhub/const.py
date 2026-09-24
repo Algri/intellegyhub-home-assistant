@@ -14,33 +14,34 @@ OUTPUTS = {
     "user_led": {"name": "USR LED", "unique_id": UNIQUE_ID_LED},
 }
 BUTTONS = {
+    "power": {"name": "Power", "unique_id": "intellegyhub_button_power"},
     "fn1": {"name": "FN1", "unique_id": "intellegyhub_button_fn1"},
     "fn2": {"name": "FN2", "unique_id": UNIQUE_ID_BUTTON},
 }
 
 CARRIER_OUTPUTS = {
     "rs485_ch1_termination": {
-        "name": "RS-485 CH1 120Ω Termination",
+        "name": "RS-485 CH1 120R",
         "unique_id": "intellegyhub_carrier_rs485_ch1_termination",
     },
     "rs485_ch2_termination": {
-        "name": "RS-485 CH2 120Ω Termination",
+        "name": "RS-485 CH2 120R",
         "unique_id": "intellegyhub_carrier_rs485_ch2_termination",
     },
     "xmod1_flash_enable": {
-        "name": "XMOD1 Flash / Enable",
+        "name": "X-Mod1 Flash/Enable",
         "unique_id": "intellegyhub_carrier_xmod1_flash_enable",
     },
     "xmod1_reset": {
-        "name": "XMOD1 Reset",
+        "name": "X-Mod1 Reset",
         "unique_id": "intellegyhub_carrier_xmod1_reset",
     },
     "xmod2_flash_enable": {
-        "name": "XMOD2 Flash / Enable",
+        "name": "X-Mod2 Flash/Enable",
         "unique_id": "intellegyhub_carrier_xmod2_flash_enable",
     },
     "xmod2_reset": {
-        "name": "XMOD2 Reset",
+        "name": "X-Mod2 Reset",
         "unique_id": "intellegyhub_carrier_xmod2_reset",
     },
     "usb12_reset": {

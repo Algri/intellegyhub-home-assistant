@@ -186,7 +186,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.139 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
+                "Starting v0.5.140 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -221,7 +221,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.139", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.140", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 
@@ -565,7 +565,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .relay-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .state-text { min-width: 30px; text-align: right; color: var(--ha-secondary); font-size: 12px; font-weight: 800; letter-spacing: .04em; }
     .state-text.on { color: var(--ha-primary); }
-    .carrier-io-grid { display: grid; grid-template-columns: repeat(4, minmax(180px, 1fr)); gap: 16px; margin-top: 18px; }
+    .carrier-io-grid { display: grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 16px; margin-top: 18px; }
     .carrier-io-card { border: 1px solid var(--ha-card-border); border-radius: 12px; background: var(--ha-surface); padding: 16px; min-width: 0; }
     .carrier-io-title { font-size: 17px; font-weight: 800; margin-bottom: 14px; }
     .carrier-io-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; min-height: 42px; border: 1px solid var(--ha-row-border); border-radius: 8px; padding: 8px 10px; background: var(--ha-row); }
@@ -818,10 +818,10 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     <section class="extension-panel">
       <div class="module-row">
         <div>
-          <div class="eyebrow">Carrier I/O</div>
-          <h1>CARRIER</h1>
+          <div class="eyebrow">Carrier Board I/O</div>
+          <h1>CONTROLS</h1>
           <div class="subtitle">MCP23017 controlled carrier outputs</div>
-          <div id="carrier-io-status" class="status">CARRIER: loading...</div>
+          <div id="carrier-io-status" class="status">CONTROLS: loading...</div>
         </div>
         <div class="transport">I2C-10</div>
       </div>
@@ -1335,8 +1335,12 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         outputs: ['rs485_ch1_termination', 'rs485_ch2_termination']
       },
       {
-        title: 'XMOD',
-        outputs: ['xmod1_flash_enable', 'xmod1_reset', 'xmod2_flash_enable', 'xmod2_reset']
+        title: 'X-Mod1',
+        outputs: ['xmod1_flash_enable', 'xmod1_reset']
+      },
+      {
+        title: 'X-Mod2',
+        outputs: ['xmod2_flash_enable', 'xmod2_reset']
       },
       {
         title: 'USB',
@@ -1344,7 +1348,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       }
     ];
     const hostOutputOrder = ['ste', 'err', 'net', 'user_led'];
-    const hostButtonOrder = ['fn1', 'fn2'];
+    const hostButtonOrder = ['power', 'fn1', 'fn2'];
     function carrierOutputsById(carrier) {
       const result = {};
       for (const output of (carrier && carrier.outputs) || []) {
@@ -1358,32 +1362,39 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         const payload = await requestJson('api/v1/state');
         paintCarrierIO(payload.carrier, payload.outputs || {}, payload.buttons || {});
       } catch (error) {
-        document.getElementById('carrier-io-status').textContent = 'CARRIER: Error';
+        document.getElementById('carrier-io-status').textContent = 'CONTROLS: Error';
         output.textContent = JSON.stringify(error, null, 2);
         output.classList.add('visible');
       }
     }
     function paintCarrierIO(carrier, hostOutputs = {}, hostButtons = {}) {
       const online = Boolean(carrier && carrier.available);
-      document.getElementById('carrier-io-status').textContent = online ? 'CARRIER: online' : 'CARRIER: offline';
+      document.getElementById('carrier-io-status').textContent = online ? 'CONTROLS: online' : 'CONTROLS: offline';
       const byId = carrierOutputsById(carrier);
       const root = document.getElementById('carrier-io');
       root.innerHTML = '';
-      const hostCard = document.createElement('article');
-      hostCard.className = 'carrier-io-card';
-      const hostTitle = document.createElement('div');
-      hostTitle.className = 'carrier-io-title';
-      hostTitle.textContent = 'Host GPIO';
-      hostCard.appendChild(hostTitle);
+      const hostOutputCard = document.createElement('article');
+      hostOutputCard.className = 'carrier-io-card';
+      const hostOutputTitle = document.createElement('div');
+      hostOutputTitle.className = 'carrier-io-title';
+      hostOutputTitle.textContent = 'Host Outputs';
+      hostOutputCard.appendChild(hostOutputTitle);
       for (const outputId of hostOutputOrder) {
         const item = hostOutputs[outputId] || { id: outputId, name: outputId, on: false };
-        hostCard.appendChild(hostOutputRow(item));
+        hostOutputCard.appendChild(hostOutputRow(item));
       }
+      root.appendChild(hostOutputCard);
+      const hostInputCard = document.createElement('article');
+      hostInputCard.className = 'carrier-io-card';
+      const hostInputTitle = document.createElement('div');
+      hostInputTitle.className = 'carrier-io-title';
+      hostInputTitle.textContent = 'Host Inputs';
+      hostInputCard.appendChild(hostInputTitle);
       for (const buttonId of hostButtonOrder) {
         const item = hostButtons[buttonId] || { id: buttonId, name: buttonId.toUpperCase(), pressed: false };
-        hostCard.appendChild(hostButtonRow(item));
+        hostInputCard.appendChild(hostButtonRow(item));
       }
-      root.appendChild(hostCard);
+      root.appendChild(hostInputCard);
       for (const group of carrierGroups) {
         const card = document.createElement('article');
         card.className = 'carrier-io-card';
@@ -1396,7 +1407,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           const row = document.createElement('div');
           row.className = 'carrier-io-row';
           const label = document.createElement('span');
-          label.textContent = item.name;
+          label.textContent = carrierGroupItemLabel(group.title, item.name);
           const state = document.createElement('span');
           state.className = `state-text ${item.on ? 'on' : ''}`;
           state.textContent = item.on ? 'ON' : 'OFF';
@@ -1411,6 +1422,10 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         }
         root.appendChild(card);
       }
+    }
+    function carrierGroupItemLabel(groupTitle, itemName) {
+      const prefix = `${groupTitle} `;
+      return String(itemName || '').startsWith(prefix) ? String(itemName).slice(prefix.length) : itemName;
     }
     function hostOutputRow(item) {
       const row = document.createElement('div');

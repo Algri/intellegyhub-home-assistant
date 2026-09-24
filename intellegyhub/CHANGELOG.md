@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.140
+
+- Add the physical Power input on GPIO17 to the add-on state, WebSocket events, and Home Assistant binary sensors.
+- Rework Carrier Board I/O as Controls with separate Host Outputs, Host Inputs, RS-485, X-Mod1, X-Mod2, and USB cards.
+- Shorten RS-485 and X-Mod control labels in the add-on UI and Home Assistant integration.
+
 ## 0.5.139
 
 - Fix mock xDO-8 relay state so toggling one relay no longer resets another relay.
