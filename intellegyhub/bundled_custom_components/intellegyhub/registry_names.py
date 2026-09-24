@@ -145,7 +145,8 @@ def compact_device_name(identifiers: object) -> str | None:
         if xbus_match:
             kind, address = xbus_match.groups()
             model = "xDO-8" if kind == "xdo8" else "xDI-16"
-            return f"0x{address.upper()} {model}"
+            slot = int(address, 16) - 0x20
+            return f"X-Bus{slot} {model}"
     return None
 
 

@@ -105,6 +105,21 @@ def _onewire_bridge_title(bridge: dict) -> str:
     return str(name)
 
 
+def _xbus_slot(address: object) -> str:
+    try:
+        return str(int(str(address), 16) - 0x20)
+    except (TypeError, ValueError):
+        return "?"
+
+
+def _xbus_module_title(address: object, model: str) -> str:
+    return f"X-Bus{_xbus_slot(address)} {model}"
+
+
+def _xbus_module_model(address: object, model: str) -> str:
+    return f"{model} {address or 'unknown'}"
+
+
 class IntellegyHubXDo8Entity(IntellegyHubGpioEntity):
     _attr_has_entity_name = True
 
@@ -131,9 +146,9 @@ class IntellegyHubXDo8Entity(IntellegyHubGpioEntity):
         address = module.get("address", "unknown")
         return DeviceInfo(
             identifiers={(DOMAIN, self.module_id)},
-            name=f"{address} xDO-8",
+            name=_xbus_module_title(address, "xDO-8"),
             manufacturer="IntellegyHub",
-            model="xDO-8",
+            model=_xbus_module_model(address, "xDO-8"),
             via_device_id=_parent_device_id(self, self.manager),
         )
 
@@ -164,9 +179,9 @@ class IntellegyHubXDi16Entity(IntellegyHubGpioEntity):
         address = module.get("address", "unknown")
         return DeviceInfo(
             identifiers={(DOMAIN, self.module_id)},
-            name=f"{address} xDI-16",
+            name=_xbus_module_title(address, "xDI-16"),
             manufacturer="IntellegyHub",
-            model="xDI-16",
+            model=_xbus_module_model(address, "xDI-16"),
             via_device_id=_parent_device_id(self, self.manager),
         )
 

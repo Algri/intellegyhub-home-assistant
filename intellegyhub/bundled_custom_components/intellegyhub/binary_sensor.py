@@ -158,7 +158,6 @@ class IntellegyHubCarrierFaultSensor(IntellegyHubGpioEntity, BinarySensorEntity)
 
 class IntellegyHubXPortDiSensor(IntellegyHubXPortEntity, BinarySensorEntity):
     _attr_translation_key = "xport_di"
-    _attr_device_class = BinarySensorDeviceClass.OCCUPANCY
 
     def __init__(self, manager, channel: int) -> None:
         super().__init__(manager, channel)
@@ -168,6 +167,14 @@ class IntellegyHubXPortDiSensor(IntellegyHubXPortEntity, BinarySensorEntity):
     @property
     def available(self) -> bool:
         return self.available_for_modes(XPORT_MODE_DI)
+
+    @property
+    def device_class(self) -> str | None:
+        return None
+
+    @property
+    def icon(self) -> str:
+        return XDI16_INPUT_CLOSED_ICON if self.is_on else XDI16_INPUT_OPEN_ICON
 
     @property
     def is_on(self) -> bool:

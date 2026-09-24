@@ -39,6 +39,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
 class IntellegyHubXPortPwmNumber(IntellegyHubXPortEntity, NumberEntity):
     _attr_translation_key = "xport_pwm"
+    _attr_icon = "mdi:brightness-percent"
     _attr_native_min_value = 0
     _attr_native_max_value = 100
     _attr_native_step = 1

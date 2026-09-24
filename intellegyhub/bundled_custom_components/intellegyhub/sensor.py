@@ -156,6 +156,7 @@ class IntellegyHubCarrierRailSensor(IntellegyHubGpioEntity, SensorEntity):
 class IntellegyHubXPortAiSensor(IntellegyHubXPortEntity, SensorEntity):
     _attr_translation_key = "xport_ai"
     _attr_device_class = SensorDeviceClass.VOLTAGE
+    _attr_icon = "mdi:current-dc"
     _attr_native_unit_of_measurement = UnitOfElectricPotential.VOLT
     _attr_suggested_display_precision = 3
     _attr_state_class = SensorStateClass.MEASUREMENT
@@ -176,6 +177,7 @@ class IntellegyHubXPortAiSensor(IntellegyHubXPortEntity, SensorEntity):
 
 class IntellegyHubXPortCounterSensor(IntellegyHubXPortEntity, SensorEntity):
     _attr_translation_key = "xport_counter"
+    _attr_icon = "mdi:electric-switch"
     _attr_native_unit_of_measurement = "pulses"
     _attr_state_class = SensorStateClass.TOTAL_INCREASING
 

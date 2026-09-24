@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.135
+
+- Update Home Assistant X-Port icons for AI, PWM, DI, and counter modes.
+- Rename X-Bus module devices to slot-style names such as `X-Bus0 xDI-16` while keeping the module address in the device model.
+
 ## 0.5.134
 
 - Refine the controller overview identity card layout with the restored logo mark, Automation Controller subtitle, and full-width identity divider.

@@ -26,6 +26,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
 class IntellegyHubXPortCounterResetButton(IntellegyHubXPortEntity, ButtonEntity):
     _attr_translation_key = "xport_counter_reset"
+    _attr_icon = "mdi:electric-switch"
 
     def __init__(self, manager, channel: int) -> None:
         super().__init__(manager, channel)
