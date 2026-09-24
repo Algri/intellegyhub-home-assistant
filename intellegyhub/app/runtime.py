@@ -73,6 +73,7 @@ class AppRuntime:
     async def _play_startup_buzzer(self) -> None:
         if not self._startup_buzzer_enabled:
             return
+        saved_settings = self.buzzer.settings()
         try:
             await self.buzzer.play_pwm_once(
                 self._startup_buzzer_frequency,
@@ -86,6 +87,8 @@ class AppRuntime:
             )
         except Exception as exc:
             LOGGER.warning("Startup buzzer failed: %s", exc)
+        finally:
+            self.buzzer.apply_settings(saved_settings)
 
     async def stop(self) -> None:
         self.ready = False

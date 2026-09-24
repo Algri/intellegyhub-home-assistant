@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.138
+
+- Keep the startup buzzer using add-on config values without overwriting persisted diagnostic buzzer settings after restart.
+
 ## 0.5.137
 
 - Persist diagnostic buzzer settings after successful play/test actions so UI changes survive add-on restart.
