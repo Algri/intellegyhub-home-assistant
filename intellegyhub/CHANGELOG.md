@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.137
+
+- Persist diagnostic buzzer settings after successful play/test actions so UI changes survive add-on restart.
+- Update the hardware coverage backlog to mark completed EEPROM and buzzer work and separate hardware-pending validation.
+
 ## 0.5.136
 
 - Show the controller identity passport in Home Assistant device metadata, including model, manufacturer, serial, hardware, and software versions.

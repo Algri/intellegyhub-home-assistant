@@ -118,7 +118,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.136 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
+                "Starting v0.5.137 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -153,7 +153,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.136", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.137", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 
@@ -1995,6 +1995,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         try:
             current = runtime_or_503()
             result = await current.buzzer.test_configured_pwm()
+            await current.buzzer_store.save(current.buzzer.settings())
             await current.broadcast({"type": "buzzer_changed", "buzzer": current.buzzer.status()})
             return result
         except ValueError as exc:
@@ -2014,6 +2015,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 payload.duty,
                 payload.volume_percent,
             )
+            await current.buzzer_store.save(current.buzzer.settings())
             await current.broadcast({"type": "buzzer_changed", "buzzer": current.buzzer.status()})
             return result
         except ValueError as exc:
@@ -2041,6 +2043,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 payload.duty,
                 payload.volume_percent,
             )
+            await current.buzzer_store.save(current.buzzer.settings())
             await current.broadcast({"type": "buzzer_changed", "buzzer": current.buzzer.status()})
             return result
         except ValueError as exc:
