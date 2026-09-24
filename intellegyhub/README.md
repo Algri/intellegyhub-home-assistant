@@ -17,8 +17,11 @@ button_debounce_ms: 50
 startup_buzzer_enabled: false
 startup_buzzer_frequency: 2000
 startup_buzzer_duration_ms: 200
+carrier_monitoring_poll_interval_seconds: 30
 onewire_bridge1_poll_interval_seconds: 30
 onewire_bridge2_poll_interval_seconds: 30
+power_button_shutdown_enabled: true
+power_button_shutdown_hold_seconds: 1.0
 ```
 
 When `startup_buzzer_enabled` is true, the add-on emits one short GPIO18
@@ -28,6 +31,11 @@ The 1-Wire bridge polling toggles in the Ingress UI enable or disable periodic
 DS18B20 temperature polling per DS2482S-100 bridge. The interval for each bridge
 is configured with `onewire_bridge1_poll_interval_seconds` and
 `onewire_bridge2_poll_interval_seconds`.
+
+When `power_button_shutdown_enabled` is true, holding the physical Power input
+on GPIO17 for `power_button_shutdown_hold_seconds` requests a graceful HAOS host
+shutdown through the Home Assistant Supervisor API. The hold time is configurable
+from `0.1` to `1.5` seconds and defaults to `1.0` second.
 
 The service listens inside the Home Assistant internal app network on port `8098`.
 For a local repository install, Home Assistant Core should reach it at:

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from fastapi import WebSocket
@@ -12,6 +13,7 @@ from .buzzer import BuzzerManager, BuzzerSettingsStore
 from .carrier import CarrierManager
 from .extensions import ExtensionHardware, ExtensionManager
 from .onewire import OneWireHardware, OneWireManager
+from .supervisor import shutdown_host
 from .ui_settings import UiSettings, UiSettingsStore, UiTheme
 from .xport import XPortManager
 
@@ -27,6 +29,9 @@ class AppRuntime:
         startup_buzzer_duration_ms: int = 200,
         carrier_monitoring_poll_interval_seconds: int = 30,
         onewire_poll_intervals: dict[str, int] | None = None,
+        power_button_shutdown_enabled: bool = True,
+        power_button_shutdown_hold_seconds: float = 1.0,
+        shutdown_host_callback: Callable[[], Awaitable[None]] | None = None,
     ) -> None:
         self.backend = backend
         self.carrier = CarrierManager(monitoring_interval_seconds=carrier_monitoring_poll_interval_seconds)
@@ -46,6 +51,11 @@ class AppRuntime:
         self._startup_buzzer_frequency = startup_buzzer_frequency
         self._startup_buzzer_duration_ms = startup_buzzer_duration_ms
         self._started_at = time.monotonic()
+        self._power_button_shutdown_enabled = power_button_shutdown_enabled
+        self._power_button_shutdown_hold_seconds = power_button_shutdown_hold_seconds
+        self._shutdown_host_callback = shutdown_host_callback or shutdown_host
+        self._power_shutdown_task: asyncio.Task[None] | None = None
+        self._power_shutdown_requested = False
 
     async def start(self) -> None:
         try:
@@ -92,6 +102,13 @@ class AppRuntime:
 
     async def stop(self) -> None:
         self.ready = False
+        if self._power_shutdown_task:
+            self._power_shutdown_task.cancel()
+            try:
+                await self._power_shutdown_task
+            except asyncio.CancelledError:
+                pass
+            self._power_shutdown_task = None
         await self.buzzer.stop()
         await self.onewire.stop()
         await self.extensions.stop()
@@ -133,6 +150,9 @@ class AppRuntime:
             "carrier": self.carrier.snapshot(),
             "app": {
                 "uptime_seconds": max(0, int(time.monotonic() - self._started_at)),
+                "power_button_shutdown_enabled": self._power_button_shutdown_enabled,
+                "power_button_shutdown_hold_seconds": self._power_button_shutdown_hold_seconds,
+                "power_button_shutdown_requested": self._power_shutdown_requested,
             },
             "xport": self.xport.snapshot(),
             "extensions": self.extensions.snapshot(),
@@ -214,6 +234,42 @@ class AppRuntime:
                     "pressed": pressed,
                 }
             )
+        self._handle_power_button_shutdown_hold(button_id, pressed)
+
+    def _handle_power_button_shutdown_hold(self, button_id: str, pressed: bool) -> None:
+        if button_id != "power":
+            return
+        if not self._power_button_shutdown_enabled:
+            return
+        if pressed:
+            if self._power_shutdown_task and not self._power_shutdown_task.done():
+                return
+            self._power_shutdown_task = asyncio.create_task(self._request_shutdown_after_power_hold())
+            return
+        if self._power_shutdown_task and not self._power_shutdown_task.done():
+            self._power_shutdown_task.cancel()
+
+    async def _request_shutdown_after_power_hold(self) -> None:
+        try:
+            await asyncio.sleep(self._power_button_shutdown_hold_seconds)
+            if not bool((self.state.buttons or {}).get("power", False)):
+                return
+            self._power_shutdown_requested = True
+            event = {
+                "type": "power_button_shutdown_requested",
+                "hold_seconds": self._power_button_shutdown_hold_seconds,
+            }
+            await self.broadcast(event)
+            LOGGER.warning(
+                "Power button held for %.1fs; requesting Supervisor host shutdown",
+                self._power_button_shutdown_hold_seconds,
+            )
+            await self._shutdown_host_callback()
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            LOGGER.exception("Power button shutdown request failed")
+            await self.broadcast({"type": "power_button_shutdown_failed", "error": str(exc)})
 
     async def add_client(self, websocket: WebSocket) -> None:
         await websocket.accept()

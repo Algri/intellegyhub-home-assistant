@@ -1,7 +1,7 @@
 name: IntellegyHUB
 slug: intellegyhub
 description: IntellegyHUB hardware runtime for Home Assistant native entities
-version: 0.5.140
+version: 0.5.141
 stage: experimental
 arch:
   - aarch64
@@ -12,7 +12,7 @@ ingress: true
 ingress_port: 8098
 panel_icon: mdi:chip
 hassio_api: true
-hassio_role: default
+hassio_role: manager
 full_access: true
 gpio: true
 privileged:
@@ -41,6 +41,8 @@ options:
   carrier_monitoring_poll_interval_seconds: 30
   onewire_bridge1_poll_interval_seconds: 30
   onewire_bridge2_poll_interval_seconds: 30
+  power_button_shutdown_enabled: true
+  power_button_shutdown_hold_seconds: 1.0
 schema:
   led_gpio: int(0,53)
   led_active_low: bool
@@ -54,3 +56,5 @@ schema:
   carrier_monitoring_poll_interval_seconds: int(1,3600)
   onewire_bridge1_poll_interval_seconds: int(1,3600)
   onewire_bridge2_poll_interval_seconds: int(1,3600)
+  power_button_shutdown_enabled: bool
+  power_button_shutdown_hold_seconds: float(0.1,1.5)

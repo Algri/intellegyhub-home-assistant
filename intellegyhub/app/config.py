@@ -32,6 +32,8 @@ class AppConfig:
     carrier_monitoring_poll_interval_seconds: int = 30
     onewire_bridge1_poll_interval_seconds: int = 30
     onewire_bridge2_poll_interval_seconds: int = 30
+    power_button_shutdown_enabled: bool = True
+    power_button_shutdown_hold_seconds: float = 1.0
     chip_path: str = "/dev/gpiochip0"
     mock: bool = False
 
@@ -46,6 +48,19 @@ def _read_options(path: Path) -> dict:
     return data
 
 
+def _bool_option(options: dict, name: str, default: bool) -> bool:
+    value = options.get(name, default)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "off"}:
+            return False
+    return bool(value)
+
+
 def load_config(path: Path | None = None) -> AppConfig:
     inline_options = os.environ.get("INTELLEGY_ADDON_OPTIONS")
     options = json.loads(inline_options) if inline_options else _read_options(path or DEFAULT_OPTIONS_PATH)
@@ -57,17 +72,19 @@ def load_config(path: Path | None = None) -> AppConfig:
     )
     config = AppConfig(
         led_gpio=int(options.get("led_gpio", 22)),
-        led_active_low=bool(options.get("led_active_low", False)),
+        led_active_low=_bool_option(options, "led_active_low", False),
         button_gpio=int(options.get("button_gpio", 26)),
-        button_active_low=bool(options.get("button_active_low", True)),
+        button_active_low=_bool_option(options, "button_active_low", True),
         button_bias=str(options.get("button_bias", "pull_up")),
         button_debounce_ms=int(options.get("button_debounce_ms", 50)),
-        startup_buzzer_enabled=bool(options.get("startup_buzzer_enabled", False)),
+        startup_buzzer_enabled=_bool_option(options, "startup_buzzer_enabled", False),
         startup_buzzer_frequency=int(options.get("startup_buzzer_frequency", 2000)),
         startup_buzzer_duration_ms=int(options.get("startup_buzzer_duration_ms", 200)),
         carrier_monitoring_poll_interval_seconds=int(options.get("carrier_monitoring_poll_interval_seconds", 30)),
         onewire_bridge1_poll_interval_seconds=int(options.get("onewire_bridge1_poll_interval_seconds", 30)),
         onewire_bridge2_poll_interval_seconds=int(options.get("onewire_bridge2_poll_interval_seconds", 30)),
+        power_button_shutdown_enabled=_bool_option(options, "power_button_shutdown_enabled", True),
+        power_button_shutdown_hold_seconds=float(options.get("power_button_shutdown_hold_seconds", 1.0)),
         mock=mock,
     )
     validate_config(config)
@@ -103,3 +120,5 @@ def validate_config(config: AppConfig) -> None:
         raise ValueError("onewire_bridge1_poll_interval_seconds must be between 1 and 3600")
     if not 1 <= config.onewire_bridge2_poll_interval_seconds <= 3600:
         raise ValueError("onewire_bridge2_poll_interval_seconds must be between 1 and 3600")
+    if not 0.1 <= config.power_button_shutdown_hold_seconds <= 1.5:
+        raise ValueError("power_button_shutdown_hold_seconds must be between 0.1 and 1.5")

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.141
+
+- Add configurable Power button hold-to-shutdown through the Home Assistant Supervisor API.
+- Expose add-on options to enable or disable Power shutdown and set the hold time from 0.1 to 1.5 seconds.
+
 ## 0.5.140
 
 - Add the physical Power input on GPIO17 to the add-on state, WebSocket events, and Home Assistant binary sensors.

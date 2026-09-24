@@ -186,7 +186,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.140 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s mock=%s port=8098",
+                "Starting v0.5.141 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s startup_buzzer_frequency=%s startup_buzzer_duration_ms=%s carrier_monitoring_poll_interval_seconds=%s onewire_bridge1_poll_interval_seconds=%s onewire_bridge2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -200,6 +200,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 config.carrier_monitoring_poll_interval_seconds,
                 config.onewire_bridge1_poll_interval_seconds,
                 config.onewire_bridge2_poll_interval_seconds,
+                config.power_button_shutdown_enabled,
+                config.power_button_shutdown_hold_seconds,
                 config.mock,
             )
             LOGGER.info("Visible devices: %s", collect_device_diagnostics())
@@ -214,6 +216,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                     "onewire_bus10_addr1a": config.onewire_bridge1_poll_interval_seconds,
                     "onewire_bus10_addr1b": config.onewire_bridge2_poll_interval_seconds,
                 },
+                power_button_shutdown_enabled=config.power_button_shutdown_enabled,
+                power_button_shutdown_hold_seconds=config.power_button_shutdown_hold_seconds,
             )
         await app.state.runtime.start()
         try:
@@ -221,7 +225,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.140", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.141", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 

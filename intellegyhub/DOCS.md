@@ -4,6 +4,12 @@ Startup reads `/data/options.json`, validates GPIO offsets, rejects identical LE
 
 The button edge listener runs outside the main asyncio loop. On each edge it waits for the configured debounce interval, samples the final logical button state, and emits one state transition if the stable value changed.
 
+The fixed Power input on GPIO17 is also exposed as a button state. If
+`power_button_shutdown_enabled` is enabled, pressing it starts a cancellable hold
+timer. Releasing it before `power_button_shutdown_hold_seconds` does nothing;
+holding it for the configured `0.1` to `1.5` seconds sends
+`POST http://supervisor/host/shutdown` with the add-on `SUPERVISOR_TOKEN`.
+
 `GET /health` returns `200 {"status":"ok"}` when ready and `503` while startup or hardware initialization has failed.
 
 ## Local UI Preview On Windows
