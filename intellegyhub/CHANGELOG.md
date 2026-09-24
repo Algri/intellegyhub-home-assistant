@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.142
+
+- Play the configured diagnostic buzzer and wait for it to finish before sending the Power button shutdown command.
+
 ## 0.5.141
 
 - Add configurable Power button hold-to-shutdown through the Home Assistant Supervisor API.

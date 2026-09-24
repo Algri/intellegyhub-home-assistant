@@ -100,6 +100,30 @@ class AppRuntime:
         finally:
             self.buzzer.apply_settings(saved_settings)
 
+    async def _play_power_shutdown_buzzer(self) -> None:
+        if not self._startup_buzzer_enabled:
+            return
+        saved_settings = self.buzzer.settings()
+        if saved_settings.volume_percent <= 0:
+            return
+        try:
+            await self.buzzer.play_pwm_once(
+                saved_settings.frequency,
+                saved_settings.duration_ms,
+                volume_percent=saved_settings.volume_percent,
+            )
+            await self.broadcast({"type": "power_button_shutdown_buzzer_played"})
+            LOGGER.info(
+                "Power button shutdown buzzer played: frequency=%sHz duration_ms=%s volume=%s%%",
+                saved_settings.frequency,
+                saved_settings.duration_ms,
+                saved_settings.volume_percent,
+            )
+        except Exception as exc:
+            LOGGER.warning("Power button shutdown buzzer failed: %s", exc)
+        finally:
+            self.buzzer.apply_settings(saved_settings)
+
     async def stop(self) -> None:
         self.ready = False
         if self._power_shutdown_task:
@@ -264,6 +288,7 @@ class AppRuntime:
                 "Power button held for %.1fs; requesting Supervisor host shutdown",
                 self._power_button_shutdown_hold_seconds,
             )
+            await self._play_power_shutdown_buzzer()
             await self._shutdown_host_callback()
         except asyncio.CancelledError:
             raise
