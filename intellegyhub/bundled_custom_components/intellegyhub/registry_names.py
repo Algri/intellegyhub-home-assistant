@@ -32,10 +32,12 @@ STATIC_ENTITY_DASHBOARD_NAMES: dict[str, str] = {
     "intellegyhub_buzzer_volume": "Buzzer Volume",
     "intellegyhub_buzzer_volume_light": "Buzzer Volume",
     "intellegyhub_buzzer_play": "Buzzer Play",
+    "intellegyhub_xport_rgbw": "X-Port RGBW",
 }
 
 STATIC_ENTITY_IDS: dict[str, str] = {
     "intellegyhub_buzzer_volume_light": "light.intellegyhub_buzzer_volume_light",
+    "intellegyhub_xport_rgbw": "light.intellegyhub_xport_rgbw",
 }
 
 XPORT_ENTITY_SUFFIX_NAMES = {

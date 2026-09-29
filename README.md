@@ -56,6 +56,138 @@ Open:
 http://127.0.0.1:8098/
 ```
 
+## Run Mock UI From The Git Repository Folder
+
+The publishable Home Assistant repository checkout has a different layout from
+this development workspace. If you are testing from:
+
+```text
+C:\Users\Algri\Documents\GitHub\intellegyhub-home-assistant
+```
+
+run the backend from the add-on subfolder:
+
+```text
+C:\Users\Algri\Documents\GitHub\intellegyhub-home-assistant\intellegyhub
+```
+
+In that folder the Uvicorn app path is:
+
+```text
+app.main:app
+```
+
+Do not use `addon.app.main:app` there; that path is only for this development
+workspace.
+
+### Windows cmd.exe
+
+Open `cmd.exe` and run:
+
+```bat
+cd C:\Users\Algri\Documents\GitHub\intellegyhub-home-assistant\intellegyhub
+
+python -m pip install fastapi "uvicorn[standard]" pydantic pigpio
+
+set INTELLEGY_GPIO_MOCK=1
+set INTELLEGY_ADDON_OPTIONS={"diagnostics":{"carrier_monitoring_poll_interval_seconds":30},"onewire":{"bus1_poll_interval_seconds":30,"bus2_poll_interval_seconds":30},"power_button":{"shutdown_enabled":true,"shutdown_hold_seconds":1.0},"buzzer":{"startup_enabled":false,"shutdown_enabled":true,"frequency":2000,"duration_ms":200}}
+
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8098 --reload
+```
+
+Use plain underscores in environment variable names:
+
+```text
+INTELLEGY_GPIO_MOCK
+```
+
+Do not type escaped Markdown underscores like:
+
+```text
+INTELLEGY\_GPIO\_MOCK
+```
+
+### Windows PowerShell
+
+Open PowerShell and run:
+
+```powershell
+cd C:\Users\Algri\Documents\GitHub\intellegyhub-home-assistant\intellegyhub
+
+python -m pip install fastapi "uvicorn[standard]" pydantic pigpio
+
+$env:INTELLEGY_GPIO_MOCK="1"
+$env:INTELLEGY_ADDON_OPTIONS='{"diagnostics":{"carrier_monitoring_poll_interval_seconds":30},"onewire":{"bus1_poll_interval_seconds":30,"bus2_poll_interval_seconds":30},"power_button":{"shutdown_enabled":true,"shutdown_hold_seconds":1.0},"buzzer":{"startup_enabled":false,"shutdown_enabled":true,"frequency":2000,"duration_ms":200}}'
+
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8098 --reload
+```
+
+Open:
+
+```text
+http://127.0.0.1:8098/
+```
+
+If port `8098` is already busy, use another port, for example:
+
+```powershell
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8099 --reload
+```
+
+### macOS
+
+Open Terminal and go to the add-on folder inside the git checkout. Adjust the
+path if the repository is in another directory:
+
+```sh
+cd ~/Documents/GitHub/intellegyhub-home-assistant/intellegyhub
+```
+
+Check whether Python 3 is installed:
+
+```sh
+python3 --version
+```
+
+If Python 3 is missing and Homebrew is already installed:
+
+```sh
+brew install python
+```
+
+If Homebrew is missing too, install Homebrew first, then Python:
+
+```sh
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+brew install python
+```
+
+Install only the packages needed for local mock preview:
+
+```sh
+python3 -m pip install fastapi "uvicorn[standard]" pydantic pigpio
+```
+
+Do not install the add-on `requirements.txt` just to preview the UI on macOS.
+It contains the Linux/HAOS hardware dependency used in the add-on container.
+
+Start the mock backend:
+
+```sh
+export INTELLEGY_GPIO_MOCK=1
+export INTELLEGY_ADDON_OPTIONS='{"diagnostics":{"carrier_monitoring_poll_interval_seconds":30},"onewire":{"bus1_poll_interval_seconds":30,"bus2_poll_interval_seconds":30},"power_button":{"shutdown_enabled":true,"shutdown_hold_seconds":1.0},"buzzer":{"startup_enabled":false,"shutdown_enabled":true,"frequency":2000,"duration_ms":200}}'
+
+python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8098 --reload
+```
+
+Open:
+
+```text
+http://127.0.0.1:8098/
+```
+
+Stop the local server with `Ctrl+C`.
+
 4. In another PowerShell window, check the REST API:
 
 ```powershell

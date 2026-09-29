@@ -18,7 +18,7 @@ from .backends import MockGpioBackend, RealGpiodBackend
 from .carrier import APP_VERSION
 from .config import load_config
 from .runtime import AppRuntime
-from .xport import XPortMode
+from .xport import XPortGroupMode, XPortMode
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 LOGGER = logging.getLogger("intellegyhub")
@@ -37,6 +37,10 @@ class OutputPayload(BaseModel):
 class XPortModePayload(BaseModel):
     mode: XPortMode
     revision: int | None = None
+
+
+class XPortGroupModePayload(BaseModel):
+    mode: XPortGroupMode
 
 
 class XPortValuePayload(BaseModel):
@@ -186,7 +190,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.144 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.145 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -227,7 +231,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.144", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.145", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 
@@ -394,7 +398,12 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .transport { border: 1px solid var(--ha-primary); color: var(--ha-primary); background: transparent; border-radius: 999px; padding: 6px 14px; font-size: 12px; font-weight: 500; margin-top: 38px; }
     .notice { color: var(--ha-secondary); font-size: 14px; line-height: 1.45; margin: 0 0 20px; overflow-wrap: anywhere; }
     .ports { display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 16px; }
+    .bus-toolbar + .ports { margin-top: 16px; }
     .port-card { border: 1px solid var(--ha-card-border); border-radius: 12px; background: var(--ha-surface); padding: 20px; min-height: 228px; }
+    .port-card.locked { opacity: .92; }
+    .port-card.locked .active-row { grid-template-columns: minmax(0, 1fr); }
+    .port-card.locked .xport-action-slot { display: none; }
+    .port-card.locked .active-mode strong { overflow: visible; text-overflow: clip; }
     .port-title { font-size: 17px; font-weight: 800; margin-bottom: 20px; }
     label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 8px; }
     .mode-select { position: relative; }
@@ -425,6 +434,13 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       transform: rotate(45deg);
     }
     .mode-select.open .mode-trigger { border-color: var(--ha-primary); box-shadow: none; }
+    .mode-select.locked .mode-trigger {
+      cursor: default;
+      color: var(--ha-secondary);
+      border-color: var(--ha-row-border);
+      background: var(--ha-row);
+    }
+    .mode-select.locked .mode-trigger::after { display: none; }
     .mode-menu {
       display: none;
       position: absolute;
@@ -554,6 +570,25 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .bus-toolbar { align-items: stretch; border: 1px solid var(--ha-card-border); border-radius: 10px; background: var(--ha-surface); padding: 12px; }
     .bus-power-control { display: flex; align-items: center; gap: 10px; min-height: 42px; padding-right: 6px; }
     .bus-power-control .metric { white-space: nowrap; }
+    .bus-power-control label { margin-bottom: 0; white-space: nowrap; }
+    .bus-power-control .mode-select { width: min(260px, 62vw); }
+    .xport-group-toolbar {
+      --xport-card-gap: 16px;
+      --xport-toolbar-pad: 12px;
+      display: grid;
+      grid-template-columns: calc(((100% + (2 * var(--xport-toolbar-pad))) - (3 * var(--xport-card-gap))) / 4 - var(--xport-toolbar-pad)) minmax(0, 1fr);
+      gap: var(--xport-card-gap);
+      align-items: center;
+    }
+    .xport-group-toolbar .bus-power-control {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: 10px;
+      padding-right: 0;
+    }
+    .xport-group-toolbar .bus-power-control .mode-select { width: 100%; min-width: 0; }
+    .xport-group-toolbar .bus-note { grid-column: 2; }
     .bus-note { color: var(--ha-secondary); font-size: 13px; line-height: 1.4; flex: 1 1 360px; align-self: center; }
     .bus-action { min-width: 142px; }
     .modules { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 18px; }
@@ -636,9 +671,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     pre.visible { display: block; }
     @media (max-width: 1300px) { .relay-grid { grid-template-columns: repeat(4, minmax(140px, 1fr)); } }
     @media (max-width: 1300px) { .overview-panel { grid-template-columns: 1fr; } .overview-identity { border-right: 0; border-bottom: 1px solid var(--ha-card-border); min-height: 260px; } }
-    @media (max-width: 1100px) { .ports, .carrier-io-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .relay-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); } }
+    @media (max-width: 1100px) { .ports, .carrier-io-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .xport-group-toolbar { grid-template-columns: calc(((100% + (2 * var(--xport-toolbar-pad))) - var(--xport-card-gap)) / 2 - var(--xport-toolbar-pad)) minmax(0, 1fr); } .relay-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); } }
     @media (max-width: 900px) { .buzzer-panel { grid-template-columns: 1fr; } .buzzer-actions { grid-template-columns: repeat(2, minmax(120px, 1fr)); grid-template-rows: auto; } .buzzer-actions .buzzer-group-title { grid-column: 1 / -1; } }
-    @media (max-width: 620px) { body { padding: 10px; } .app-toolbar { justify-content: stretch; } .theme-switcher { width: 100%; justify-content: space-between; } .theme-choice { flex: 1; } .overview-identity { min-height: 260px; padding: 22px 18px; } .overview-wordmark { font-size: 22px; letter-spacing: .12em; } .overview-title-row { align-items: flex-start; flex-direction: column; gap: 14px; } .overview-title h1 { font-size: 34px; } .overview-title .subtitle { font-size: 16px; } .overview-facts { grid-template-columns: 88px minmax(0, 1fr); } .overview-facts dt, .overview-facts dd { font-size: 14px; } .overview-health { grid-template-columns: 1fr; gap: 18px; } .overview-health-item + .overview-health-item { border-left: 0; padding-left: 0; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+3) { border-right: 0; border-bottom: 1px solid var(--ha-card-border); } .overview-metric:nth-of-type(4) { border-bottom: 0; } .xport-panel { padding: 18px 14px; border-radius: 12px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .ports, .carrier-io-grid, .relay-grid { grid-template-columns: 1fr; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-row { grid-template-columns: 1fr; gap: 6px; } }
+    @media (max-width: 620px) { body { padding: 10px; } .app-toolbar { justify-content: stretch; } .theme-switcher { width: 100%; justify-content: space-between; } .theme-choice { flex: 1; } .overview-identity { min-height: 260px; padding: 22px 18px; } .overview-wordmark { font-size: 22px; letter-spacing: .12em; } .overview-title-row { align-items: flex-start; flex-direction: column; gap: 14px; } .overview-title h1 { font-size: 34px; } .overview-title .subtitle { font-size: 16px; } .overview-facts { grid-template-columns: 88px minmax(0, 1fr); } .overview-facts dt, .overview-facts dd { font-size: 14px; } .overview-health { grid-template-columns: 1fr; gap: 18px; } .overview-health-item + .overview-health-item { border-left: 0; padding-left: 0; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+3) { border-right: 0; border-bottom: 1px solid var(--ha-card-border); } .overview-metric:nth-of-type(4) { border-bottom: 0; } .xport-panel { padding: 18px 14px; border-radius: 12px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .xport-group-toolbar { grid-template-columns: 1fr; } .xport-group-toolbar .bus-note { grid-column: 1; } .ports, .carrier-io-grid, .relay-grid { grid-template-columns: 1fr; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-row { grid-template-columns: 1fr; gap: 6px; } }
   </style>
 </head>
 <body>
@@ -724,6 +759,13 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         <div class="transport">REST</div>
       </div>
       <p class="notice">When a port mode changes, the previous channel mode is safely shut down first. Selected modes are stored on the Hardware Host and restored after restart.</p>
+      <div class="extension-actions bus-toolbar xport-group-toolbar">
+        <div class="bus-power-control">
+          <label>Group Mode</label>
+          <div id="xport-group-mode"></div>
+        </div>
+        <div class="bus-note">RGBW Dimmer assigns X1-X4 as Red, Green, Blue, and White channels.</div>
+      </div>
       <div id="ports" class="ports"></div>
     </section>
     <section class="extension-panel">
@@ -876,6 +918,17 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       'PulseCounterExternalVoltage',
       'PulseCounterInternalPullUp'
     ];
+    const groupModeLabels = {
+      Independent: 'Independent',
+      RgbwDimmer: 'RGBW Dimmer'
+    };
+    const groupModeOrder = ['Independent', 'RgbwDimmer'];
+    const rgbwRoles = {
+      1: 'Red',
+      2: 'Green',
+      3: 'Blue',
+      4: 'White'
+    };
     let latestAppInfo = { uptime_seconds: 0 };
     let selectedTheme = 'auto';
     const themeMedia = window.matchMedia('(prefers-color-scheme: dark)');
@@ -946,6 +999,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     function paintXPort(payload) {
       document.getElementById('xport-status').textContent = `X-PORT: ${payload.topology} - ${payload.availability}`;
+      updateXPortGroupMode(payload);
       const ports = document.getElementById('ports');
       const seen = new Set();
       for (const channel of payload.channels) {
@@ -956,11 +1010,21 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           card = renderXPortCard(channel, payload.modes);
           ports.appendChild(card);
         }
-        updateXPortCard(card, channel, payload.modes);
+        updateXPortCard(card, channel, payload.modes, payload.group_mode);
       }
       ports.querySelectorAll('[data-xport-channel]').forEach((card) => {
         if (!seen.has(card.dataset.xportChannel)) { card.remove(); }
       });
+    }
+    function updateXPortGroupMode(payload) {
+      const target = document.getElementById('xport-group-mode');
+      const currentMode = payload.group_mode || 'Independent';
+      const availableModes = payload.group_modes || groupModeOrder;
+      const key = `${currentMode}|${availableModes.join(',')}`;
+      if (target.dataset.key !== key) {
+        target.replaceChildren(renderGroupModeSelect(currentMode, availableModes));
+        target.dataset.key = key;
+      }
     }
     function renderXPortCard(channel, modes) {
       const card = document.createElement('article');
@@ -989,37 +1053,52 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       card.append(title, label, modeSelect, activeRow, modeBody);
       return card;
     }
-    function updateXPortCard(card, channel, modes) {
-      const desiredLabel = labels[channel.desired_mode] || channel.desired_mode;
+    function updateXPortCard(card, channel, modes, groupMode = 'Independent') {
+      const locked = groupMode && groupMode !== 'Independent';
+      card.classList.toggle('locked', locked);
+      const desiredLabel = locked ? `${rgbwRoles[channel.channel] || 'RGBW'} channel` : labels[channel.desired_mode] || channel.desired_mode;
       const trigger = card.querySelector('.mode-trigger');
       if (trigger && trigger.textContent !== desiredLabel) {
         trigger.textContent = desiredLabel;
+      }
+      if (trigger) {
+        trigger.disabled = locked;
+        trigger.title = locked ? 'X1-X4 are assigned by X-Port Group Mode' : '';
+      }
+      const modeSelect = card.querySelector('.mode-select');
+      if (modeSelect) {
+        modeSelect.classList.toggle('locked', locked);
       }
       card.querySelectorAll('.mode-option').forEach((option) => {
         option.classList.toggle('active', option.dataset.mode === channel.desired_mode);
       });
       const activeValue = card.querySelector('.active-mode-value');
-      const confirmedLabel = labels[channel.confirmed_mode] || channel.confirmed_mode;
+      const confirmedLabel = locked ? 'RGBW Dimmer' : labels[channel.confirmed_mode] || channel.confirmed_mode;
       if (activeValue && activeValue.textContent !== confirmedLabel) {
         activeValue.textContent = confirmedLabel;
         activeValue.title = confirmedLabel;
       }
-      updateXPortAction(card, channel);
+      updateXPortAction(card, channel, locked);
       const body = card.querySelector('.mode-body');
       const bodyKey = [
+        groupMode || '',
         channel.confirmed_mode,
         channel.error || '',
         String(channel.value ?? ''),
         String(channel.counter ?? '')
       ].join('|');
       if (body && body.dataset.bodyKey !== bodyKey) {
-        body.replaceChildren(renderModeBody(channel));
+        body.replaceChildren(locked ? renderLockedXPortBody(channel) : renderModeBody(channel));
         body.dataset.bodyKey = bodyKey;
       }
     }
-    function updateXPortAction(card, channel) {
+    function updateXPortAction(card, channel, locked = false) {
       const actionSlot = card.querySelector('.xport-action-slot');
       if (!actionSlot) { return; }
+      if (locked) {
+        actionSlot.replaceChildren();
+        return;
+      }
       const needsReset = channel.confirmed_mode === 'PulseCounterExternalVoltage' || channel.confirmed_mode === 'PulseCounterInternalPullUp';
       const needsPwmToggle = channel.confirmed_mode === 'PwmOutput';
       if (!needsReset && !needsPwmToggle) {
@@ -1069,6 +1148,34 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         await renderXPort();
       }
     }
+    async function setGroupMode(mode) {
+      const output = document.getElementById('output');
+      output.classList.remove('visible');
+      try {
+        await requestJson('api/v1/xport/group-mode', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode }) });
+        await renderXPort();
+      } catch (error) {
+        output.textContent = JSON.stringify(error, null, 2);
+        output.classList.add('visible');
+        await renderXPort();
+      }
+    }
+    async function setGroupChannelValue(channel, value) {
+      const output = document.getElementById('output');
+      output.classList.remove('visible');
+      try {
+        await requestJson(`api/v1/xport/group/channels/${channel}/value`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value })
+        });
+        await renderXPort();
+      } catch (error) {
+        output.textContent = JSON.stringify(error, null, 2);
+        output.classList.add('visible');
+        await renderXPort();
+      }
+    }
     function renderModeBody(channel) {
       if (channel.error) { return readoutRow(channel.error, ''); }
       switch (channel.confirmed_mode) {
@@ -1091,6 +1198,23 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       valueEl.textContent = value;
       row.append(labelEl, valueEl);
       return row;
+    }
+    function renderLockedXPortBody(channel) {
+      const wrap = document.createElement('div');
+      wrap.className = 'xport-control-row pwm';
+      const percent = Math.round(Number(channel.value || 0) * 100);
+      const label = document.createElement('span');
+      label.textContent = rgbwRoles[channel.channel] || 'Channel';
+      const value = document.createElement('strong');
+      value.textContent = `${percent}%`;
+      const slider = document.createElement('input');
+      slider.type = 'range';
+      slider.min = '0';
+      slider.max = '100';
+      slider.value = String(percent);
+      slider.onchange = () => setGroupChannelValue(channel.channel, Number(slider.value) / 100);
+      wrap.append(label, slider, value);
+      return wrap;
     }
     function digitalOutput(channel) {
       const row = document.createElement('div');
@@ -1179,6 +1303,38 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         option.onclick = () => {
           wrap.classList.remove('open');
           setMode(channel.channel, mode);
+        };
+        menu.appendChild(option);
+      }
+      wrap.append(trigger, menu);
+      return wrap;
+    }
+    function renderGroupModeSelect(currentMode, modes) {
+      const wrap = document.createElement('div');
+      wrap.className = 'mode-select';
+      const trigger = document.createElement('button');
+      trigger.type = 'button';
+      trigger.className = 'mode-trigger';
+      trigger.textContent = groupModeLabels[currentMode] || currentMode;
+      trigger.onclick = () => {
+        document.querySelectorAll('.mode-select.open').forEach((item) => {
+          if (item !== wrap) { item.classList.remove('open'); }
+        });
+        wrap.classList.toggle('open');
+      };
+
+      const menu = document.createElement('div');
+      menu.className = 'mode-menu';
+      const orderedModes = groupModeOrder.filter((mode) => modes.includes(mode));
+      for (const mode of orderedModes) {
+        const option = document.createElement('button');
+        option.type = 'button';
+        option.dataset.mode = mode;
+        option.className = `mode-option ${mode === currentMode ? 'active' : ''}`;
+        option.textContent = groupModeLabels[mode] || mode;
+        option.onclick = () => {
+          wrap.classList.remove('open');
+          setGroupMode(mode);
         };
         menu.appendChild(option);
       }
@@ -2151,6 +2307,20 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     async def put_xport_mode(channel: int, payload: XPortModePayload) -> dict:
         try:
             return await runtime_or_503().xport.configure(channel, payload.mode, payload.revision)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.put("/api/v1/xport/group-mode")
+    async def put_xport_group_mode(payload: XPortGroupModePayload) -> dict:
+        try:
+            return await runtime_or_503().xport.configure_group_mode(payload.mode)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.put("/api/v1/xport/group/channels/{channel}/value")
+    async def put_xport_group_channel_value(channel: int, payload: XPortValuePayload) -> dict:
+        try:
+            return await runtime_or_503().xport.set_group_channel_value(channel, payload.value)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 

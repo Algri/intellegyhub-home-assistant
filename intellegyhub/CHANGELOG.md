@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.145
+
+- Add X-Port RGBW Dimmer group mode with persisted backend state.
+- Expose one Home Assistant RGBW light entity for X1-X4 while hiding the individual X-Port channel entities in group mode.
+- Restore the individual X1-X4 entities when X-Port returns to Independent mode.
+
 ## 0.5.144
 
 - Group add-on options into Diagnostics, 1-Wire, Power button, and Buzzer sections.

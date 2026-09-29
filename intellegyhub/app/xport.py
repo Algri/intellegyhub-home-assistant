@@ -27,6 +27,11 @@ class XPortMode(StrEnum):
     COUNTER_INTERNAL = "PulseCounterInternalPullUp"
 
 
+class XPortGroupMode(StrEnum):
+    INDEPENDENT = "Independent"
+    RGBW_DIMMER = "RgbwDimmer"
+
+
 class XPortTopology(StrEnum):
     NOT_INSTALLED = "NotInstalled"
     STANDARD = "Standard"
@@ -96,6 +101,13 @@ class XPortStore:
         async with self._lock:
             await asyncio.to_thread(self._save_sync, channel)
 
+    async def load_group_mode(self) -> XPortGroupMode:
+        return await asyncio.to_thread(self._load_group_mode_sync)
+
+    async def save_group_mode(self, mode: XPortGroupMode) -> None:
+        async with self._lock:
+            await asyncio.to_thread(self._save_group_mode_sync, mode)
+
     def _connect(self) -> sqlite3.Connection:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         return sqlite3.connect(self.path)
@@ -117,6 +129,14 @@ class XPortStore:
                 )
                 """
             )
+            db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS xport_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+                """
+            )
 
     def _load_sync(self) -> list[XPortChannel]:
         with self._connect() as db:
@@ -125,6 +145,18 @@ class XPortStore:
                 "FROM xport_channels ORDER BY channel"
             ).fetchall()
         return [XPortChannel(*row) for row in rows]
+
+    def _load_group_mode_sync(self) -> XPortGroupMode:
+        with self._connect() as db:
+            row = db.execute(
+                "SELECT value FROM xport_settings WHERE key='group_mode'"
+            ).fetchone()
+        if row is None:
+            return XPortGroupMode.INDEPENDENT
+        try:
+            return XPortGroupMode(row[0])
+        except ValueError:
+            return XPortGroupMode.INDEPENDENT
 
     def _save_sync(self, channel: XPortChannel) -> None:
         with self._connect() as db:
@@ -153,6 +185,17 @@ class XPortStore:
                     channel.error,
                     channel.updated_at,
                 ),
+            )
+
+    def _save_group_mode_sync(self, mode: XPortGroupMode) -> None:
+        with self._connect() as db:
+            db.execute(
+                """
+                INSERT INTO xport_settings(key,value)
+                VALUES('group_mode', ?)
+                ON CONFLICT(key) DO UPDATE SET value=excluded.value
+                """,
+                (mode.value,),
             )
 
 
@@ -443,6 +486,7 @@ class XPortManager:
         self.topology = XPortTopology.NOT_INSTALLED
         self.availability = Availability.UNKNOWN
         self.error: str | None = "startup pending"
+        self.group_mode = XPortGroupMode.INDEPENDENT
         self.channels: dict[int, XPortChannel] = {}
         self._lock = asyncio.Lock()
         self._publisher: Callable[[dict[str, Any]], Any] | None = None
@@ -460,6 +504,7 @@ class XPortManager:
         self.topology = topology
         self.availability = availability
         self.error = error
+        self.group_mode = await self.store.load_group_mode()
         stored = {item.channel: item for item in await self.store.load()}
         now = self._now()
         for channel in range(1, 5):
@@ -470,6 +515,8 @@ class XPortManager:
             state.updated_at = now
             self.channels[channel] = state
             await self.store.save(state)
+            if self.group_mode == XPortGroupMode.RGBW_DIMMER:
+                continue
             if availability == Availability.AVAILABLE and state.desired_mode != XPortMode.DISABLED:
                 restored_value = state.value
                 try:
@@ -483,6 +530,8 @@ class XPortManager:
                     state.error = f"restore failed: {exc}"
                     state.updated_at = self._now()
                     await self.store.save(state)
+        if availability == Availability.AVAILABLE and self.group_mode == XPortGroupMode.RGBW_DIMMER:
+            await self._enable_rgbw_group(restore_values=True)
         self._stopping.clear()
         self._monitor_task = asyncio.create_task(self._monitor_inputs(), name="intellegy-xport-monitor")
 
@@ -511,12 +560,34 @@ class XPortManager:
             "topology": self.topology,
             "availability": self.availability,
             "error": self.error,
+            "group_mode": self.group_mode,
+            "group_modes": [mode.value for mode in XPortGroupMode],
             "modes": [mode.value for mode in XPortMode],
             "channels": [asdict(self.channels[index]) for index in sorted(self.channels)],
         }
 
+    async def configure_group_mode(self, mode: XPortGroupMode) -> dict[str, Any]:
+        async with self._lock:
+            if mode == XPortGroupMode.RGBW_DIMMER:
+                if self.availability != Availability.AVAILABLE:
+                    raise ValueError(self.error or "X-Port is not available")
+                if self.topology != XPortTopology.EXTENDED:
+                    raise ValueError("RGBW Dimmer requires X-Port Extended topology with PCA9632 0x62")
+            self.group_mode = mode
+            await self.store.save_group_mode(mode)
+            if mode == XPortGroupMode.RGBW_DIMMER:
+                await self._enable_rgbw_group(restore_values=True)
+            if self._publisher:
+                result = self._publisher({"type": "xport_changed", "xport": self.snapshot()})
+                if asyncio.iscoroutine(result):
+                    await result
+            return {"group_mode": self.group_mode, "status": "Succeeded", "xport": self.snapshot()}
+
     async def configure(self, channel: int, mode: XPortMode, revision: int | None = None) -> dict[str, Any]:
         async with self._lock:
+            if self.group_mode != XPortGroupMode.INDEPENDENT:
+                state = self._required(channel)
+                return self._operation(state, "Rejected", "X-Port channels are locked by group mode")
             state = self._required(channel)
             state.desired_mode = mode
             state.revision = max(state.revision + 1, revision or 0)
@@ -567,6 +638,40 @@ class XPortManager:
                 state.error = str(exc)
                 await self.store.save(state)
                 return self._operation(state, "Failed", state.error)
+
+    async def set_group_channel_value(self, channel: int, value: float) -> dict[str, Any]:
+        async with self._lock:
+            state = self._required(channel)
+            if self.group_mode != XPortGroupMode.RGBW_DIMMER:
+                return self._operation(state, "Rejected", "X-Port group dimmer is not enabled")
+            if self.availability != Availability.AVAILABLE or self.topology != XPortTopology.EXTENDED:
+                return self._operation(state, "Rejected", self.error or "X-Port Extended is not available")
+            state.value = await self.hardware.set_value(channel, XPortMode.PWM, value)
+            state.updated_at = self._now()
+            state.availability = self.availability
+            state.error = None
+            await self.store.save(state)
+            await self._publish_state(state)
+            return self._operation(state, "Succeeded", None)
+
+    async def _enable_rgbw_group(self, restore_values: bool) -> None:
+        for channel in range(1, 5):
+            state = self._required(channel)
+            restored_value = state.value if restore_values else 0
+            try:
+                await self.hardware.disable_channel(channel)
+                await self.hardware.configure_channel(channel, XPortMode.PWM, self.topology)
+                state.desired_mode = XPortMode.PWM
+                state.confirmed_mode = XPortMode.PWM
+                state.value = await self.hardware.set_value(channel, XPortMode.PWM, restored_value)
+                state.availability = self.availability
+                state.error = None
+            except Exception as exc:
+                state.confirmed_mode = XPortMode.DISABLED
+                state.availability = Availability.FAULTED
+                state.error = str(exc)
+            state.updated_at = self._now()
+            await self.store.save(state)
 
     async def reset_counter(self, channel: int) -> dict[str, Any]:
         async with self._lock:

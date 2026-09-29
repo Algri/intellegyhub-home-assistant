@@ -82,6 +82,9 @@
       },
       "xport_pwm": {
         "name": "PWM"
+      },
+      "xport_rgbw": {
+        "name": "X-Port RGBW"
       }
     },
     "light": {

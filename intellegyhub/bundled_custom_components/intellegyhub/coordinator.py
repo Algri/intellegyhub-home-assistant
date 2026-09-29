@@ -103,6 +103,19 @@ class IntellegyHubGpioManager:
         self.connected = True
         self._notify()
 
+    async def async_set_xport_group_channel_value(self, channel: int, value: float) -> None:
+        result = await self.client.set_xport_group_channel_value(channel, value)
+        self._apply_xport_channel(result.get("channel"))
+        self.connected = True
+        self._notify()
+
+    async def async_set_xport_rgbw(self, values: tuple[float, float, float, float]) -> None:
+        for channel, value in enumerate(values, start=1):
+            result = await self.client.set_xport_group_channel_value(channel, value)
+            self._apply_xport_channel(result.get("channel"))
+        self.connected = True
+        self._notify()
+
     async def async_set_buzzer_volume(self, volume_percent: int) -> None:
         await self.async_set_buzzer_settings(volume_percent=int(volume_percent))
 
@@ -304,6 +317,9 @@ class IntellegyHubGpioManager:
                 return
         elif event_type == "xport_channel_changed":
             self._apply_xport_channel(event.get("channel"))
+            self._remove_stale_xport_registry_entries()
+        elif event_type == "xport_changed":
+            self.xport = event.get("xport", self.xport)
             self._remove_stale_xport_registry_entries()
         elif event_type == "extensions_changed":
             self.extensions = event.get("extensions", self.extensions)
@@ -517,9 +533,13 @@ class IntellegyHubGpioManager:
     @callback
     def _remove_stale_xport_registry_entries(self) -> None:
         desired: set[tuple[str, str]] = set()
-        for channel in range(1, 5):
-            mode = self.xport_channel(channel).get("confirmed_mode")
-            desired.update(xport_desired_unique_ids(channel, mode))
+        if self.xport.get("group_mode") == "RgbwDimmer":
+            desired.add(("light", "intellegyhub_xport_rgbw"))
+        else:
+            for channel in range(1, 5):
+                mode = self.xport_channel(channel).get("confirmed_mode")
+                desired.update(xport_desired_unique_ids(channel, mode))
+                desired.add(("select", f"intellegyhub_xport_x{channel}_mode"))
 
         entity_registry = er.async_get(self.hass)
         if not hasattr(entity_registry, "async_get_entity_id"):
@@ -532,6 +552,13 @@ class IntellegyHubGpioManager:
                 entity_id = entity_registry.async_get_entity_id(platform, DOMAIN, unique_id)
                 if entity_id is not None:
                     entity_registry.async_remove(entity_id)
+            mode_unique_id = f"intellegyhub_xport_x{channel}_mode"
+            mode_entity_id = entity_registry.async_get_entity_id("select", DOMAIN, mode_unique_id)
+            if mode_entity_id is not None and ("select", mode_unique_id) not in desired:
+                entity_registry.async_remove(mode_entity_id)
+        rgbw_entity_id = entity_registry.async_get_entity_id("light", DOMAIN, "intellegyhub_xport_rgbw")
+        if rgbw_entity_id is not None and ("light", "intellegyhub_xport_rgbw") not in desired:
+            entity_registry.async_remove(rgbw_entity_id)
 
     @callback
     def _notify(self) -> None:

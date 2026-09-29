@@ -75,6 +75,22 @@ class IntellegyHubXPortEntity(IntellegyHubGpioEntity):
             )
 
 
+class IntellegyHubXPortGroupEntity(IntellegyHubGpioEntity):
+    @property
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, "xport")},
+            name="X-Port",
+            manufacturer="IntellegyHub",
+            model="X-Port",
+            via_device_id=_parent_device_id(self, self.manager),
+        )
+
+    @property
+    def xport_available(self) -> bool:
+        return self.manager.connected and self.manager.xport.get("availability") == "Available"
+
+
 class IntellegyHubExtensionPowerEntity(IntellegyHubGpioEntity):
     @property
     def available(self) -> bool:

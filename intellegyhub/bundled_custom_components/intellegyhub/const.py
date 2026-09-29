@@ -100,3 +100,5 @@ XPORT_MODE_PWM = "PwmOutput"
 XPORT_MODE_AI = "AnalogInput"
 XPORT_MODE_DI = {"DigitalInputExternalVoltage", "DigitalInputInternalPullUp"}
 XPORT_MODE_COUNTER = {"PulseCounterExternalVoltage", "PulseCounterInternalPullUp"}
+XPORT_GROUP_MODE_INDEPENDENT = "Independent"
+XPORT_GROUP_MODE_RGBW = "RgbwDimmer"

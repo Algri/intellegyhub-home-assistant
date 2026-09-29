@@ -14,6 +14,7 @@ from .const import (
     XPORT_MODE_DI,
     XPORT_MODE_DO,
     XPORT_MODE_PWM,
+    XPORT_GROUP_MODE_RGBW,
 )
 
 T = TypeVar("T", bound=Entity)
@@ -66,6 +67,8 @@ def xport_desired_unique_ids(channel: int, mode: str | None) -> set[tuple[str, s
 
 def xport_desired_channels_for_suffix(manager, platform: Platform, suffix: str) -> set[int]:
     if not hasattr(manager, "xport_channel"):
+        return set()
+    if getattr(manager, "xport", {}).get("group_mode") == XPORT_GROUP_MODE_RGBW:
         return set()
     platform_value = xport_platform_value(platform)
     channels: set[int] = set()
