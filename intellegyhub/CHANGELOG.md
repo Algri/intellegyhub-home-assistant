@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.148
+
+- Rename the main Home Assistant controller device to Controller while keeping the IHC-1400 model visible in device details.
+
 ## 0.5.147
 
 - Remove the legacy X-Port Home Assistant device registry entry when the active profile uses the new X-Port device model.

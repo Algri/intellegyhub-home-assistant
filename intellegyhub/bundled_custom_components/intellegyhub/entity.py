@@ -26,9 +26,9 @@ class IntellegyHubGpioEntity(Entity):
         identity = self.manager.carrier.get("identity", {})
         return DeviceInfo(
             identifiers={(DOMAIN, DEVICE_IDENTIFIER)},
-            name=_identity_text(identity, "model", "product", fallback="IHC-1400"),
+            name="Controller",
             manufacturer=_identity_text(identity, "manufacturer", fallback="IntellegyHUB"),
-            model="Automation Controller",
+            model=_controller_model(identity),
             serial_number=_identity_text(identity, "serial_number"),
             hw_version=_hardware_version(identity),
             sw_version=_identity_text(identity, "software_version"),
@@ -139,6 +139,11 @@ def _hardware_version(identity: dict) -> str | None:
     if version and revision:
         return f"v{version.lstrip('v')} Rev.{revision.removeprefix('Rev.').removeprefix('Rev')}"
     return version or revision
+
+
+def _controller_model(identity: dict) -> str:
+    model = _identity_text(identity, "model", "product", fallback="IHC-1400")
+    return f"{model} Automation Controller"
 
 
 def _xbus_slot(address: object) -> str:
