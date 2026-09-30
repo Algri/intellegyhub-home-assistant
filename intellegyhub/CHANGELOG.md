@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.153
+
+- Parse BusyBox hwclock output with variable spacing in the RTC Clock backend.
+
 ## 0.5.152
 
 - Pass the host RTC device into the add-on container and use explicit host RTC paths for RTC Clock commands.

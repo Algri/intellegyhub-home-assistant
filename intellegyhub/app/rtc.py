@@ -92,7 +92,14 @@ def _parse_hwclock_time(value: str) -> datetime:
     first_line = value.splitlines()[0].strip()
     if not first_line:
         raise ValueError("hwclock returned empty output")
-    normalized = first_line.replace("  ", " ")
+    compact = " ".join(first_line.split())
+    busybox_prefix = compact.rsplit(" ", 2)[0].strip()
+    for candidate in (compact, busybox_prefix):
+        try:
+            return datetime.strptime(candidate, "%a %b %d %H:%M:%S %Y").replace(tzinfo=timezone.utc)
+        except ValueError:
+            pass
+    normalized = compact
     if normalized.endswith("Z"):
         normalized = f"{normalized[:-1]}+00:00"
     if " " in normalized and "T" not in normalized:
