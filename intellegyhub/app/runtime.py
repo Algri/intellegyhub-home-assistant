@@ -11,6 +11,7 @@ from fastapi import WebSocket
 from .backends import BUTTONS, OUTPUTS, HardwareBackend, HardwareState
 from .buzzer import BuzzerManager, BuzzerSettingsStore
 from .carrier import CarrierManager
+from .diagnostic_indicators import DiagnosticIndicatorManager, DiagnosticIndicatorSettings
 from .extensions import ExtensionHardware, ExtensionManager
 from .onewire import OneWireHardware, OneWireManager
 from .supervisor import shutdown_host
@@ -29,6 +30,8 @@ class AppRuntime:
         startup_buzzer_duration_ms: int = 200,
         shutdown_buzzer_enabled: bool = True,
         carrier_monitoring_poll_interval_seconds: int = 30,
+        ste_heartbeat_on_seconds: float = 0.2,
+        ste_heartbeat_off_seconds: float = 1.8,
         onewire_poll_intervals: dict[str, int] | None = None,
         power_button_shutdown_enabled: bool = True,
         power_button_shutdown_hold_seconds: float = 1.0,
@@ -36,6 +39,13 @@ class AppRuntime:
     ) -> None:
         self.backend = backend
         self.carrier = CarrierManager(monitoring_interval_seconds=carrier_monitoring_poll_interval_seconds)
+        self.diagnostic_indicators = DiagnosticIndicatorManager(
+            self.set_output,
+            default_settings=DiagnosticIndicatorSettings(
+                ste_heartbeat_on_seconds=ste_heartbeat_on_seconds,
+                ste_heartbeat_off_seconds=ste_heartbeat_off_seconds,
+            ),
+        )
         self.buzzer = BuzzerManager()
         self.buzzer_store = BuzzerSettingsStore()
         self.xport = XPortManager()
@@ -67,10 +77,12 @@ class AppRuntime:
             self.buzzer.apply_settings(await self.buzzer_store.load())
             self.state = await self.backend.start(self.handle_button_changed)
             self.carrier.set_publisher(self.broadcast)
+            self.diagnostic_indicators.set_publisher(self.broadcast)
             self.xport.set_publisher(self.broadcast)
             self.extensions.set_publisher(self.broadcast)
             self.onewire.set_publisher(self.broadcast)
             await self.carrier.start()
+            await self.diagnostic_indicators.start()
             await self.xport.start()
             await self.extensions.start()
             await self.onewire.start()
@@ -137,6 +149,7 @@ class AppRuntime:
         await self.onewire.stop()
         await self.extensions.stop()
         await self.xport.stop()
+        await self.diagnostic_indicators.stop()
         await self.carrier.stop()
         await self.backend.stop()
         clients = list(self._clients)
@@ -186,6 +199,7 @@ class AppRuntime:
             "extensions": self.extensions.snapshot(),
             "onewire": self.onewire.snapshot(),
             "buzzer": self.buzzer.status(),
+            "diagnostic_indicators": self.diagnostic_indicators.snapshot(),
             "ui": self.ui_settings.snapshot(),
         }
 
@@ -242,6 +256,20 @@ class AppRuntime:
         payload = self.ui_settings.snapshot()
         await self.broadcast({"type": "ui_changed", "ui": payload})
         return payload
+
+    async def set_ste_heartbeat(
+        self,
+        enabled: bool | None = None,
+        on_seconds: float | None = None,
+        off_seconds: float | None = None,
+    ) -> dict:
+        return await self.diagnostic_indicators.set_ste_heartbeat(enabled, on_seconds, off_seconds)
+
+    async def set_net_indicator(self, enabled: bool) -> dict:
+        return await self.diagnostic_indicators.set_net_indicator(enabled)
+
+    async def set_err_indicator(self, enabled: bool) -> dict:
+        return await self.diagnostic_indicators.set_err_indicator(enabled)
 
     async def handle_button_changed(self, button_id: str, pressed: bool) -> None:
         if button_id not in BUTTONS:
@@ -304,9 +332,14 @@ class AppRuntime:
         await websocket.accept()
         self._clients.add(websocket)
         await websocket.send_json({"type": "state", **self.snapshot()})
+        await self.diagnostic_indicators.set_connected_clients(len(self._clients))
 
     def remove_client(self, websocket: WebSocket) -> None:
         self._clients.discard(websocket)
+        try:
+            asyncio.create_task(self.diagnostic_indicators.set_connected_clients(len(self._clients)))
+        except RuntimeError:
+            pass
 
     async def broadcast(self, message: dict[str, Any]) -> None:
         stale = []

@@ -35,6 +35,8 @@ class AppConfig:
     startup_buzzer_duration_ms: int = 200
     shutdown_buzzer_enabled: bool = True
     carrier_monitoring_poll_interval_seconds: int = 30
+    ste_heartbeat_on_seconds: float = 0.2
+    ste_heartbeat_off_seconds: float = 1.8
     onewire_bridge1_poll_interval_seconds: int = 30
     onewire_bridge2_poll_interval_seconds: int = 30
     power_button_shutdown_enabled: bool = True
@@ -107,6 +109,12 @@ def load_config(path: Path | None = None) -> AppConfig:
         carrier_monitoring_poll_interval_seconds=int(
             _option(diagnostics, "carrier_monitoring_poll_interval_seconds", options.get("carrier_monitoring_poll_interval_seconds", 30))
         ),
+        ste_heartbeat_on_seconds=float(
+            _option(diagnostics, "ste_heartbeat_on_seconds", options.get("ste_heartbeat_on_seconds", 0.2))
+        ),
+        ste_heartbeat_off_seconds=float(
+            _option(diagnostics, "ste_heartbeat_off_seconds", options.get("ste_heartbeat_off_seconds", 1.8))
+        ),
         onewire_bridge1_poll_interval_seconds=int(
             _option(
                 onewire,
@@ -160,6 +168,10 @@ def validate_config(config: AppConfig) -> None:
         raise ValueError("startup_buzzer_duration_ms must be between 10 and 5000")
     if not 1 <= config.carrier_monitoring_poll_interval_seconds <= 3600:
         raise ValueError("carrier_monitoring_poll_interval_seconds must be between 1 and 3600")
+    if not 0.05 <= config.ste_heartbeat_on_seconds <= 10:
+        raise ValueError("ste_heartbeat_on_seconds must be between 0.05 and 10")
+    if not 0.05 <= config.ste_heartbeat_off_seconds <= 60:
+        raise ValueError("ste_heartbeat_off_seconds must be between 0.05 and 60")
     if not 1 <= config.onewire_bridge1_poll_interval_seconds <= 3600:
         raise ValueError("onewire_bus1_poll_interval_seconds must be between 1 and 3600")
     if not 1 <= config.onewire_bridge2_poll_interval_seconds <= 3600:

@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from .backends import MockGpioBackend, RealGpiodBackend
 from .carrier import APP_VERSION
 from .config import load_config
+from .rtc import HostRtc
 from .runtime import AppRuntime
 from .xport import XPortGroupMode, XPortMode
 
@@ -78,6 +79,16 @@ class BuzzerSettingsPayload(BaseModel):
     frequency: int | None = None
     duration_ms: int | None = None
     volume_percent: int | None = None
+
+
+class SteHeartbeatPayload(BaseModel):
+    enabled: bool
+    on_seconds: float | None = None
+    off_seconds: float | None = None
+
+
+class DiagnosticIndicatorPayload(BaseModel):
+    enabled: bool
 
 
 class UiThemePayload(BaseModel):
@@ -190,7 +201,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.149 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.150 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -203,6 +214,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 config.startup_buzzer_frequency,
                 config.startup_buzzer_duration_ms,
                 config.carrier_monitoring_poll_interval_seconds,
+                config.ste_heartbeat_on_seconds,
+                config.ste_heartbeat_off_seconds,
                 config.onewire_bridge1_poll_interval_seconds,
                 config.onewire_bridge2_poll_interval_seconds,
                 config.power_button_shutdown_enabled,
@@ -218,6 +231,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 startup_buzzer_duration_ms=config.startup_buzzer_duration_ms,
                 shutdown_buzzer_enabled=config.shutdown_buzzer_enabled,
                 carrier_monitoring_poll_interval_seconds=config.carrier_monitoring_poll_interval_seconds,
+                ste_heartbeat_on_seconds=config.ste_heartbeat_on_seconds,
+                ste_heartbeat_off_seconds=config.ste_heartbeat_off_seconds,
                 onewire_poll_intervals={
                     "onewire_bus10_addr1a": config.onewire_bridge1_poll_interval_seconds,
                     "onewire_bus10_addr1b": config.onewire_bridge2_poll_interval_seconds,
@@ -231,9 +246,10 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.149", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.150", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
+    app.state.rtc = HostRtc()
 
     def runtime_or_503() -> AppRuntime:
         current: AppRuntime = app.state.runtime
@@ -622,6 +638,14 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     .buzzer-group { border: 1px solid var(--ha-card-border); border-radius: 10px; background: var(--ha-surface); padding: 16px; min-width: 0; }
     .buzzer-group-title { color: var(--ha-secondary); font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 14px; }
+    .diagnostic-led-grid { display: grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 16px; margin-top: 18px; }
+    .diagnostic-led-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; min-height: 42px; border: 1px solid var(--ha-row-border); border-radius: 8px; padding: 8px 10px; background: var(--ha-row); }
+    .diagnostic-led-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .diagnostic-led-note { margin-top: 10px; color: var(--ha-secondary); font-size: 13px; overflow-wrap: anywhere; }
+    .diagnostic-rtc-card { margin-top: 18px; }
+    .diagnostic-rtc-grid { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 12px 16px; }
+    .diagnostic-rtc-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 42px; border: 1px solid var(--ha-row-border); border-radius: 8px; padding: 8px 10px; background: var(--ha-row); }
+    .diagnostic-rtc-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .buzzer-settings { display: grid; gap: 12px; }
     .buzzer-row { display: grid; grid-template-columns: minmax(100px, 150px) minmax(0, 1fr); align-items: center; gap: 14px; min-height: 40px; }
     .buzzer-row label,
@@ -672,7 +696,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     @media (max-width: 1300px) { .relay-grid { grid-template-columns: repeat(4, minmax(140px, 1fr)); } }
     @media (max-width: 1300px) { .overview-panel { grid-template-columns: 1fr; } .overview-identity { border-right: 0; border-bottom: 1px solid var(--ha-card-border); min-height: 260px; } }
     @media (max-width: 1100px) { .ports, .carrier-io-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .xport-group-toolbar { grid-template-columns: calc(((100% + (2 * var(--xport-toolbar-pad))) - var(--xport-card-gap)) / 2 - var(--xport-toolbar-pad)) minmax(0, 1fr); } .relay-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); } }
-    @media (max-width: 900px) { .buzzer-panel { grid-template-columns: 1fr; } .buzzer-actions { grid-template-columns: repeat(2, minmax(120px, 1fr)); grid-template-rows: auto; } .buzzer-actions .buzzer-group-title { grid-column: 1 / -1; } }
+    @media (max-width: 900px) { .diagnostic-led-grid, .diagnostic-rtc-grid, .buzzer-panel { grid-template-columns: 1fr; } .buzzer-actions { grid-template-columns: repeat(2, minmax(120px, 1fr)); grid-template-rows: auto; } .buzzer-actions .buzzer-group-title { grid-column: 1 / -1; } }
     @media (max-width: 620px) { body { padding: 10px; } .app-toolbar { justify-content: stretch; } .theme-switcher { width: 100%; justify-content: space-between; } .theme-choice { flex: 1; } .overview-identity { min-height: 260px; padding: 22px 18px; } .overview-wordmark { font-size: 22px; letter-spacing: .12em; } .overview-title-row { align-items: flex-start; flex-direction: column; gap: 14px; } .overview-title h1 { font-size: 34px; } .overview-title .subtitle { font-size: 16px; } .overview-facts { grid-template-columns: 88px minmax(0, 1fr); } .overview-facts dt, .overview-facts dd { font-size: 14px; } .overview-health { grid-template-columns: 1fr; gap: 18px; } .overview-health-item + .overview-health-item { border-left: 0; padding-left: 0; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+3) { border-right: 0; border-bottom: 1px solid var(--ha-card-border); } .overview-metric:nth-of-type(4) { border-bottom: 0; } .xport-panel { padding: 18px 14px; border-radius: 12px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .xport-group-toolbar { grid-template-columns: 1fr; } .xport-group-toolbar .bus-note { grid-column: 1; } .ports, .carrier-io-grid, .relay-grid { grid-template-columns: 1fr; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-row { grid-template-columns: 1fr; gap: 6px; } }
   </style>
 </head>
@@ -815,15 +839,16 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       <div class="module-row">
         <div>
           <div class="eyebrow">Diagnostic</div>
-          <h1>BUZZER</h1>
-          <div class="subtitle">GPIO18 hardware PWM test</div>
+          <h1>BOARD DIAGNOSTICS</h1>
+          <div class="subtitle">Onboard status indicators and GPIO18 hardware PWM test</div>
           <div id="buzzer-status" class="status">BUZZER: loading...</div>
         </div>
-        <div class="transport">GPIO18</div>
+        <div class="transport">GPIO18 / GPIO19 / GPIO21 / RTC</div>
       </div>
+      <div id="buzzer-detail" class="buzzer-status"></div>
       <div class="buzzer-panel">
         <div class="buzzer-group">
-          <div class="buzzer-group-title">Parameters</div>
+          <div class="buzzer-group-title">Buzzer Parameters</div>
           <div class="buzzer-settings">
             <div class="buzzer-row">
               <label for="buzzer-frequency">Frequency</label>
@@ -856,12 +881,66 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           </div>
         </div>
         <div class="buzzer-group buzzer-actions">
-          <div class="buzzer-group-title">Command</div>
+          <div class="buzzer-group-title">Buzzer Command</div>
           <button onclick="playBuzzer()">Play</button>
           <button onclick="stopBuzzer()">Stop</button>
         </div>
       </div>
-      <div id="buzzer-detail" class="buzzer-status"></div>
+      <div class="diagnostic-led-grid">
+        <div class="buzzer-group">
+          <div class="buzzer-group-title">STE LED</div>
+          <div class="diagnostic-led-row">
+            <span>Heartbeat</span>
+            <strong id="ste-heartbeat-state" class="state-text">OFF</strong>
+            <button id="ste-heartbeat-toggle" class="toggle" type="button" onclick="toggleSteHeartbeat()"><span>OFF</span></button>
+          </div>
+          <div class="diagnostic-led-note">UI placeholder. Hardware control will be connected after the indicator policy is added.</div>
+        </div>
+        <div class="buzzer-group">
+          <div class="buzzer-group-title">NET LED</div>
+          <div class="diagnostic-led-row">
+            <span>Connection indicator</span>
+            <strong id="net-led-state" class="state-text">OFF</strong>
+            <button id="net-led-toggle" class="toggle" type="button" onclick="toggleNetLed()"><span>OFF</span></button>
+          </div>
+          <div class="diagnostic-led-note">UI placeholder. Hardware control will be connected after the indicator policy is added.</div>
+        </div>
+        <div class="buzzer-group">
+          <div class="buzzer-group-title">ERR LED</div>
+          <div class="diagnostic-led-row">
+            <span>Error indicator</span>
+            <strong id="err-led-state" class="state-text">OFF</strong>
+            <button id="err-led-toggle" class="toggle" type="button" onclick="toggleErrLed()"><span>OFF</span></button>
+          </div>
+          <div class="diagnostic-led-note">UI placeholder. Error indication policy will be connected later.</div>
+        </div>
+      </div>
+      <div class="buzzer-group diagnostic-rtc-card">
+        <div class="buzzer-group-title">RTC Clock</div>
+        <div class="diagnostic-rtc-grid">
+          <div class="diagnostic-rtc-row">
+            <span>RTC time</span>
+            <strong id="rtc-time">Not available</strong>
+          </div>
+          <div class="diagnostic-rtc-row">
+            <span>System time</span>
+            <strong id="rtc-system-time">Loading</strong>
+          </div>
+          <div class="diagnostic-rtc-row">
+            <span>Difference</span>
+            <strong id="rtc-difference">Unknown</strong>
+          </div>
+          <div class="diagnostic-rtc-row">
+            <span>Status</span>
+            <strong id="rtc-status" class="state-text">PENDING</strong>
+          </div>
+        </div>
+        <div class="toolbar">
+          <button type="button" id="rtc-sync-button" onclick="syncRtc()">Sync RTC</button>
+          <button type="button" onclick="refreshRtc()">Refresh</button>
+        </div>
+        <div class="diagnostic-led-note">RTC is handled by the host kernel driver. The add-on does not access the RTC I2C address directly.</div>
+      </div>
     </section>
     <section class="extension-panel">
       <div class="module-row">
@@ -1518,7 +1597,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         outputs: ['usb12_reset', 'usb3_reset', 'usb4_reset', 'usb_hub_reset']
       }
     ];
-    const hostOutputOrder = ['ste', 'err', 'net', 'user_led'];
+    const hostOutputOrder = ['user_led'];
     const hostButtonOrder = ['power', 'fn1', 'fn2'];
     function carrierOutputsById(carrier) {
       const result = {};
@@ -1925,6 +2004,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           paintXPort(message.xport);
           paintExtensions(message.extensions);
           paintOneWire(message.onewire);
+          paintDiagnosticIndicators(message.diagnostic_indicators);
         } else if (message.type === 'carrier_changed') {
           paintCarrier(message.carrier);
           renderCarrierIO();
@@ -1953,6 +2033,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           renderOneWire();
         } else if (message.type === 'buzzer_changed') {
           paintBuzzer(message.buzzer);
+        } else if (message.type === 'diagnostic_indicators_changed') {
+          paintDiagnosticIndicators(message.diagnostic_indicators);
         } else if (message.type === 'ui_changed') {
           applyTheme(message.ui && message.ui.theme ? message.ui.theme : 'auto');
         }
@@ -1963,6 +2045,121 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         console.warn('IntellegyHUB WebSocket closed; reconnecting', url.href);
         window.setTimeout(connectEvents, 2000);
       };
+    }
+    let diagnosticIndicators = {
+      ste: { heartbeat_enabled: false },
+      net: { indicator_enabled: false },
+      err: { indicator_enabled: false }
+    };
+    async function toggleSteHeartbeat() {
+      const enabled = !(diagnosticIndicators.ste && diagnosticIndicators.ste.heartbeat_enabled);
+      const payload = await requestJson('api/v1/diagnostic-indicators/ste-heartbeat', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled })
+      });
+      paintDiagnosticIndicators(payload);
+    }
+    async function toggleNetLed() {
+      const enabled = !(diagnosticIndicators.net && diagnosticIndicators.net.indicator_enabled);
+      const payload = await requestJson('api/v1/diagnostic-indicators/net', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled })
+      });
+      paintDiagnosticIndicators(payload);
+    }
+    async function toggleErrLed() {
+      const enabled = !(diagnosticIndicators.err && diagnosticIndicators.err.indicator_enabled);
+      const payload = await requestJson('api/v1/diagnostic-indicators/err', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled })
+      });
+      paintDiagnosticIndicators(payload);
+    }
+    function paintDiagnosticIndicators(payload) {
+      if (!payload) return;
+      diagnosticIndicators = payload;
+      paintDiagnosticLed(
+        'ste-heartbeat-state',
+        'ste-heartbeat-toggle',
+        Boolean(payload.ste && payload.ste.heartbeat_enabled),
+        'Toggle STE LED heartbeat'
+      );
+      paintDiagnosticLed(
+        'net-led-state',
+        'net-led-toggle',
+        Boolean(payload.net && payload.net.indicator_enabled),
+        'Toggle NET LED connection indication'
+      );
+      paintDiagnosticLed(
+        'err-led-state',
+        'err-led-toggle',
+        Boolean(payload.err && payload.err.indicator_enabled),
+        'Toggle ERR LED placeholder state'
+      );
+    }
+    function paintDiagnosticLed(stateId, toggleId, enabled, title) {
+      const state = document.getElementById(stateId);
+      const toggle = document.getElementById(toggleId);
+      if (!state || !toggle) return;
+      state.textContent = enabled ? 'ON' : 'OFF';
+      state.className = `state-text ${enabled ? 'on' : ''}`;
+      toggle.className = `toggle ${enabled ? 'on' : ''}`;
+      toggle.innerHTML = `<span>${enabled ? 'ON' : 'OFF'}</span>`;
+      toggle.title = title;
+    }
+    function formatRtcTime(value) {
+      if (!value) return 'Not available';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return value;
+      return date.toLocaleString();
+    }
+    function paintRtcStatus(payload) {
+      const systemTime = document.getElementById('rtc-system-time');
+      const rtcTime = document.getElementById('rtc-time');
+      const difference = document.getElementById('rtc-difference');
+      const status = document.getElementById('rtc-status');
+      const syncButton = document.getElementById('rtc-sync-button');
+      if (!systemTime || !rtcTime || !difference || !status || !syncButton) return;
+      systemTime.textContent = formatRtcTime(payload.system_time);
+      rtcTime.textContent = formatRtcTime(payload.rtc_time);
+      difference.textContent = payload.difference_seconds === null || payload.difference_seconds === undefined
+        ? 'Unknown'
+        : `${payload.difference_seconds}s`;
+      status.textContent = payload.status || 'UNKNOWN';
+      status.className = `state-text ${payload.available ? 'on' : ''}`;
+      syncButton.disabled = !payload.available;
+      syncButton.title = payload.error || 'Write current system time to RTC';
+    }
+    async function refreshRtc() {
+      try {
+        paintRtcStatus(await requestJson('api/v1/rtc'));
+      } catch (error) {
+        paintRtcStatus({
+          available: false,
+          rtc_time: null,
+          system_time: new Date().toISOString(),
+          difference_seconds: null,
+          status: 'ERROR',
+          error: JSON.stringify(error)
+        });
+      }
+    }
+    async function syncRtc() {
+      try {
+        paintRtcStatus(await requestJson('api/v1/rtc/sync', { method: 'POST' }));
+      } catch (error) {
+        paintRtcStatus({
+          available: false,
+          rtc_time: null,
+          system_time: new Date().toISOString(),
+          difference_seconds: null,
+          status: 'ERROR',
+          error: JSON.stringify(error)
+        });
+      }
     }
     let buzzerLastVolumePercent = 50;
     function buzzerPayload() {
@@ -2017,11 +2214,18 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       try {
         const payload = await requestJson('api/v1/buzzer/status');
         paintBuzzer(payload);
-        document.getElementById('buzzer-detail').textContent = `pigpio: ${payload.pigpio.connected ? 'connected' : 'offline'} | pwmchip: ${payload.pwm.available ? 'available' : 'missing'} | gpio18: ${payload.gpio.available ? 'available' : 'missing'}`;
+        paintBuzzerAvailability(payload);
       } catch (error) {
         document.getElementById('buzzer-status').textContent = 'BUZZER: Error';
         document.getElementById('buzzer-detail').textContent = JSON.stringify(error);
       }
+    }
+    function paintBuzzerAvailability(payload) {
+      const detail = document.getElementById('buzzer-detail');
+      if (!detail || !payload) return;
+      const backendAvailable = Boolean((payload.pigpio && payload.pigpio.connected) || (payload.pwm && payload.pwm.available));
+      const gpioAvailable = Boolean(payload.gpio && payload.gpio.available);
+      detail.textContent = `GPIO18 PWM: ${backendAvailable && gpioAvailable ? 'available' : 'not available'}`;
     }
     function paintBuzzer(payload) {
       if (!payload) return;
@@ -2065,7 +2269,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           body: JSON.stringify(requested)
         });
         document.getElementById('buzzer-status').textContent = `BUZZER: running ${payload.backend}`;
-        detail.textContent = `duration: ${payload.duration_ms} ms | pigpio: ${payload.pigpio.connected ? 'connected' : 'offline'}`;
+        paintBuzzerAvailability(payload);
         window.setTimeout(renderBuzzerStatus, requested.duration_ms + 250);
       } catch (error) {
         document.getElementById('buzzer-status').textContent = 'BUZZER: Test failed';
@@ -2076,7 +2280,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       try {
         const payload = await requestJson('api/v1/buzzer/stop', { method: 'POST' });
         document.getElementById('buzzer-status').textContent = 'BUZZER: stopped';
-        document.getElementById('buzzer-detail').textContent = `pigpio: ${payload.pigpio.connected ? 'connected' : 'offline'} | pwmchip: ${payload.pwm.available ? 'available' : 'missing'}`;
+        paintBuzzerAvailability(payload);
       } catch (error) {
         document.getElementById('buzzer-status').textContent = 'BUZZER: stop failed';
         document.getElementById('buzzer-detail').textContent = JSON.stringify(error);
@@ -2097,6 +2301,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     renderExtensions();
     renderOneWire();
     renderBuzzerStatus();
+    refreshRtc();
     connectEvents();
   </script>
 </body>
@@ -2118,6 +2323,25 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     @app.get("/api/v1/ui/settings")
     async def get_ui_settings() -> dict:
         return runtime_or_503().ui_settings.snapshot()
+
+    @app.put("/api/v1/diagnostic-indicators/ste-heartbeat")
+    async def put_ste_heartbeat(payload: SteHeartbeatPayload) -> dict:
+        try:
+            return await runtime_or_503().set_ste_heartbeat(
+                payload.enabled,
+                payload.on_seconds,
+                payload.off_seconds,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.put("/api/v1/diagnostic-indicators/net")
+    async def put_net_indicator(payload: DiagnosticIndicatorPayload) -> dict:
+        return await runtime_or_503().set_net_indicator(payload.enabled)
+
+    @app.put("/api/v1/diagnostic-indicators/err")
+    async def put_err_indicator(payload: DiagnosticIndicatorPayload) -> dict:
+        return await runtime_or_503().set_err_indicator(payload.enabled)
 
     @app.put("/api/v1/ui/theme")
     async def put_ui_theme(payload: UiThemePayload) -> dict:
@@ -2350,6 +2574,17 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     @app.get("/api/v1/diagnostics/devices")
     async def get_device_diagnostics() -> dict[str, list[str]]:
         return collect_device_diagnostics()
+
+    @app.get("/api/v1/rtc")
+    async def get_rtc_status() -> dict:
+        return (await app.state.rtc.status()).__dict__
+
+    @app.post("/api/v1/rtc/sync")
+    async def post_rtc_sync() -> dict:
+        try:
+            return (await app.state.rtc.sync_from_system()).__dict__
+        except RuntimeError as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     @app.get("/api/v1/i2c/scan/{bus}")
     async def get_i2c_scan(bus: int) -> dict:

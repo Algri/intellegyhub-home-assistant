@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.150
+
+- Add Board Diagnostics backend support for STE heartbeat, NET connection indication, and ERR placeholder state persistence.
+- Add host RTC status and sync endpoints for the RTC Clock card without direct I2C access to the RTC address.
+
 ## 0.5.149
 
 - Rename the RGBW dimmer control to Dimmer and label RGBW channel sliders as X1 Red, X2 Green, X3 Blue, and X4 White.

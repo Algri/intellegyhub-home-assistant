@@ -1,7 +1,7 @@
 name: IntellegyHUB
 slug: intellegyhub
 description: IntellegyHUB hardware runtime for Home Assistant native entities
-version: 0.5.149
+version: 0.5.150
 stage: experimental
 arch:
   - aarch64
@@ -31,6 +31,8 @@ map:
 options:
   diagnostics:
     carrier_monitoring_poll_interval_seconds: 30
+    ste_heartbeat_on_seconds: 0.2
+    ste_heartbeat_off_seconds: 1.8
   onewire:
     bus1_poll_interval_seconds: 30
     bus2_poll_interval_seconds: 30
@@ -45,6 +47,8 @@ options:
 schema:
   diagnostics:
     carrier_monitoring_poll_interval_seconds: int(1,3600)
+    ste_heartbeat_on_seconds: float(0.05,10)
+    ste_heartbeat_off_seconds: float(0.05,60)
   onewire:
     bus1_poll_interval_seconds: int(1,3600)
     bus2_poll_interval_seconds: int(1,3600)
