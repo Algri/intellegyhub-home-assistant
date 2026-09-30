@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.154
+
+- Add SYS_TIME privilege for RTC sync and keep the last readable RTC status visible when a sync command fails.
+
 ## 0.5.153
 
 - Parse BusyBox hwclock output with variable spacing in the RTC Clock backend.

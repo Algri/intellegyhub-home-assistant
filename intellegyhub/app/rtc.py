@@ -58,8 +58,19 @@ class HostRtc:
     async def sync_from_system(self) -> RtcStatus:
         if shutil.which(self.command) is None:
             return await self.status()
-        await self._run(*self._args("-w", "-u"))
-        return await self.status()
+        try:
+            await self._run(*self._args("-w", "-u"))
+            return await self.status()
+        except (OSError, RuntimeError) as exc:
+            current = await self.status()
+            return RtcStatus(
+                available=current.available,
+                rtc_time=current.rtc_time,
+                system_time=current.system_time,
+                difference_seconds=current.difference_seconds,
+                status="ERROR",
+                error=str(exc),
+            )
 
     def _args(self, *args: str) -> tuple[str, ...]:
         device = self._device()

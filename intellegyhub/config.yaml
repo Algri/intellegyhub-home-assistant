@@ -1,7 +1,7 @@
 name: IntellegyHUB
 slug: intellegyhub
 description: IntellegyHUB hardware runtime for Home Assistant native entities
-version: 0.5.153
+version: 0.5.154
 stage: experimental
 arch:
   - aarch64
@@ -17,6 +17,7 @@ full_access: true
 gpio: true
 privileged:
   - SYS_RAWIO
+  - SYS_TIME
 devices:
   - /dev/gpiochip0
   - /dev/gpiomem
