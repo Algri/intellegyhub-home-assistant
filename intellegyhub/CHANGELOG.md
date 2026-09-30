@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.158
+
+- Keep STE LED off during WebSocket reconnect grace while NET blinks until the connection timeout expires.
+
 ## 0.5.157
 
 - Add a configurable WebSocket connection grace period so NET blinks while connecting and ERR starts only after timeout.
