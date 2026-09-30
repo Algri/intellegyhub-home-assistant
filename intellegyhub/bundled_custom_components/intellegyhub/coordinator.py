@@ -10,7 +10,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
 from .api import IntellegyHubApiClient
-from .const import BUTTONS, CARRIER_OUTPUTS, DOMAIN, OUTPUTS
+from .const import BUTTONS, CARRIER_OUTPUTS, DOMAIN, OUTPUTS, normalize_xport_profile
 from .registry_names import apply_compact_entity_dashboard_names
 from .xport_entities import XPORT_ENTITY_KINDS, xport_desired_unique_ids, xport_platform_value
 
@@ -93,6 +93,14 @@ class IntellegyHubGpioManager:
     async def async_set_xport_mode(self, channel: int, mode: str) -> None:
         result = await self.client.set_xport_mode(channel, mode, self.xport_channel(channel).get("revision", 0) + 1)
         self._apply_xport_channel(result.get("channel"))
+        self._remove_stale_xport_registry_entries()
+        self.connected = True
+        self._notify()
+
+    async def async_set_xport_profile(self, profile: str) -> None:
+        result = await self.client.set_xport_profile(profile)
+        self.xport = result.get("xport", self.xport)
+        self._normalize_xport_profile()
         self._remove_stale_xport_registry_entries()
         self.connected = True
         self._notify()
@@ -228,6 +236,7 @@ class IntellegyHubGpioManager:
         self.carrier_outputs = self._carrier_outputs_from_payload(self.carrier)
         self.buzzer = payload.get("buzzer", self.buzzer)
         self.xport = payload.get("xport", {})
+        self._normalize_xport_profile()
         self.extensions = payload.get("extensions", {})
         self.onewire = payload.get("onewire", {})
         self._remove_stale_extension_registry_entries()
@@ -293,6 +302,7 @@ class IntellegyHubGpioManager:
             self.carrier_outputs = self._carrier_outputs_from_payload(self.carrier)
             self.buzzer = event.get("buzzer", self.buzzer)
             self.xport = event.get("xport", self.xport)
+            self._normalize_xport_profile()
             self.extensions = event.get("extensions", self.extensions)
             self.onewire = event.get("onewire", self.onewire)
             self.connected = True
@@ -320,6 +330,7 @@ class IntellegyHubGpioManager:
             self._remove_stale_xport_registry_entries()
         elif event_type == "xport_changed":
             self.xport = event.get("xport", self.xport)
+            self._normalize_xport_profile()
             self._remove_stale_xport_registry_entries()
         elif event_type == "extensions_changed":
             self.extensions = event.get("extensions", self.extensions)
@@ -412,6 +423,11 @@ class IntellegyHubGpioManager:
         else:
             channels.append(channel)
         self.xport["channels"] = sorted(channels, key=lambda item: item.get("channel", 0))
+
+    @callback
+    def _normalize_xport_profile(self) -> None:
+        if isinstance(self.xport, dict):
+            self.xport["group_mode"] = normalize_xport_profile(self.xport.get("group_mode"))
 
     @callback
     def _apply_extension_module(self, module: dict | None) -> None:
@@ -533,8 +549,11 @@ class IntellegyHubGpioManager:
     @callback
     def _remove_stale_xport_registry_entries(self) -> None:
         desired: set[tuple[str, str]] = set()
-        if self.xport.get("group_mode") == "RgbwDimmer":
+        desired.add(("select", "intellegyhub_xport_profile"))
+        if normalize_xport_profile(self.xport.get("group_mode")) == "RGBW Dimmer":
             desired.add(("light", "intellegyhub_xport_rgbw"))
+            for color in ("red", "green", "blue", "white"):
+                desired.add(("number", f"intellegyhub_xport_rgbw_{color}"))
         else:
             for channel in range(1, 5):
                 mode = self.xport_channel(channel).get("confirmed_mode")
@@ -559,6 +578,26 @@ class IntellegyHubGpioManager:
         rgbw_entity_id = entity_registry.async_get_entity_id("light", DOMAIN, "intellegyhub_xport_rgbw")
         if rgbw_entity_id is not None and ("light", "intellegyhub_xport_rgbw") not in desired:
             entity_registry.async_remove(rgbw_entity_id)
+        for color in ("red", "green", "blue", "white"):
+            unique_id = f"intellegyhub_xport_rgbw_{color}"
+            entity_id = entity_registry.async_get_entity_id("number", DOMAIN, unique_id)
+            if entity_id is not None and ("number", unique_id) not in desired:
+                entity_registry.async_remove(entity_id)
+
+        device_registry = dr.async_get(self.hass)
+        devices = getattr(device_registry, "devices", {})
+        rgbw_enabled = normalize_xport_profile(self.xport.get("group_mode")) == "RGBW Dimmer"
+        for device in list(getattr(devices, "values", lambda: [])()):
+            identifiers = getattr(device, "identifiers", set())
+            for domain, identifier in identifiers:
+                if domain != DOMAIN:
+                    continue
+                if rgbw_enabled and identifier in {f"xport_{channel}" for channel in range(1, 5)}:
+                    device_registry.async_remove_device(device.id)
+                    break
+                if not rgbw_enabled and identifier == "xport_rgbw_dimmer":
+                    device_registry.async_remove_device(device.id)
+                    break
 
     @callback
     def _notify(self) -> None:

@@ -79,10 +79,10 @@ class IntellegyHubXPortGroupEntity(IntellegyHubGpioEntity):
     @property
     def device_info(self) -> DeviceInfo:
         return DeviceInfo(
-            identifiers={(DOMAIN, "xport")},
-            name="X-Port",
+            identifiers={(DOMAIN, "xport_rgbw_dimmer")},
+            name="X-Port RGBW Dimmer",
             manufacturer="IntellegyHub",
-            model="X-Port",
+            model="RGBW Dimmer",
             via_device_id=_parent_device_id(self, self.manager),
         )
 

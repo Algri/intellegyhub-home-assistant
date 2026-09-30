@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.146
+
+- Rename X-Port group mode to Profile with Universal I/O and RGBW Dimmer profiles.
+- Safely reset outputs on manual profile switching while restoring the active profile state after add-on restart.
+- Add the Home Assistant X-PORT Profile select entity and keep X1-X4/RGBW entities synchronized with the active profile.
+
 ## 0.5.145
 
 - Add X-Port RGBW Dimmer group mode with persisted backend state.

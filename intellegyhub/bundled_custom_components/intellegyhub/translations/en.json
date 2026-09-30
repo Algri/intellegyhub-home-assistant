@@ -51,6 +51,9 @@
     "select": {
       "xport_mode": {
         "name": "Mode"
+      },
+      "xport_profile": {
+        "name": "X-PORT Profile"
       }
     },
     "sensor": {
@@ -83,8 +86,8 @@
       "xport_pwm": {
         "name": "PWM"
       },
-      "xport_rgbw": {
-        "name": "X-Port RGBW"
+      "xport_rgbw_channel": {
+        "name": "RGBW Channel"
       }
     },
     "light": {
@@ -93,6 +96,9 @@
       },
       "xport_pwm": {
         "name": "PWM"
+      },
+      "xport_rgbw": {
+        "name": "RGBW"
       }
     },
     "button": {

@@ -11,6 +11,7 @@ from .const import BUTTONS, CARRIER_OUTPUTS, DOMAIN, OUTPUTS
 
 DEVICE_DASHBOARD_NAMES: dict[str, str] = {
     "mainboard": "IHC-1400",
+    "xport_rgbw_dimmer": "X-Port RGBW Dimmer",
     "onewire_bus10_addr1a": "1-Wire Bus1",
     "onewire_bus10_addr1b": "1-Wire Bus2",
 }
@@ -32,12 +33,22 @@ STATIC_ENTITY_DASHBOARD_NAMES: dict[str, str] = {
     "intellegyhub_buzzer_volume": "Buzzer Volume",
     "intellegyhub_buzzer_volume_light": "Buzzer Volume",
     "intellegyhub_buzzer_play": "Buzzer Play",
-    "intellegyhub_xport_rgbw": "X-Port RGBW",
+    "intellegyhub_xport_profile": "X-PORT Profile",
+    "intellegyhub_xport_rgbw": "RGBW",
+    "intellegyhub_xport_rgbw_red": "Red",
+    "intellegyhub_xport_rgbw_green": "Green",
+    "intellegyhub_xport_rgbw_blue": "Blue",
+    "intellegyhub_xport_rgbw_white": "White",
 }
 
 STATIC_ENTITY_IDS: dict[str, str] = {
     "intellegyhub_buzzer_volume_light": "light.intellegyhub_buzzer_volume_light",
+    "intellegyhub_xport_profile": "select.intellegyhub_xport_profile",
     "intellegyhub_xport_rgbw": "light.intellegyhub_xport_rgbw",
+    "intellegyhub_xport_rgbw_red": "number.intellegyhub_xport_rgbw_red",
+    "intellegyhub_xport_rgbw_green": "number.intellegyhub_xport_rgbw_green",
+    "intellegyhub_xport_rgbw_blue": "number.intellegyhub_xport_rgbw_blue",
+    "intellegyhub_xport_rgbw_white": "number.intellegyhub_xport_rgbw_white",
 }
 
 XPORT_ENTITY_SUFFIX_NAMES = {

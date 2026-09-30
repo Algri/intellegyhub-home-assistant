@@ -100,5 +100,18 @@ XPORT_MODE_PWM = "PwmOutput"
 XPORT_MODE_AI = "AnalogInput"
 XPORT_MODE_DI = {"DigitalInputExternalVoltage", "DigitalInputInternalPullUp"}
 XPORT_MODE_COUNTER = {"PulseCounterExternalVoltage", "PulseCounterInternalPullUp"}
-XPORT_GROUP_MODE_INDEPENDENT = "Independent"
-XPORT_GROUP_MODE_RGBW = "RgbwDimmer"
+XPORT_PROFILE_UNIVERSAL_IO = "Universal I/O"
+XPORT_PROFILE_RGBW_DIMMER = "RGBW Dimmer"
+XPORT_PROFILE_OPTIONS = [XPORT_PROFILE_UNIVERSAL_IO, XPORT_PROFILE_RGBW_DIMMER]
+XPORT_GROUP_MODE_INDEPENDENT = XPORT_PROFILE_UNIVERSAL_IO
+XPORT_GROUP_MODE_RGBW = XPORT_PROFILE_RGBW_DIMMER
+
+
+def normalize_xport_profile(profile: str | None) -> str:
+    if profile == "Independent":
+        return XPORT_PROFILE_UNIVERSAL_IO
+    if profile == "RgbwDimmer":
+        return XPORT_PROFILE_RGBW_DIMMER
+    if profile in XPORT_PROFILE_OPTIONS:
+        return profile
+    return XPORT_PROFILE_UNIVERSAL_IO

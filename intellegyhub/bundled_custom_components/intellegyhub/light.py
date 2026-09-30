@@ -7,7 +7,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, XPORT_GROUP_MODE_RGBW, XPORT_MODE_PWM
+from .const import DOMAIN, XPORT_GROUP_MODE_RGBW, XPORT_MODE_PWM, normalize_xport_profile
 from .entity import IntellegyHubGpioEntity, IntellegyHubXPortEntity, IntellegyHubXPortGroupEntity
 from .xport_entities import setup_xport_dynamic_platform
 
@@ -32,7 +32,7 @@ def setup_xport_rgbw_light(entry: ConfigEntry, manager, async_add_entities: AddE
     @callback
     def sync_entity() -> None:
         nonlocal entity
-        enabled = manager.xport.get("group_mode") == XPORT_GROUP_MODE_RGBW
+        enabled = normalize_xport_profile(manager.xport.get("group_mode")) == XPORT_GROUP_MODE_RGBW
         if enabled and entity is None:
             entity = IntellegyHubXPortRgbwLight(manager)
             async_add_entities([entity])
@@ -94,14 +94,14 @@ class IntellegyHubXPortRgbwLight(IntellegyHubXPortGroupEntity, LightEntity):
     _attr_translation_key = "xport_rgbw"
     _attr_unique_id = "intellegyhub_xport_rgbw"
     _attr_suggested_object_id = "intellegyhub_xport_rgbw"
-    _attr_name = "X-Port RGBW"
+    _attr_name = "RGBW"
     _attr_supported_color_modes = {ColorMode.RGBW}
     _attr_color_mode = ColorMode.RGBW
     _attr_icon = "mdi:lightbulb"
 
     @property
     def available(self) -> bool:
-        return self.xport_available and self.manager.xport.get("group_mode") == XPORT_GROUP_MODE_RGBW
+        return self.xport_available and normalize_xport_profile(self.manager.xport.get("group_mode")) == XPORT_GROUP_MODE_RGBW
 
     @property
     def is_on(self) -> bool:

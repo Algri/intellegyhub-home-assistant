@@ -28,8 +28,16 @@ class XPortMode(StrEnum):
 
 
 class XPortGroupMode(StrEnum):
-    INDEPENDENT = "Independent"
-    RGBW_DIMMER = "RgbwDimmer"
+    UNIVERSAL_IO = "Universal I/O"
+    RGBW_DIMMER = "RGBW Dimmer"
+
+    @classmethod
+    def _missing_(cls, value: object) -> XPortGroupMode | None:
+        if value == "Independent":
+            return cls.UNIVERSAL_IO
+        if value == "RgbwDimmer":
+            return cls.RGBW_DIMMER
+        return None
 
 
 class XPortTopology(StrEnum):
@@ -108,6 +116,13 @@ class XPortStore:
         async with self._lock:
             await asyncio.to_thread(self._save_group_mode_sync, mode)
 
+    async def save_profile_channels(self, profile: XPortGroupMode, channels: list[XPortChannel]) -> None:
+        async with self._lock:
+            await asyncio.to_thread(self._save_profile_channels_sync, profile, channels)
+
+    async def load_profile_channels(self, profile: XPortGroupMode) -> list[XPortChannel]:
+        return await asyncio.to_thread(self._load_profile_channels_sync, profile)
+
     def _connect(self) -> sqlite3.Connection:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         return sqlite3.connect(self.path)
@@ -137,6 +152,23 @@ class XPortStore:
                 )
                 """
             )
+            db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS xport_profile_channels (
+                    profile TEXT NOT NULL,
+                    channel INTEGER NOT NULL CHECK(channel BETWEEN 1 AND 4),
+                    desired_mode TEXT NOT NULL,
+                    confirmed_mode TEXT NOT NULL,
+                    value REAL NOT NULL,
+                    counter INTEGER NOT NULL,
+                    revision INTEGER NOT NULL,
+                    availability TEXT NOT NULL,
+                    error TEXT NULL,
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY(profile, channel)
+                )
+                """
+            )
 
     def _load_sync(self) -> list[XPortChannel]:
         with self._connect() as db:
@@ -152,11 +184,11 @@ class XPortStore:
                 "SELECT value FROM xport_settings WHERE key='group_mode'"
             ).fetchone()
         if row is None:
-            return XPortGroupMode.INDEPENDENT
+            return XPortGroupMode.UNIVERSAL_IO
         try:
             return XPortGroupMode(row[0])
         except ValueError:
-            return XPortGroupMode.INDEPENDENT
+            return XPortGroupMode.UNIVERSAL_IO
 
     def _save_sync(self, channel: XPortChannel) -> None:
         with self._connect() as db:
@@ -197,6 +229,46 @@ class XPortStore:
                 """,
                 (mode.value,),
             )
+
+    def _save_profile_channels_sync(self, profile: XPortGroupMode, channels: list[XPortChannel]) -> None:
+        with self._connect() as db:
+            for channel in channels:
+                db.execute(
+                    """
+                    INSERT INTO xport_profile_channels(profile,channel,desired_mode,confirmed_mode,value,counter,revision,availability,error,updated_at)
+                    VALUES(?,?,?,?,?,?,?,?,?,?)
+                    ON CONFLICT(profile, channel) DO UPDATE SET
+                      desired_mode=excluded.desired_mode,
+                      confirmed_mode=excluded.confirmed_mode,
+                      value=excluded.value,
+                      counter=excluded.counter,
+                      revision=excluded.revision,
+                      availability=excluded.availability,
+                      error=excluded.error,
+                      updated_at=excluded.updated_at
+                    """,
+                    (
+                        profile.value,
+                        channel.channel,
+                        channel.desired_mode,
+                        channel.confirmed_mode,
+                        channel.value,
+                        channel.counter,
+                        channel.revision,
+                        channel.availability,
+                        channel.error,
+                        channel.updated_at,
+                    ),
+                )
+
+    def _load_profile_channels_sync(self, profile: XPortGroupMode) -> list[XPortChannel]:
+        with self._connect() as db:
+            rows = db.execute(
+                "SELECT channel,desired_mode,confirmed_mode,value,counter,revision,availability,error,updated_at "
+                "FROM xport_profile_channels WHERE profile=? ORDER BY channel",
+                (profile.value,),
+            ).fetchall()
+        return [XPortChannel(*row) for row in rows]
 
 
 class XPortHardware:
@@ -486,7 +558,7 @@ class XPortManager:
         self.topology = XPortTopology.NOT_INSTALLED
         self.availability = Availability.UNKNOWN
         self.error: str | None = "startup pending"
-        self.group_mode = XPortGroupMode.INDEPENDENT
+        self.group_mode = XPortGroupMode.UNIVERSAL_IO
         self.channels: dict[int, XPortChannel] = {}
         self._lock = asyncio.Lock()
         self._publisher: Callable[[dict[str, Any]], Any] | None = None
@@ -568,15 +640,22 @@ class XPortManager:
 
     async def configure_group_mode(self, mode: XPortGroupMode) -> dict[str, Any]:
         async with self._lock:
+            mode = XPortGroupMode(mode)
             if mode == XPortGroupMode.RGBW_DIMMER:
                 if self.availability != Availability.AVAILABLE:
                     raise ValueError(self.error or "X-Port is not available")
                 if self.topology != XPortTopology.EXTENDED:
                     raise ValueError("RGBW Dimmer requires X-Port Extended topology with PCA9632 0x62")
+            if mode == self.group_mode:
+                return {"group_mode": self.group_mode, "status": "Succeeded", "xport": self.snapshot()}
+            await self.store.save_profile_channels(self.group_mode, list(self.channels.values()))
+            await self._safe_shutdown_channels()
             self.group_mode = mode
             await self.store.save_group_mode(mode)
             if mode == XPortGroupMode.RGBW_DIMMER:
-                await self._enable_rgbw_group(restore_values=True)
+                await self._enable_rgbw_group(restore_values=False)
+            else:
+                await self._enable_universal_io_profile()
             if self._publisher:
                 result = self._publisher({"type": "xport_changed", "xport": self.snapshot()})
                 if asyncio.iscoroutine(result):
@@ -585,7 +664,7 @@ class XPortManager:
 
     async def configure(self, channel: int, mode: XPortMode, revision: int | None = None) -> dict[str, Any]:
         async with self._lock:
-            if self.group_mode != XPortGroupMode.INDEPENDENT:
+            if self.group_mode != XPortGroupMode.UNIVERSAL_IO:
                 state = self._required(channel)
                 return self._operation(state, "Rejected", "X-Port channels are locked by group mode")
             state = self._required(channel)
@@ -611,6 +690,7 @@ class XPortManager:
                 state.error = None
                 state.updated_at = self._now()
                 await self.store.save(state)
+                await self.store.save_profile_channels(self.group_mode, [state])
                 await self._publish_state(state)
                 return self._operation(state, "Succeeded", None)
             except Exception as exc:
@@ -619,6 +699,7 @@ class XPortManager:
                 state.error = str(exc)
                 state.updated_at = self._now()
                 await self.store.save(state)
+                await self.store.save_profile_channels(self.group_mode, [state])
                 await self._publish_state(state)
                 return self._operation(state, "Failed", state.error)
 
@@ -632,6 +713,7 @@ class XPortManager:
                 state.value = await self.hardware.set_value(channel, mode, value)
                 state.updated_at = self._now()
                 await self.store.save(state)
+                await self.store.save_profile_channels(self.group_mode, [state])
                 await self._publish_state(state)
                 return self._operation(state, "Succeeded", None)
             except Exception as exc:
@@ -651,6 +733,7 @@ class XPortManager:
             state.availability = self.availability
             state.error = None
             await self.store.save(state)
+            await self.store.save_profile_channels(self.group_mode, [state])
             await self._publish_state(state)
             return self._operation(state, "Succeeded", None)
 
@@ -672,6 +755,26 @@ class XPortManager:
                 state.error = str(exc)
             state.updated_at = self._now()
             await self.store.save(state)
+        await self.store.save_profile_channels(self.group_mode, list(self.channels.values()))
+
+    async def _enable_universal_io_profile(self) -> None:
+        for channel in range(1, 5):
+            state = self._required(channel)
+            state.desired_mode = XPortMode.DISABLED
+            state.confirmed_mode = XPortMode.DISABLED
+            state.value = 0
+            state.availability = self.availability
+            state.error = None if self.availability == Availability.AVAILABLE else self.error
+            state.updated_at = self._now()
+            await self.store.save(state)
+        await self.store.save_profile_channels(self.group_mode, list(self.channels.values()))
+
+    async def _safe_shutdown_channels(self) -> None:
+        for channel in range(1, 5):
+            try:
+                await self.hardware.disable_channel(channel)
+            except Exception:
+                pass
 
     async def reset_counter(self, channel: int) -> dict[str, Any]:
         async with self._lock:

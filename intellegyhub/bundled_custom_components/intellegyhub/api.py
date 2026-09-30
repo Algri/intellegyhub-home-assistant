@@ -100,6 +100,16 @@ class IntellegyHubApiClient:
                 raise IntellegyHubApiError(f"X-Port group value command failed with HTTP {response.status}")
             return await response.json()
 
+    async def set_xport_profile(self, profile: str) -> dict[str, Any]:
+        async with self.session.put(
+            urljoin(self.base_url, "api/v1/xport/group-mode"),
+            json={"mode": profile},
+            timeout=10,
+        ) as response:
+            if response.status != 200:
+                raise IntellegyHubApiError(f"X-Port profile command failed with HTTP {response.status}")
+            return await response.json()
+
     async def reset_xport_counter(self, channel: int) -> dict[str, Any]:
         async with self.session.post(
             urljoin(self.base_url, f"api/v1/xport/channels/{channel}/counter/reset"),

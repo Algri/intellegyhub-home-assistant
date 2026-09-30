@@ -190,7 +190,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.145 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.146 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -231,7 +231,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.145", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.146", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
 
@@ -761,7 +761,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       <p class="notice">When a port mode changes, the previous channel mode is safely shut down first. Selected modes are stored on the Hardware Host and restored after restart.</p>
       <div class="extension-actions bus-toolbar xport-group-toolbar">
         <div class="bus-power-control">
-          <label>Group Mode</label>
+          <label>Profile</label>
           <div id="xport-group-mode"></div>
         </div>
         <div class="bus-note">RGBW Dimmer assigns X1-X4 as Red, Green, Blue, and White channels.</div>
@@ -919,10 +919,12 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       'PulseCounterInternalPullUp'
     ];
     const groupModeLabels = {
-      Independent: 'Independent',
+      'Universal I/O': 'Universal I/O',
+      'RGBW Dimmer': 'RGBW Dimmer',
+      Independent: 'Universal I/O',
       RgbwDimmer: 'RGBW Dimmer'
     };
-    const groupModeOrder = ['Independent', 'RgbwDimmer'];
+    const groupModeOrder = ['Universal I/O', 'RGBW Dimmer'];
     const rgbwRoles = {
       1: 'Red',
       2: 'Green',
@@ -1018,7 +1020,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     function updateXPortGroupMode(payload) {
       const target = document.getElementById('xport-group-mode');
-      const currentMode = payload.group_mode || 'Independent';
+      const currentMode = normalizeGroupMode(payload.group_mode);
       const availableModes = payload.group_modes || groupModeOrder;
       const key = `${currentMode}|${availableModes.join(',')}`;
       if (target.dataset.key !== key) {
@@ -1053,8 +1055,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       card.append(title, label, modeSelect, activeRow, modeBody);
       return card;
     }
-    function updateXPortCard(card, channel, modes, groupMode = 'Independent') {
-      const locked = groupMode && groupMode !== 'Independent';
+    function updateXPortCard(card, channel, modes, groupMode = 'Universal I/O') {
+      groupMode = normalizeGroupMode(groupMode);
+      const locked = groupMode && groupMode !== 'Universal I/O';
       card.classList.toggle('locked', locked);
       const desiredLabel = locked ? `${rgbwRoles[channel.channel] || 'RGBW'} channel` : labels[channel.desired_mode] || channel.desired_mode;
       const trigger = card.querySelector('.mode-trigger');
@@ -1063,7 +1066,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       }
       if (trigger) {
         trigger.disabled = locked;
-        trigger.title = locked ? 'X1-X4 are assigned by X-Port Group Mode' : '';
+        trigger.title = locked ? 'X1-X4 are assigned by the active X-Port profile' : '';
       }
       const modeSelect = card.querySelector('.mode-select');
       if (modeSelect) {
@@ -1309,6 +1312,11 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       wrap.append(trigger, menu);
       return wrap;
     }
+    function normalizeGroupMode(mode) {
+      if (mode === 'Independent') { return 'Universal I/O'; }
+      if (mode === 'RgbwDimmer') { return 'RGBW Dimmer'; }
+      return mode || 'Universal I/O';
+    }
     function renderGroupModeSelect(currentMode, modes) {
       const wrap = document.createElement('div');
       wrap.className = 'mode-select';
@@ -1325,7 +1333,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
 
       const menu = document.createElement('div');
       menu.className = 'mode-menu';
-      const orderedModes = groupModeOrder.filter((mode) => modes.includes(mode));
+      const normalizedModes = modes.map(normalizeGroupMode);
+      const orderedModes = groupModeOrder.filter((mode) => normalizedModes.includes(mode));
       for (const mode of orderedModes) {
         const option = document.createElement('button');
         option.type = 'button';
