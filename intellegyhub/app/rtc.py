@@ -15,6 +15,7 @@ class RtcStatus:
     difference_seconds: float | None
     status: str
     error: str | None = None
+    rtc_local_time: str | None = None
 
 
 class HostRtc:
@@ -38,12 +39,14 @@ class HostRtc:
         try:
             completed = await self._run(*self._args("-r", "-u"))
             rtc_time = _parse_hwclock_time(completed.strip())
+            rtc_local_time = _parse_hwclock_local_time(completed.strip())
             return RtcStatus(
                 available=True,
                 rtc_time=rtc_time.isoformat(),
                 system_time=system_time.isoformat(),
                 difference_seconds=round((rtc_time - system_time).total_seconds(), 3),
                 status="OK",
+                rtc_local_time=rtc_local_time,
             )
         except (OSError, RuntimeError, ValueError) as exc:
             return RtcStatus(
@@ -70,6 +73,7 @@ class HostRtc:
                 difference_seconds=current.difference_seconds,
                 status="ERROR",
                 error=str(exc),
+                rtc_local_time=current.rtc_local_time,
             )
 
     def _args(self, *args: str) -> tuple[str, ...]:
@@ -98,6 +102,22 @@ class HostRtc:
         return stdout.decode(errors="replace")
 
 
+class MockRtc:
+    async def status(self) -> RtcStatus:
+        now = datetime.now(timezone.utc)
+        return RtcStatus(
+            available=True,
+            rtc_time=now.isoformat(),
+            system_time=now.isoformat(),
+            difference_seconds=0.0,
+            status="OK",
+            rtc_local_time=datetime.now().replace(microsecond=0).isoformat(),
+        )
+
+    async def sync_from_system(self) -> RtcStatus:
+        return await self.status()
+
+
 def _parse_hwclock_time(value: str) -> datetime:
     # BusyBox/util-linux usually returns: 2026-09-30 21:10:00.123456+03:00
     first_line = value.splitlines()[0].strip()
@@ -107,7 +127,8 @@ def _parse_hwclock_time(value: str) -> datetime:
     busybox_prefix = compact.rsplit(" ", 2)[0].strip()
     for candidate in (compact, busybox_prefix):
         try:
-            return datetime.strptime(candidate, "%a %b %d %H:%M:%S %Y").replace(tzinfo=timezone.utc)
+            local_zone = datetime.now().astimezone().tzinfo
+            return datetime.strptime(candidate, "%a %b %d %H:%M:%S %Y").replace(tzinfo=local_zone).astimezone(timezone.utc)
         except ValueError:
             pass
     normalized = compact
@@ -119,3 +140,16 @@ def _parse_hwclock_time(value: str) -> datetime:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc)
+
+
+def _parse_hwclock_local_time(value: str) -> str | None:
+    first_line = value.splitlines()[0].strip()
+    if not first_line:
+        return None
+    compact = " ".join(first_line.split())
+    busybox_prefix = compact.rsplit(" ", 2)[0].strip()
+    try:
+        parsed = datetime.strptime(busybox_prefix, "%a %b %d %H:%M:%S %Y")
+        return parsed.isoformat()
+    except ValueError:
+        return None

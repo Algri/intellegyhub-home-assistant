@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from .backends import MockGpioBackend, RealGpiodBackend
 from .carrier import APP_VERSION
 from .config import load_config
-from .rtc import HostRtc
+from .rtc import HostRtc, MockRtc
 from .runtime import AppRuntime
 from .xport import XPortGroupMode, XPortMode
 
@@ -203,7 +203,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.154 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.155 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -248,10 +248,10 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.154", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.155", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
-    app.state.rtc = HostRtc()
+    app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
 
     def runtime_or_503() -> AppRuntime:
         current: AppRuntime = app.state.runtime
@@ -2128,11 +2128,14 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       const errorText = document.getElementById('rtc-error');
       const syncButton = document.getElementById('rtc-sync-button');
       if (!systemTime || !rtcTime || !difference || !status || !syncButton || !errorText) return;
+      const systemDate = new Date(payload.system_time);
+      const rtcValue = payload.rtc_local_time || payload.rtc_time;
+      const rtcDate = rtcValue ? new Date(rtcValue) : new Date(Number.NaN);
       systemTime.textContent = formatRtcTime(payload.system_time);
-      rtcTime.textContent = formatRtcTime(payload.rtc_time);
-      difference.textContent = payload.difference_seconds === null || payload.difference_seconds === undefined
+      rtcTime.textContent = payload.rtc_local_time ? formatRtcTime(payload.rtc_local_time) : formatRtcTime(payload.rtc_time);
+      difference.textContent = Number.isNaN(rtcDate.getTime()) || Number.isNaN(systemDate.getTime())
         ? 'Unknown'
-        : `${payload.difference_seconds}s`;
+        : `${((rtcDate.getTime() - systemDate.getTime()) / 1000).toFixed(3)}s`;
       status.textContent = payload.status || 'UNKNOWN';
       status.className = `state-text ${payload.available ? 'on' : ''}`;
       syncButton.disabled = !payload.available;

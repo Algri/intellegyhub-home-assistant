@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.155
+
+- Normalize RTC Clock display time and provide a usable mock RTC status in add-on mock mode.
+
 ## 0.5.154
 
 - Add SYS_TIME privilege for RTC sync and keep the last readable RTC status visible when a sync command fails.
