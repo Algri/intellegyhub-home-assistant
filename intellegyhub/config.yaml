@@ -1,7 +1,7 @@
 name: IntellegyHUB
 slug: intellegyhub
 description: IntellegyHUB hardware runtime for Home Assistant native entities
-version: 0.5.151
+version: 0.5.152
 stage: experimental
 arch:
   - aarch64
@@ -22,6 +22,7 @@ devices:
   - /dev/gpiomem
   - /dev/i2c-1
   - /dev/i2c-10
+  - /dev/rtc0
   - /dev/mem
   - /dev/vcio
 map:

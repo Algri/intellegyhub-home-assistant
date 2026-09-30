@@ -4,6 +4,7 @@ import asyncio
 import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -19,8 +20,9 @@ class RtcStatus:
 class HostRtc:
     """Access the kernel-owned RTC through host tools, never raw I2C."""
 
-    def __init__(self, command: str = "hwclock") -> None:
+    def __init__(self, command: str = "hwclock", device_candidates: tuple[str, ...] | None = None) -> None:
         self.command = command
+        self.device_candidates = device_candidates or ("/dev/rtc0", "/dev/rtc", "/dev/misc/rtc")
 
     async def status(self) -> RtcStatus:
         system_time = datetime.now(timezone.utc)
@@ -34,7 +36,7 @@ class HostRtc:
                 error=f"{self.command} not found",
             )
         try:
-            completed = await self._run("-r", "-u")
+            completed = await self._run(*self._args("-r", "-u"))
             rtc_time = _parse_hwclock_time(completed.strip())
             return RtcStatus(
                 available=True,
@@ -56,8 +58,20 @@ class HostRtc:
     async def sync_from_system(self) -> RtcStatus:
         if shutil.which(self.command) is None:
             return await self.status()
-        await self._run("-w", "-u")
+        await self._run(*self._args("-w", "-u"))
         return await self.status()
+
+    def _args(self, *args: str) -> tuple[str, ...]:
+        device = self._device()
+        if device is None:
+            return args
+        return ("-f", device, *args)
+
+    def _device(self) -> str | None:
+        for candidate in self.device_candidates:
+            if Path(candidate).exists():
+                return candidate
+        return None
 
     async def _run(self, *args: str) -> str:
         process = await asyncio.create_subprocess_exec(

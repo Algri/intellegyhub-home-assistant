@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.152
+
+- Pass the host RTC device into the add-on container and use explicit host RTC paths for RTC Clock commands.
+
 ## 0.5.151
 
 - Use BusyBox-compatible host RTC commands for the RTC Clock card and show RTC backend errors in the add-on UI.
