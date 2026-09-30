@@ -17,7 +17,7 @@ power_button:
   shutdown_enabled: true
   shutdown_hold_seconds: 1.0
 buzzer:
-  startup_enabled: false
+  startup_enabled: true
   shutdown_enabled: true
   frequency: 2000
   duration_ms: 200

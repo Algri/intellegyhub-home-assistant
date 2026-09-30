@@ -90,7 +90,7 @@ cd C:\Users\Algri\Documents\GitHub\intellegyhub-home-assistant\intellegyhub
 python -m pip install fastapi "uvicorn[standard]" pydantic pigpio
 
 set INTELLEGY_GPIO_MOCK=1
-set INTELLEGY_ADDON_OPTIONS={"diagnostics":{"carrier_monitoring_poll_interval_seconds":30},"onewire":{"bus1_poll_interval_seconds":30,"bus2_poll_interval_seconds":30},"power_button":{"shutdown_enabled":true,"shutdown_hold_seconds":1.0},"buzzer":{"startup_enabled":false,"shutdown_enabled":true,"frequency":2000,"duration_ms":200}}
+set INTELLEGY_ADDON_OPTIONS={"diagnostics":{"carrier_monitoring_poll_interval_seconds":30},"onewire":{"bus1_poll_interval_seconds":30,"bus2_poll_interval_seconds":30},"power_button":{"shutdown_enabled":true,"shutdown_hold_seconds":1.0},"buzzer":{"startup_enabled":true,"shutdown_enabled":true,"frequency":2000,"duration_ms":200}}
 
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8098 --reload
 ```
@@ -117,7 +117,7 @@ cd C:\Users\Algri\Documents\GitHub\intellegyhub-home-assistant\intellegyhub
 python -m pip install fastapi "uvicorn[standard]" pydantic pigpio
 
 $env:INTELLEGY_GPIO_MOCK="1"
-$env:INTELLEGY_ADDON_OPTIONS='{"diagnostics":{"carrier_monitoring_poll_interval_seconds":30},"onewire":{"bus1_poll_interval_seconds":30,"bus2_poll_interval_seconds":30},"power_button":{"shutdown_enabled":true,"shutdown_hold_seconds":1.0},"buzzer":{"startup_enabled":false,"shutdown_enabled":true,"frequency":2000,"duration_ms":200}}'
+$env:INTELLEGY_ADDON_OPTIONS='{"diagnostics":{"carrier_monitoring_poll_interval_seconds":30},"onewire":{"bus1_poll_interval_seconds":30,"bus2_poll_interval_seconds":30},"power_button":{"shutdown_enabled":true,"shutdown_hold_seconds":1.0},"buzzer":{"startup_enabled":true,"shutdown_enabled":true,"frequency":2000,"duration_ms":200}}'
 
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8098 --reload
 ```
@@ -175,7 +175,7 @@ Start the mock backend:
 
 ```sh
 export INTELLEGY_GPIO_MOCK=1
-export INTELLEGY_ADDON_OPTIONS='{"diagnostics":{"carrier_monitoring_poll_interval_seconds":30},"onewire":{"bus1_poll_interval_seconds":30,"bus2_poll_interval_seconds":30},"power_button":{"shutdown_enabled":true,"shutdown_hold_seconds":1.0},"buzzer":{"startup_enabled":false,"shutdown_enabled":true,"frequency":2000,"duration_ms":200}}'
+export INTELLEGY_ADDON_OPTIONS='{"diagnostics":{"carrier_monitoring_poll_interval_seconds":30},"onewire":{"bus1_poll_interval_seconds":30,"bus2_poll_interval_seconds":30},"power_button":{"shutdown_enabled":true,"shutdown_hold_seconds":1.0},"buzzer":{"startup_enabled":true,"shutdown_enabled":true,"frequency":2000,"duration_ms":200}}'
 
 python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8098 --reload
 ```
@@ -500,7 +500,7 @@ power_button:
   shutdown_enabled: true
   shutdown_hold_seconds: 1.0
 buzzer:
-  startup_enabled: false
+  startup_enabled: true
   shutdown_enabled: true
   frequency: 2000
   duration_ms: 200

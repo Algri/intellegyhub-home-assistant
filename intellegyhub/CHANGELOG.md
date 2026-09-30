@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.157
+
+- Add a configurable WebSocket connection grace period so NET blinks while connecting and ERR starts only after timeout.
+- Enable the startup buzzer by default in add-on configuration and local run examples.
+
 ## 0.5.156
 
 - Change Board Diagnostics LED behavior so STE heartbeat and NET stay active only while WebSocket is connected, and ERR blinks when the connection is lost.

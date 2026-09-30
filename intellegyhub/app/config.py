@@ -30,13 +30,14 @@ class AppConfig:
     button_active_low: bool = True
     button_bias: str = "pull_up"
     button_debounce_ms: int = 50
-    startup_buzzer_enabled: bool = False
+    startup_buzzer_enabled: bool = True
     startup_buzzer_frequency: int = 2000
     startup_buzzer_duration_ms: int = 200
     shutdown_buzzer_enabled: bool = True
     carrier_monitoring_poll_interval_seconds: int = 30
     ste_heartbeat_on_seconds: float = 0.2
     ste_heartbeat_off_seconds: float = 1.8
+    websocket_connection_grace_seconds: float = 30.0
     onewire_bridge1_poll_interval_seconds: int = 30
     onewire_bridge2_poll_interval_seconds: int = 30
     power_button_shutdown_enabled: bool = True
@@ -102,7 +103,7 @@ def load_config(path: Path | None = None) -> AppConfig:
         button_active_low=True,
         button_bias=FIXED_BUTTON_BIAS,
         button_debounce_ms=FIXED_BUTTON_DEBOUNCE_MS,
-        startup_buzzer_enabled=_bool_option(buzzer, "startup_enabled", _bool_option(options, "startup_buzzer_enabled", False)),
+        startup_buzzer_enabled=_bool_option(buzzer, "startup_enabled", _bool_option(options, "startup_buzzer_enabled", True)),
         startup_buzzer_frequency=int(_option(buzzer, "frequency", options.get("startup_buzzer_frequency", 2000))),
         startup_buzzer_duration_ms=int(_option(buzzer, "duration_ms", options.get("startup_buzzer_duration_ms", 200))),
         shutdown_buzzer_enabled=_bool_option(buzzer, "shutdown_enabled", _bool_option(options, "shutdown_buzzer_enabled", True)),
@@ -114,6 +115,9 @@ def load_config(path: Path | None = None) -> AppConfig:
         ),
         ste_heartbeat_off_seconds=float(
             _option(diagnostics, "ste_heartbeat_off_seconds", options.get("ste_heartbeat_off_seconds", 1.8))
+        ),
+        websocket_connection_grace_seconds=float(
+            _option(diagnostics, "websocket_connection_grace_seconds", options.get("websocket_connection_grace_seconds", 30.0))
         ),
         onewire_bridge1_poll_interval_seconds=int(
             _option(
@@ -172,6 +176,8 @@ def validate_config(config: AppConfig) -> None:
         raise ValueError("ste_heartbeat_on_seconds must be between 0.05 and 10")
     if not 0.05 <= config.ste_heartbeat_off_seconds <= 60:
         raise ValueError("ste_heartbeat_off_seconds must be between 0.05 and 60")
+    if not 0.1 <= config.websocket_connection_grace_seconds <= 3600:
+        raise ValueError("websocket_connection_grace_seconds must be between 0.1 and 3600")
     if not 1 <= config.onewire_bridge1_poll_interval_seconds <= 3600:
         raise ValueError("onewire_bus1_poll_interval_seconds must be between 1 and 3600")
     if not 1 <= config.onewire_bridge2_poll_interval_seconds <= 3600:

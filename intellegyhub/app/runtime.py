@@ -32,6 +32,7 @@ class AppRuntime:
         carrier_monitoring_poll_interval_seconds: int = 30,
         ste_heartbeat_on_seconds: float = 0.2,
         ste_heartbeat_off_seconds: float = 1.8,
+        websocket_connection_grace_seconds: float = 30.0,
         onewire_poll_intervals: dict[str, int] | None = None,
         power_button_shutdown_enabled: bool = True,
         power_button_shutdown_hold_seconds: float = 1.0,
@@ -44,6 +45,7 @@ class AppRuntime:
             default_settings=DiagnosticIndicatorSettings(
                 ste_heartbeat_on_seconds=ste_heartbeat_on_seconds,
                 ste_heartbeat_off_seconds=ste_heartbeat_off_seconds,
+                websocket_connection_grace_seconds=websocket_connection_grace_seconds,
             ),
         )
         self.buzzer = BuzzerManager()
