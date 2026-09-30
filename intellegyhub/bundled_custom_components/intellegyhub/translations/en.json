@@ -98,7 +98,7 @@
         "name": "PWM"
       },
       "xport_rgbw": {
-        "name": "RGBW"
+        "name": "Dimmer"
       }
     },
     "button": {

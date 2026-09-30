@@ -40,10 +40,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
 
 RGBW_CHANNELS = {
-    1: ("red", "Red"),
-    2: ("green", "Green"),
-    3: ("blue", "Blue"),
-    4: ("white", "White"),
+    1: ("red", "X1 Red"),
+    2: ("green", "X2 Green"),
+    3: ("blue", "X3 Blue"),
+    4: ("white", "X4 White"),
 }
 
 

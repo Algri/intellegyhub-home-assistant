@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.149
+
+- Rename the RGBW dimmer control to Dimmer and label RGBW channel sliders as X1 Red, X2 Green, X3 Blue, and X4 White.
+
 ## 0.5.148
 
 - Rename the main Home Assistant controller device to Controller while keeping the IHC-1400 model visible in device details.

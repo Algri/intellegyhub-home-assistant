@@ -34,11 +34,11 @@ STATIC_ENTITY_DASHBOARD_NAMES: dict[str, str] = {
     "intellegyhub_buzzer_volume_light": "Buzzer Volume",
     "intellegyhub_buzzer_play": "Buzzer Play",
     "intellegyhub_xport_profile": "X-PORT Profile",
-    "intellegyhub_xport_rgbw": "RGBW",
-    "intellegyhub_xport_rgbw_red": "Red",
-    "intellegyhub_xport_rgbw_green": "Green",
-    "intellegyhub_xport_rgbw_blue": "Blue",
-    "intellegyhub_xport_rgbw_white": "White",
+    "intellegyhub_xport_rgbw": "Dimmer",
+    "intellegyhub_xport_rgbw_red": "X1 Red",
+    "intellegyhub_xport_rgbw_green": "X2 Green",
+    "intellegyhub_xport_rgbw_blue": "X3 Blue",
+    "intellegyhub_xport_rgbw_white": "X4 White",
 }
 
 STATIC_ENTITY_IDS: dict[str, str] = {

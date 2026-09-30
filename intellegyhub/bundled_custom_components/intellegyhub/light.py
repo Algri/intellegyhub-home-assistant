@@ -94,7 +94,7 @@ class IntellegyHubXPortRgbwLight(IntellegyHubXPortGroupEntity, LightEntity):
     _attr_translation_key = "xport_rgbw"
     _attr_unique_id = "intellegyhub_xport_rgbw"
     _attr_suggested_object_id = "intellegyhub_xport_rgbw"
-    _attr_name = "RGBW"
+    _attr_name = "Dimmer"
     _attr_supported_color_modes = {ColorMode.RGBW}
     _attr_color_mode = ColorMode.RGBW
     _attr_icon = "mdi:lightbulb"
