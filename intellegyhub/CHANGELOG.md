@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.147
+
+- Remove the legacy X-Port Home Assistant device registry entry when the active profile uses the new X-Port device model.
+
 ## 0.5.146
 
 - Rename X-Port group mode to Profile with Universal I/O and RGBW Dimmer profiles.

@@ -598,6 +598,9 @@ class IntellegyHubGpioManager:
                 if not rgbw_enabled and identifier == "xport_rgbw_dimmer":
                     device_registry.async_remove_device(device.id)
                     break
+                if identifier == "xport":
+                    device_registry.async_remove_device(device.id)
+                    break
 
     @callback
     def _notify(self) -> None:
