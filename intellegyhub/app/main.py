@@ -201,7 +201,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.150 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.151 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -246,7 +246,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.150", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.151", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = HostRtc()
@@ -646,6 +646,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .diagnostic-rtc-grid { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 12px 16px; }
     .diagnostic-rtc-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 42px; border: 1px solid var(--ha-row-border); border-radius: 8px; padding: 8px 10px; background: var(--ha-row); }
     .diagnostic-rtc-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .diagnostic-rtc-error { min-height: 18px; margin-top: 10px; color: var(--ha-secondary); font-size: 13px; overflow-wrap: anywhere; }
     .buzzer-settings { display: grid; gap: 12px; }
     .buzzer-row { display: grid; grid-template-columns: minmax(100px, 150px) minmax(0, 1fr); align-items: center; gap: 14px; min-height: 40px; }
     .buzzer-row label,
@@ -894,7 +895,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
             <strong id="ste-heartbeat-state" class="state-text">OFF</strong>
             <button id="ste-heartbeat-toggle" class="toggle" type="button" onclick="toggleSteHeartbeat()"><span>OFF</span></button>
           </div>
-          <div class="diagnostic-led-note">UI placeholder. Hardware control will be connected after the indicator policy is added.</div>
+          <div class="diagnostic-led-note">Blinks the STE LED while the add-on is running.</div>
         </div>
         <div class="buzzer-group">
           <div class="buzzer-group-title">NET LED</div>
@@ -903,7 +904,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
             <strong id="net-led-state" class="state-text">OFF</strong>
             <button id="net-led-toggle" class="toggle" type="button" onclick="toggleNetLed()"><span>OFF</span></button>
           </div>
-          <div class="diagnostic-led-note">UI placeholder. Hardware control will be connected after the indicator policy is added.</div>
+          <div class="diagnostic-led-note">Shows UI WebSocket status: on when connected, blinking while disconnected.</div>
         </div>
         <div class="buzzer-group">
           <div class="buzzer-group-title">ERR LED</div>
@@ -912,7 +913,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
             <strong id="err-led-state" class="state-text">OFF</strong>
             <button id="err-led-toggle" class="toggle" type="button" onclick="toggleErrLed()"><span>OFF</span></button>
           </div>
-          <div class="diagnostic-led-note">UI placeholder. Error indication policy will be connected later.</div>
+          <div class="diagnostic-led-note">Reserved for add-on and hardware error indication.</div>
         </div>
       </div>
       <div class="buzzer-group diagnostic-rtc-card">
@@ -939,6 +940,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           <button type="button" id="rtc-sync-button" onclick="syncRtc()">Sync RTC</button>
           <button type="button" onclick="refreshRtc()">Refresh</button>
         </div>
+        <div id="rtc-error" class="diagnostic-rtc-error"></div>
         <div class="diagnostic-led-note">RTC is handled by the host kernel driver. The add-on does not access the RTC I2C address directly.</div>
       </div>
     </section>
@@ -2097,7 +2099,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         'err-led-state',
         'err-led-toggle',
         Boolean(payload.err && payload.err.indicator_enabled),
-        'Toggle ERR LED placeholder state'
+        'Toggle ERR LED error indication'
       );
     }
     function paintDiagnosticLed(stateId, toggleId, enabled, title) {
@@ -2121,8 +2123,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       const rtcTime = document.getElementById('rtc-time');
       const difference = document.getElementById('rtc-difference');
       const status = document.getElementById('rtc-status');
+      const errorText = document.getElementById('rtc-error');
       const syncButton = document.getElementById('rtc-sync-button');
-      if (!systemTime || !rtcTime || !difference || !status || !syncButton) return;
+      if (!systemTime || !rtcTime || !difference || !status || !syncButton || !errorText) return;
       systemTime.textContent = formatRtcTime(payload.system_time);
       rtcTime.textContent = formatRtcTime(payload.rtc_time);
       difference.textContent = payload.difference_seconds === null || payload.difference_seconds === undefined
@@ -2132,6 +2135,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       status.className = `state-text ${payload.available ? 'on' : ''}`;
       syncButton.disabled = !payload.available;
       syncButton.title = payload.error || 'Write current system time to RTC';
+      errorText.textContent = payload.error ? `RTC error: ${payload.error}` : '';
     }
     async function refreshRtc() {
       try {

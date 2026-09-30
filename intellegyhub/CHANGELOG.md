@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.151
+
+- Use BusyBox-compatible host RTC commands for the RTC Clock card and show RTC backend errors in the add-on UI.
+
 ## 0.5.150
 
 - Add Board Diagnostics backend support for STE heartbeat, NET connection indication, and ERR placeholder state persistence.

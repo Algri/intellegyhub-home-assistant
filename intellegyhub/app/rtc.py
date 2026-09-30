@@ -34,7 +34,7 @@ class HostRtc:
                 error=f"{self.command} not found",
             )
         try:
-            completed = await self._run("--show", "--utc")
+            completed = await self._run("-r", "-u")
             rtc_time = _parse_hwclock_time(completed.strip())
             return RtcStatus(
                 available=True,
@@ -56,7 +56,7 @@ class HostRtc:
     async def sync_from_system(self) -> RtcStatus:
         if shutil.which(self.command) is None:
             return await self.status()
-        await self._run("--systohc", "--utc")
+        await self._run("-w", "-u")
         return await self.status()
 
     async def _run(self, *args: str) -> str:
