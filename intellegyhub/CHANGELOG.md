@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.156
+
+- Change Board Diagnostics LED behavior so STE heartbeat and NET stay active only while WebSocket is connected, and ERR blinks when the connection is lost.
+
 ## 0.5.155
 
 - Normalize RTC Clock display time and provide a usable mock RTC status in add-on mock mode.

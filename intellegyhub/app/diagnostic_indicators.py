@@ -102,7 +102,7 @@ class DiagnosticIndicatorManager:
         self._set_output = set_output
         self._publisher: Callable[[dict], Awaitable[None]] | None = None
         self._heartbeat_task: asyncio.Task[None] | None = None
-        self._net_blink_task: asyncio.Task[None] | None = None
+        self._err_blink_task: asyncio.Task[None] | None = None
         self._connected_clients = 0
 
     def set_publisher(self, publisher: Callable[[dict], Awaitable[None]]) -> None:
@@ -113,12 +113,14 @@ class DiagnosticIndicatorManager:
         self.settings = await self.store.load()
         await self._apply_ste()
         await self._apply_net()
+        await self._apply_err()
 
     async def stop(self) -> None:
         await self._stop_heartbeat()
-        await self._stop_net_blink()
+        await self._stop_err_blink()
         await self._set_output("ste", False)
         await self._set_output("net", False)
+        await self._set_output("err", False)
 
     def snapshot(self) -> dict:
         payload = self.settings.snapshot()
@@ -155,30 +157,35 @@ class DiagnosticIndicatorManager:
     async def set_err_indicator(self, enabled: bool) -> dict:
         self.settings.err_indicator_enabled = bool(enabled)
         await self.store.save(self.settings)
+        await self._apply_err()
         await self._publish()
         return self.snapshot()
 
     async def set_connected_clients(self, count: int) -> None:
         self._connected_clients = max(0, int(count))
+        await self._apply_ste()
         await self._apply_net()
-        await self._publish()
+        await self._apply_err()
 
     async def _apply_ste(self) -> None:
         await self._stop_heartbeat()
-        if not self.settings.ste_heartbeat_enabled:
+        if not self.settings.ste_heartbeat_enabled or self._connected_clients <= 0:
             await self._set_output("ste", False)
             return
         self._heartbeat_task = asyncio.create_task(self._heartbeat_loop(), name="intellegyhub-ste-heartbeat")
 
     async def _apply_net(self) -> None:
-        await self._stop_net_blink()
-        if not self.settings.net_indicator_enabled:
+        if not self.settings.net_indicator_enabled or self._connected_clients <= 0:
             await self._set_output("net", False)
             return
-        if self._connected_clients > 0:
-            await self._set_output("net", True)
+        await self._set_output("net", True)
+
+    async def _apply_err(self) -> None:
+        await self._stop_err_blink()
+        if not self.settings.err_indicator_enabled or self._connected_clients > 0:
+            await self._set_output("err", False)
             return
-        self._net_blink_task = asyncio.create_task(self._net_blink_loop(), name="intellegyhub-net-indicator")
+        self._err_blink_task = asyncio.create_task(self._err_blink_loop(), name="intellegyhub-err-indicator")
 
     async def _heartbeat_loop(self) -> None:
         try:
@@ -190,12 +197,12 @@ class DiagnosticIndicatorManager:
         except asyncio.CancelledError:
             raise
 
-    async def _net_blink_loop(self) -> None:
+    async def _err_blink_loop(self) -> None:
         try:
             while True:
-                await self._set_output("net", True)
+                await self._set_output("err", True)
                 await asyncio.sleep(0.2)
-                await self._set_output("net", False)
+                await self._set_output("err", False)
                 await asyncio.sleep(0.8)
         except asyncio.CancelledError:
             raise
@@ -209,14 +216,14 @@ class DiagnosticIndicatorManager:
                 pass
             self._heartbeat_task = None
 
-    async def _stop_net_blink(self) -> None:
-        if self._net_blink_task:
-            self._net_blink_task.cancel()
+    async def _stop_err_blink(self) -> None:
+        if self._err_blink_task:
+            self._err_blink_task.cancel()
             try:
-                await self._net_blink_task
+                await self._err_blink_task
             except asyncio.CancelledError:
                 pass
-            self._net_blink_task = None
+            self._err_blink_task = None
 
     async def _publish(self) -> None:
         if self._publisher:
