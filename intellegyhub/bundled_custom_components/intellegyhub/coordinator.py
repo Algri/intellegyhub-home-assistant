@@ -18,6 +18,10 @@ from .const import (
     XPORT_GROUP_MODE_RGBW,
     XPORT_GROUP_MODE_RGB_PLUS_W,
     XPORT_GROUP_MODE_W_PLUS_W_PLUS_W_PLUS_W,
+    XPORT_GROUP_MODE_TWO_W_PLUS_TWO_W,
+    XPORT_GROUP_MODE_TWO_W_PLUS_W_PLUS_W,
+    XPORT_GROUP_MODE_W_PLUS_W_PLUS_TWO_W,
+    XPORT_GROUP_MODE_FOUR_W,
     normalize_xport_profile,
 )
 from .registry_names import apply_compact_entity_dashboard_names
@@ -126,6 +130,9 @@ class IntellegyHubGpioManager:
     async def async_set_xport_group_channel_value(self, channel: int, value: float) -> None:
         result = await self.client.set_xport_group_channel_value(channel, value)
         self._apply_xport_channel(result.get("channel"))
+        for linked_channel in self._linked_xport_group_channels(channel):
+            if linked_channel != channel:
+                self._apply_xport_channel({**self.xport_channel(linked_channel), "channel": linked_channel, "value": value})
         self.connected = True
         self._notify()
 
@@ -173,6 +180,13 @@ class IntellegyHubGpioManager:
             self.xport_rgb_color = tuple(max(0, min(255, round(value / level * 255))) for value in physical)
             self.xport_rgb_brightness = max(1, min(255, round(level * 255)))
         return self.xport_rgb_color, self.xport_rgb_brightness
+
+    def _linked_xport_group_channels(self, channel: int) -> tuple[int, ...]:
+        group_mode = normalize_xport_profile(self.xport.get("group_mode"))
+        for channels in _linked_white_groups(group_mode):
+            if channel in channels:
+                return channels
+        return (channel,)
 
     async def async_set_buzzer_volume(self, volume_percent: int) -> None:
         await self.async_set_buzzer_settings(volume_percent=int(volume_percent))
@@ -625,6 +639,15 @@ class IntellegyHubGpioManager:
             for channel in range(1, 5):
                 desired.add(("light", f"intellegyhub_xport_w_x{channel}"))
                 desired.add(("number", f"intellegyhub_xport_w_w_x{channel}"))
+        elif group_mode in {
+            XPORT_GROUP_MODE_TWO_W_PLUS_TWO_W,
+            XPORT_GROUP_MODE_TWO_W_PLUS_W_PLUS_W,
+            XPORT_GROUP_MODE_W_PLUS_W_PLUS_TWO_W,
+            XPORT_GROUP_MODE_FOUR_W,
+        }:
+            for channels in _linked_white_groups(group_mode):
+                suffix = "_".join(f"x{channel}" for channel in channels)
+                desired.add(("light", f"intellegyhub_xport_w_{suffix}"))
         else:
             for channel in range(1, 5):
                 mode = self.xport_channel(channel).get("confirmed_mode")
@@ -661,6 +684,11 @@ class IntellegyHubGpioManager:
             entity_id = entity_registry.async_get_entity_id("light", DOMAIN, unique_id)
             if entity_id is not None and ("light", unique_id) not in desired:
                 entity_registry.async_remove(entity_id)
+        for suffix in ("x1_x2", "x3_x4", "x1", "x2", "x3", "x4", "x1_x2_x3_x4"):
+            unique_id = f"intellegyhub_xport_w_{suffix}"
+            entity_id = entity_registry.async_get_entity_id("light", DOMAIN, unique_id)
+            if entity_id is not None and ("light", unique_id) not in desired:
+                entity_registry.async_remove(entity_id)
         for color in ("red", "green", "blue", "white"):
             unique_id = f"intellegyhub_xport_rgbw_{color}"
             entity_id = entity_registry.async_get_entity_id("number", DOMAIN, unique_id)
@@ -686,6 +714,10 @@ class IntellegyHubGpioManager:
         rgbw_enabled = group_mode == XPORT_GROUP_MODE_RGBW
         rgb_plus_w_enabled = group_mode == XPORT_GROUP_MODE_RGB_PLUS_W
         w_plus_w_enabled = group_mode == XPORT_GROUP_MODE_W_PLUS_W_PLUS_W_PLUS_W
+        active_linked_white_devices = {
+            f"xport_w_{'_'.join(f'x{channel}' for channel in channels)}_dimmer"
+            for channels in _linked_white_groups(group_mode)
+        }
         for device in list(getattr(devices, "values", lambda: [])()):
             identifiers = getattr(device, "identifiers", set())
             for domain, identifier in identifiers:
@@ -704,6 +736,14 @@ class IntellegyHubGpioManager:
                     device_registry.async_remove_device(device.id)
                     break
                 if not (rgb_plus_w_enabled or w_plus_w_enabled) and identifier == "xport_w_dimmer":
+                    device_registry.async_remove_device(device.id)
+                    break
+                if (
+                    identifier.startswith("xport_w_")
+                    and identifier.endswith("_dimmer")
+                    and identifier != "xport_w_dimmer"
+                    and identifier not in active_linked_white_devices
+                ):
                     device_registry.async_remove_device(device.id)
                     break
                 if identifier == "xport":
@@ -761,3 +801,15 @@ def _onewire_sensor_id_from_temperature_unique_id(unique_id: str) -> str | None:
     if not sensor_id.startswith("ds18b20_"):
         return None
     return sensor_id
+
+
+def _linked_white_groups(group_mode: str) -> tuple[tuple[int, ...], ...]:
+    if group_mode == XPORT_GROUP_MODE_FOUR_W:
+        return ((1, 2, 3, 4),)
+    if group_mode == XPORT_GROUP_MODE_TWO_W_PLUS_TWO_W:
+        return ((1, 2), (3, 4))
+    if group_mode == XPORT_GROUP_MODE_TWO_W_PLUS_W_PLUS_W:
+        return ((1, 2), (3,), (4,))
+    if group_mode == XPORT_GROUP_MODE_W_PLUS_W_PLUS_TWO_W:
+        return ((1,), (2,), (3, 4))
+    return ()

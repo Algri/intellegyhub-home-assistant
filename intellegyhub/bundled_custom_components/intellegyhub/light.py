@@ -12,6 +12,10 @@ from .const import (
     XPORT_GROUP_MODE_RGBW,
     XPORT_GROUP_MODE_RGB_PLUS_W,
     XPORT_GROUP_MODE_W_PLUS_W_PLUS_W_PLUS_W,
+    XPORT_GROUP_MODE_TWO_W_PLUS_TWO_W,
+    XPORT_GROUP_MODE_TWO_W_PLUS_W_PLUS_W,
+    XPORT_GROUP_MODE_W_PLUS_W_PLUS_TWO_W,
+    XPORT_GROUP_MODE_FOUR_W,
     XPORT_MODE_PWM,
     normalize_xport_profile,
 )
@@ -25,6 +29,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     setup_xport_rgbw_light(entry, manager, async_add_entities)
     setup_xport_rgb_plus_w_lights(entry, manager, async_add_entities)
     setup_xport_w_plus_w_lights(entry, manager, async_add_entities)
+    setup_xport_linked_white_lights(entry, manager, async_add_entities)
     setup_xport_dynamic_platform(
         entry,
         manager,
@@ -101,6 +106,44 @@ def setup_xport_w_plus_w_lights(entry: ConfigEntry, manager, async_add_entities:
 
     entry.async_on_unload(manager.async_add_listener(sync_entities))
     sync_entities()
+
+
+def setup_xport_linked_white_lights(entry: ConfigEntry, manager, async_add_entities: AddEntitiesCallback) -> None:
+    entities: dict[tuple[str, tuple[int, ...]], IntellegyHubXPortLinkedWhiteLight] = {}
+
+    @callback
+    def sync_entities() -> None:
+        group_mode = normalize_xport_profile(manager.xport.get("group_mode"))
+        desired = {
+            (group_mode, channels)
+            for channels in linked_white_light_groups(group_mode)
+        }
+        for key in sorted(desired - set(entities), key=lambda item: item[1]):
+            group_mode, channels = key
+            entity = IntellegyHubXPortLinkedWhiteLight(manager, group_mode, channels)
+            entities[key] = entity
+            async_add_entities([entity])
+        for key in sorted(set(entities) - desired, key=lambda item: item[1]):
+            entity = entities.pop(key)
+            manager.hass.async_create_task(
+                entity.async_remove(force_remove=True),
+                f"intellegyhub_remove_xport_linked_white_{entity._attr_unique_id}",
+            )
+
+    entry.async_on_unload(manager.async_add_listener(sync_entities))
+    sync_entities()
+
+
+def linked_white_light_groups(group_mode: str) -> tuple[tuple[int, ...], ...]:
+    if group_mode == XPORT_GROUP_MODE_FOUR_W:
+        return ((1, 2, 3, 4),)
+    if group_mode == XPORT_GROUP_MODE_TWO_W_PLUS_TWO_W:
+        return ((1, 2), (3, 4))
+    if group_mode == XPORT_GROUP_MODE_TWO_W_PLUS_W_PLUS_W:
+        return ((1, 2), (3,), (4,))
+    if group_mode == XPORT_GROUP_MODE_W_PLUS_W_PLUS_TWO_W:
+        return ((1,), (2,), (3, 4))
+    return ()
 
 
 class IntellegyHubXPortPwmLight(IntellegyHubXPortEntity, LightEntity):
@@ -345,6 +388,68 @@ class IntellegyHubXPortWhiteChannelLight(IntellegyHubXPortGroupEntity, LightEnti
     @property
     def _value(self) -> float:
         return max(0.0, min(1.0, float(self.manager.xport_channel(self.channel).get("value", 0))))
+
+
+class IntellegyHubXPortLinkedWhiteLight(IntellegyHubXPortGroupEntity, LightEntity):
+    _attr_translation_key = "xport_w_channel"
+    _attr_supported_color_modes = {ColorMode.BRIGHTNESS}
+    _attr_color_mode = ColorMode.BRIGHTNESS
+    _attr_icon = "mdi:lightbulb"
+
+    def __init__(self, manager, group_mode: str, channels: tuple[int, ...]) -> None:
+        super().__init__(manager)
+        self.group_mode = normalize_xport_profile(group_mode)
+        self.channels = channels
+        suffix = "_".join(f"x{channel}" for channel in channels)
+        self.group_identifier = f"xport_w_{suffix}_dimmer"
+        self.group_name = f"X-Port {self._channels_label} W Dimmer"
+        self.group_model = "W Dimmer"
+        self._attr_unique_id = f"intellegyhub_xport_w_{suffix}"
+        self._attr_suggested_object_id = f"intellegyhub_xport_w_{suffix}"
+        self._attr_name = f"{self._channels_label} White" if len(channels) > 1 else f"X{channels[0]} White"
+
+    @property
+    def available(self) -> bool:
+        return self.xport_available and normalize_xport_profile(self.manager.xport.get("group_mode")) == self.group_mode
+
+    @property
+    def is_on(self) -> bool:
+        return self._value > 0
+
+    @property
+    def brightness(self) -> int | None:
+        if self._value <= 0:
+            return None
+        return max(1, min(255, round(self._value * 255)))
+
+    async def async_turn_on(self, **kwargs) -> None:
+        if not self.available:
+            raise HomeAssistantError("X-Port W Dimmer is not active")
+        brightness = kwargs.get(ATTR_BRIGHTNESS)
+        if brightness is None:
+            value = self._value or 1.0
+        else:
+            value = max(0.0, min(1.0, int(brightness) / 255))
+        await self.manager.async_set_xport_group_channel_value(self.channels[0], value)
+
+    async def async_turn_off(self, **kwargs) -> None:
+        if not self.available:
+            raise HomeAssistantError("X-Port W Dimmer is not active")
+        await self.manager.async_set_xport_group_channel_value(self.channels[0], 0.0)
+
+    @property
+    def _value(self) -> float:
+        values = [
+            max(0.0, min(1.0, float(self.manager.xport_channel(channel).get("value", 0))))
+            for channel in self.channels
+        ]
+        return max(values, default=0.0)
+
+    @property
+    def _channels_label(self) -> str:
+        if len(self.channels) == 1:
+            return f"X{self.channels[0]}"
+        return f"X{self.channels[0]}-X{self.channels[-1]}"
 
 
 class IntellegyHubBuzzerVolumeLight(IntellegyHubGpioEntity, LightEntity):

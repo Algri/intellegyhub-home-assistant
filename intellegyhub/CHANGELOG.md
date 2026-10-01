@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.164
+
+- Add Home Assistant and backend support for linked X-Port white dimmer modes: `4×W`, `2×W + 2×W`, `2×W + W + W`, and `W + W + 2×W`.
+
 ## 0.5.163
 
 - Fix RGB + W Home Assistant RGB light handling so logical color and brightness stay separate and color changes no longer dim RGB channels repeatedly.

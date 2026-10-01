@@ -17,6 +17,10 @@ from .const import (
     XPORT_GROUP_MODE_RGBW,
     XPORT_GROUP_MODE_RGB_PLUS_W,
     XPORT_GROUP_MODE_W_PLUS_W_PLUS_W_PLUS_W,
+    XPORT_GROUP_MODE_TWO_W_PLUS_TWO_W,
+    XPORT_GROUP_MODE_TWO_W_PLUS_W_PLUS_W,
+    XPORT_GROUP_MODE_W_PLUS_W_PLUS_TWO_W,
+    XPORT_GROUP_MODE_FOUR_W,
     normalize_xport_profile,
 )
 
@@ -75,6 +79,10 @@ def xport_desired_channels_for_suffix(manager, platform: Platform, suffix: str) 
         XPORT_GROUP_MODE_RGBW,
         XPORT_GROUP_MODE_RGB_PLUS_W,
         XPORT_GROUP_MODE_W_PLUS_W_PLUS_W_PLUS_W,
+        XPORT_GROUP_MODE_TWO_W_PLUS_TWO_W,
+        XPORT_GROUP_MODE_TWO_W_PLUS_W_PLUS_W,
+        XPORT_GROUP_MODE_W_PLUS_W_PLUS_TWO_W,
+        XPORT_GROUP_MODE_FOUR_W,
     }:
         return set()
     platform_value = xport_platform_value(platform)

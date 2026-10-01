@@ -203,7 +203,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.163 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.164 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -250,7 +250,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.163", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.164", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -1025,13 +1025,32 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       'Universal I/O': 'Universal I/O',
       'RGBW Dimmer': 'RGBW Dimmer',
       'RGB + W': 'RGB + W',
+      '2xW + 2xW': '2×W + 2×W',
+      '2XW + 2XW': '2×W + 2×W',
+      '2*W + 2*W': '2×W + 2×W',
+      '2×W + 2×W': '2×W + 2×W',
+      '2xW + W + W': '2×W + W + W',
+      '2XW + W + W': '2×W + W + W',
+      '2*W + W + W': '2×W + W + W',
+      '2×W + W + W': '2×W + W + W',
+      'W + W + 2xW': 'W + W + 2×W',
+      'W + W + 2XW': 'W + W + 2×W',
+      'W + W + 2*W': 'W + W + 2×W',
+      'W + W + 2×W': 'W + W + 2×W',
+      '4xW': '4×W',
+      '4XW': '4×W',
+      '4*W': '4×W',
+      '4×W': '4×W',
       Independent: 'Universal I/O',
       RgbwDimmer: 'RGBW Dimmer',
       RgbPlusW: 'RGB + W',
-      RGBPlusW: 'RGB + W'
+      RGBPlusW: 'RGB + W',
+      TwoWPlusTwoW: '2×W + 2×W',
+      TwoWPlusWPlusW: '2×W + W + W',
+      WPlusWPlusTwoW: 'W + W + 2×W'
     };
     const profileOrder = ['Universal I/O', 'LED Dimmer'];
-    const configurationOrder = ['RGBW Dimmer', 'RGB + W', 'W + W + W + W'];
+    const configurationOrder = ['RGBW Dimmer', 'RGB + W', 'W + W + W + W', '2×W + 2×W', '2×W + W + W', 'W + W + 2×W', '4×W'];
     const profileLabels = {
       'Universal I/O': 'Universal I/O',
       'LED Dimmer': 'LED Dimmer'
@@ -1039,7 +1058,11 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     const configurationLabels = {
       'RGBW Dimmer': 'RGBW',
       'RGB + W': 'RGB + W',
-      'W + W + W + W': 'W + W + W + W'
+      'W + W + W + W': 'W + W + W + W',
+      '2×W + 2×W': '2×W + 2×W',
+      '2×W + W + W': '2×W + W + W',
+      'W + W + 2×W': 'W + W + 2×W',
+      '4×W': '4×W'
     };
     const rgbwRoles = {
       1: 'Red',
@@ -1148,6 +1171,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       const configTarget = document.getElementById('xport-configuration');
       if (configControl && configTarget) {
         const showConfig = profile === 'LED Dimmer';
+        configTarget.dataset.currentMode = currentMode;
         if (toolbar) {
           toolbar.classList.toggle('config-hidden', !showConfig);
         }
@@ -1168,6 +1192,14 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           note.textContent = 'RGB + W creates an RGB dimmer on X1-X3 and an independent white dimmer on X4.';
         } else if (currentMode === 'W + W + W + W') {
           note.textContent = 'W + W + W + W creates four independent white dimmers on X1-X4.';
+        } else if (currentMode === '2×W + 2×W') {
+          note.textContent = '2×W + 2×W links X1-X2 as one white dimmer and X3-X4 as another.';
+        } else if (currentMode === '2×W + W + W') {
+          note.textContent = '2×W + W + W links X1-X2 and keeps X3 and X4 independent.';
+        } else if (currentMode === 'W + W + 2×W') {
+          note.textContent = 'W + W + 2×W keeps X1 and X2 independent and links X3-X4.';
+        } else if (currentMode === '4×W') {
+          note.textContent = '4×W links X1-X4 as one white dimmer.';
         } else if (currentMode === 'RGBW Dimmer') {
           note.textContent = 'RGBW Dimmer assigns X1-X4 as Red, Green, Blue, and White channels.';
         } else {
@@ -1313,6 +1345,11 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     async function setGroupChannelValue(channel, value) {
       const output = document.getElementById('output');
       output.classList.remove('visible');
+      const mode = normalizeGroupMode(document.getElementById('xport-configuration')?.dataset.currentMode);
+      const linkedChannels = linkedWhiteChannels(mode, channel);
+      if (linkedChannels.length > 1) {
+        syncLinkedWhiteSliders(linkedChannels, value);
+      }
       try {
         await requestJson(`api/v1/xport/group/channels/${channel}/value`, {
           method: 'PUT',
@@ -1325,6 +1362,16 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         output.classList.add('visible');
         await renderXPort();
       }
+    }
+    function syncLinkedWhiteSliders(channels, value) {
+      const percent = Math.round(Number(value || 0) * 100);
+      document.querySelectorAll('[data-xport-linked-white="true"]').forEach((wrap) => {
+        if (!channels.includes(Number(wrap.dataset.xportChannel || 0))) { return; }
+        const slider = wrap.querySelector('input[type="range"]');
+        const valueEl = wrap.querySelector('strong');
+        if (slider) { slider.value = String(percent); }
+        if (valueEl) { valueEl.textContent = `${percent}%`; }
+      });
     }
     function renderModeBody(channel) {
       if (channel.error) { return readoutRow(channel.error, ''); }
@@ -1352,6 +1399,10 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     function renderLockedXPortBody(channel, groupMode) {
       const wrap = document.createElement('div');
       wrap.className = 'xport-control-row pwm';
+      if (linkedWhiteChannels(groupMode, channel.channel).length > 1) {
+        wrap.dataset.xportLinkedWhite = 'true';
+        wrap.dataset.xportChannel = String(channel.channel);
+      }
       const percent = Math.round(Number(channel.value || 0) * 100);
       const label = document.createElement('span');
       label.textContent = groupChannelSliderLabel(groupMode, channel.channel);
@@ -1464,7 +1515,18 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       if (mode === 'RgbwDimmer') { return 'RGBW Dimmer'; }
       if (mode === 'RgbPlusW' || mode === 'RGBPlusW') { return 'RGB + W'; }
       if (mode === 'WPlusWPlusWPlusW' || mode === 'WWWW') { return 'W + W + W + W'; }
+      if (mode === 'TwoWPlusTwoW' || mode === '2xW + 2xW' || mode === '2XW + 2XW' || mode === '2*W + 2*W' || mode === '2×W + 2×W') { return '2×W + 2×W'; }
+      if (mode === 'TwoWPlusWPlusW' || mode === '2xW + W + W' || mode === '2XW + W + W' || mode === '2*W + W + W' || mode === '2×W + W + W') { return '2×W + W + W'; }
+      if (mode === 'WPlusWPlusTwoW' || mode === 'W + W + 2xW' || mode === 'W + W + 2XW' || mode === 'W + W + 2*W' || mode === 'W + W + 2×W') { return 'W + W + 2×W'; }
+      if (mode === 'FourW' || mode === '4xW' || mode === '4XW' || mode === '4*W' || mode === '4×W') { return '4×W'; }
       return mode || 'Universal I/O';
+    }
+    function linkedWhiteChannels(groupMode, channel) {
+      if (groupMode === '4×W') { return [1, 2, 3, 4]; }
+      if (groupMode === '2×W + 2×W') { return channel <= 2 ? [1, 2] : [3, 4]; }
+      if (groupMode === '2×W + W + W') { return channel <= 2 ? [1, 2] : [channel]; }
+      if (groupMode === 'W + W + 2×W') { return channel >= 3 ? [3, 4] : [channel]; }
+      return [channel];
     }
     function groupModeToProfile(mode) {
       return normalizeGroupMode(mode) === 'Universal I/O' ? 'Universal I/O' : 'LED Dimmer';
@@ -1473,7 +1535,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       if (groupMode === 'RGB + W') {
         return channel === 4 ? 'White' : 'RGB';
       }
-      if (groupMode === 'W + W + W + W') {
+      if (groupMode === 'W + W + W + W' || groupMode === '4×W' || groupMode === '2×W + 2×W' || groupMode === '2×W + W + W' || groupMode === 'W + W + 2×W') {
         return 'White';
       }
       if (groupMode === 'RGBW Dimmer') {
@@ -1482,13 +1544,13 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       return groupMode;
     }
     function groupChannelModeLabel(groupMode, channel) {
-      if (groupMode === 'W + W + W + W') {
+      if (groupMode === 'W + W + W + W' || groupMode === '4×W' || groupMode === '2×W + 2×W' || groupMode === '2×W + W + W' || groupMode === 'W + W + 2×W') {
         return 'White channel';
       }
       return `${rgbwRoles[channel] || 'RGBW'} channel`;
     }
     function groupChannelSliderLabel(groupMode, channel) {
-      if (groupMode === 'W + W + W + W') {
+      if (groupMode === 'W + W + W + W' || groupMode === '4×W' || groupMode === '2×W + 2×W' || groupMode === '2×W + W + W' || groupMode === 'W + W + 2×W') {
         return 'White';
       }
       return rgbwRoles[channel] || 'Channel';

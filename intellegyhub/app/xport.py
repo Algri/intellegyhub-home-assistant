@@ -32,6 +32,10 @@ class XPortGroupMode(StrEnum):
     RGBW_DIMMER = "RGBW Dimmer"
     RGB_PLUS_W = "RGB + W"
     W_PLUS_W_PLUS_W_PLUS_W = "W + W + W + W"
+    TWO_W_PLUS_TWO_W = "2×W + 2×W"
+    TWO_W_PLUS_W_PLUS_W = "2×W + W + W"
+    W_PLUS_W_PLUS_TWO_W = "W + W + 2×W"
+    FOUR_W = "4×W"
 
     @classmethod
     def _missing_(cls, value: object) -> XPortGroupMode | None:
@@ -43,6 +47,14 @@ class XPortGroupMode(StrEnum):
             return cls.RGB_PLUS_W
         if value in {"WPlusWPlusWPlusW", "WWWW"}:
             return cls.W_PLUS_W_PLUS_W_PLUS_W
+        if value in {"TwoWPlusTwoW", "2WPlus2W", "2xW + 2xW", "2XW + 2XW", "2*W + 2*W", "2×W + 2×W"}:
+            return cls.TWO_W_PLUS_TWO_W
+        if value in {"TwoWPlusWPlusW", "2WPlusWPlusW", "2xW + W + W", "2XW + W + W", "2*W + W + W", "2×W + W + W"}:
+            return cls.TWO_W_PLUS_W_PLUS_W
+        if value in {"WPlusWPlusTwoW", "WPlusWPlus2W", "W + W + 2xW", "W + W + 2XW", "W + W + 2*W", "W + W + 2×W"}:
+            return cls.W_PLUS_W_PLUS_TWO_W
+        if value in {"FourW", "4W", "4xW", "4XW", "4*W", "4×W"}:
+            return cls.FOUR_W
         return None
 
 
@@ -69,6 +81,10 @@ GROUP_DIMMER_MODES = {
     XPortGroupMode.RGBW_DIMMER,
     XPortGroupMode.RGB_PLUS_W,
     XPortGroupMode.W_PLUS_W_PLUS_W_PLUS_W,
+    XPortGroupMode.TWO_W_PLUS_TWO_W,
+    XPortGroupMode.TWO_W_PLUS_W_PLUS_W,
+    XPortGroupMode.W_PLUS_W_PLUS_TWO_W,
+    XPortGroupMode.FOUR_W,
 }
 
 
@@ -739,6 +755,21 @@ class XPortManager:
                 return self._operation(state, "Rejected", "X-Port group dimmer is not enabled")
             if self.availability != Availability.AVAILABLE or self.topology != XPortTopology.EXTENDED:
                 return self._operation(state, "Rejected", self.error or "X-Port Extended is not available")
+            linked_channels = self._linked_group_channels(channel)
+            if len(linked_channels) > 1:
+                states: list[XPortChannel] = []
+                for linked_channel in linked_channels:
+                    linked_state = self._required(linked_channel)
+                    linked_state.value = await self.hardware.set_value(linked_channel, XPortMode.PWM, value)
+                    linked_state.updated_at = self._now()
+                    linked_state.availability = self.availability
+                    linked_state.error = None
+                    await self.store.save(linked_state)
+                    states.append(linked_state)
+                await self.store.save_profile_channels(self.group_mode, states)
+                for linked_state in states:
+                    await self._publish_state(linked_state)
+                return self._operation(state, "Succeeded", None)
             state.value = await self.hardware.set_value(channel, XPortMode.PWM, value)
             state.updated_at = self._now()
             state.availability = self.availability
@@ -767,6 +798,17 @@ class XPortManager:
             state.updated_at = self._now()
             await self.store.save(state)
         await self.store.save_profile_channels(self.group_mode, list(self.channels.values()))
+
+    def _linked_group_channels(self, channel: int) -> list[int]:
+        if self.group_mode == XPortGroupMode.FOUR_W:
+            return [1, 2, 3, 4]
+        if self.group_mode == XPortGroupMode.TWO_W_PLUS_TWO_W:
+            return [1, 2] if channel <= 2 else [3, 4]
+        if self.group_mode == XPortGroupMode.TWO_W_PLUS_W_PLUS_W:
+            return [1, 2] if channel <= 2 else [channel]
+        if self.group_mode == XPortGroupMode.W_PLUS_W_PLUS_TWO_W:
+            return [3, 4] if channel >= 3 else [channel]
+        return [channel]
 
     async def _enable_universal_io_profile(self) -> None:
         for channel in range(1, 5):
