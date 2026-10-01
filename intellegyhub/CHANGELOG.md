@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.163
+
+- Fix RGB + W Home Assistant RGB light handling so logical color and brightness stay separate and color changes no longer dim RGB channels repeatedly.
+
 ## 0.5.162
 
 - Polish X-Port LED Dimmer UI labels so `RGB + W` shows the white channel as `White` instead of `W`.

@@ -222,48 +222,29 @@ class IntellegyHubXPortRgbLight(IntellegyHubXPortGroupEntity, LightEntity):
 
     @property
     def is_on(self) -> bool:
-        return any(value > 0 for value in self._channel_values())
+        return self.brightness is not None and self.brightness > 0
 
     @property
-    def brightness(self) -> int | None:
-        level = max(self._channel_values())
-        if level <= 0:
-            return None
-        return max(1, min(255, round(level * 255)))
+    def brightness(self) -> int:
+        _, brightness = self.manager.xport_rgb_state()
+        return max(0, min(255, int(brightness)))
 
     @property
     def rgb_color(self) -> tuple[int, int, int] | None:
-        return tuple(max(0, min(255, round(value * 255))) for value in self._channel_values())
+        color, _ = self.manager.xport_rgb_state()
+        return color
 
     async def async_turn_on(self, **kwargs) -> None:
         if not self.available:
             raise HomeAssistantError("X-Port RGB Dimmer is not active")
-        values = self._channel_values()
         rgb = kwargs.get(ATTR_RGB_COLOR)
         brightness = kwargs.get(ATTR_BRIGHTNESS)
-        if rgb is not None:
-            values = tuple(max(0.0, min(1.0, int(part) / 255)) for part in rgb)
-        elif not any(values):
-            values = (1.0, 1.0, 1.0)
-        if brightness is not None:
-            scale = max(0.0, min(1.0, int(brightness) / 255))
-            current = max(values)
-            if current > 0:
-                values = tuple(max(0.0, min(1.0, value / current * scale)) for value in values)
-            else:
-                values = (scale, scale, scale)
-        await self.manager.async_set_xport_rgb(values)
+        await self.manager.async_set_xport_rgb_state(rgb_color=rgb, brightness=brightness)
 
     async def async_turn_off(self, **kwargs) -> None:
         if not self.available:
             raise HomeAssistantError("X-Port RGB Dimmer is not active")
-        await self.manager.async_set_xport_rgb((0.0, 0.0, 0.0))
-
-    def _channel_values(self) -> tuple[float, float, float]:
-        return tuple(
-            max(0.0, min(1.0, float(self.manager.xport_channel(channel).get("value", 0))))
-            for channel in range(1, 4)
-        )
+        await self.manager.async_set_xport_rgb_state(brightness=0)
 
 
 class IntellegyHubXPortWhiteLight(IntellegyHubXPortGroupEntity, LightEntity):

@@ -40,6 +40,9 @@ class IntellegyHubGpioManager:
         self.carrier: dict = {}
         self.buzzer: dict = {"volume_percent": 50}
         self.xport: dict = {}
+        self.xport_rgb_color: tuple[int, int, int] | None = None
+        self.xport_rgb_brightness: int | None = None
+        self._last_xport_group_mode: str | None = None
         self.extensions: dict = {}
         self.onewire: dict = {}
         self._listeners: list[Callable[[], None]] = []
@@ -139,6 +142,37 @@ class IntellegyHubGpioManager:
             self._apply_xport_channel(result.get("channel"))
         self.connected = True
         self._notify()
+
+    async def async_set_xport_rgb_state(
+        self,
+        rgb_color: tuple[int, int, int] | None = None,
+        brightness: int | None = None,
+    ) -> None:
+        current_color, current_brightness = self.xport_rgb_state()
+        if rgb_color is not None:
+            current_color = tuple(max(0, min(255, int(part))) for part in rgb_color)
+        if brightness is not None:
+            current_brightness = max(0, min(255, int(brightness)))
+        self.xport_rgb_color = current_color
+        self.xport_rgb_brightness = current_brightness
+        scale = current_brightness / 255
+        await self.async_set_xport_rgb(tuple(part / 255 * scale for part in current_color))
+
+    def xport_rgb_state(self) -> tuple[tuple[int, int, int], int]:
+        if self.xport_rgb_color is not None and self.xport_rgb_brightness is not None:
+            return self.xport_rgb_color, self.xport_rgb_brightness
+        physical = [
+            max(0.0, min(1.0, float(self.xport_channel(channel).get("value", 0))))
+            for channel in range(1, 4)
+        ]
+        level = max(physical)
+        if level <= 0:
+            self.xport_rgb_color = (255, 255, 255)
+            self.xport_rgb_brightness = 0
+        else:
+            self.xport_rgb_color = tuple(max(0, min(255, round(value / level * 255))) for value in physical)
+            self.xport_rgb_brightness = max(1, min(255, round(level * 255)))
+        return self.xport_rgb_color, self.xport_rgb_brightness
 
     async def async_set_buzzer_volume(self, volume_percent: int) -> None:
         await self.async_set_buzzer_settings(volume_percent=int(volume_percent))
@@ -444,6 +478,11 @@ class IntellegyHubGpioManager:
     def _normalize_xport_profile(self) -> None:
         if isinstance(self.xport, dict):
             self.xport["group_mode"] = normalize_xport_profile(self.xport.get("group_mode"))
+            group_mode = self.xport["group_mode"]
+            if group_mode != self._last_xport_group_mode:
+                self.xport_rgb_color = None
+                self.xport_rgb_brightness = None
+                self._last_xport_group_mode = group_mode
 
     @callback
     def _apply_extension_module(self, module: dict | None) -> None:
