@@ -10,7 +10,16 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
 from .api import IntellegyHubApiClient
-from .const import BUTTONS, CARRIER_OUTPUTS, DOMAIN, OUTPUTS, XPORT_GROUP_MODE_RGBW, XPORT_GROUP_MODE_RGB_PLUS_W, normalize_xport_profile
+from .const import (
+    BUTTONS,
+    CARRIER_OUTPUTS,
+    DOMAIN,
+    OUTPUTS,
+    XPORT_GROUP_MODE_RGBW,
+    XPORT_GROUP_MODE_RGB_PLUS_W,
+    XPORT_GROUP_MODE_W_PLUS_W_PLUS_W_PLUS_W,
+    normalize_xport_profile,
+)
 from .registry_names import apply_compact_entity_dashboard_names
 from .xport_entities import XPORT_ENTITY_KINDS, xport_desired_unique_ids, xport_platform_value
 
@@ -573,6 +582,10 @@ class IntellegyHubGpioManager:
                 "intellegyhub_xport_w_white",
             ):
                 desired.add(("number", unique_id))
+        elif group_mode == XPORT_GROUP_MODE_W_PLUS_W_PLUS_W_PLUS_W:
+            for channel in range(1, 5):
+                desired.add(("light", f"intellegyhub_xport_w_x{channel}"))
+                desired.add(("number", f"intellegyhub_xport_w_w_x{channel}"))
         else:
             for channel in range(1, 5):
                 mode = self.xport_channel(channel).get("confirmed_mode")
@@ -604,6 +617,11 @@ class IntellegyHubGpioManager:
             entity_id = entity_registry.async_get_entity_id("light", DOMAIN, unique_id)
             if entity_id is not None and ("light", unique_id) not in desired:
                 entity_registry.async_remove(entity_id)
+        for channel in range(1, 5):
+            unique_id = f"intellegyhub_xport_w_x{channel}"
+            entity_id = entity_registry.async_get_entity_id("light", DOMAIN, unique_id)
+            if entity_id is not None and ("light", unique_id) not in desired:
+                entity_registry.async_remove(entity_id)
         for color in ("red", "green", "blue", "white"):
             unique_id = f"intellegyhub_xport_rgbw_{color}"
             entity_id = entity_registry.async_get_entity_id("number", DOMAIN, unique_id)
@@ -618,11 +636,17 @@ class IntellegyHubGpioManager:
             entity_id = entity_registry.async_get_entity_id("number", DOMAIN, unique_id)
             if entity_id is not None and ("number", unique_id) not in desired:
                 entity_registry.async_remove(entity_id)
+        for channel in range(1, 5):
+            unique_id = f"intellegyhub_xport_w_w_x{channel}"
+            entity_id = entity_registry.async_get_entity_id("number", DOMAIN, unique_id)
+            if entity_id is not None and ("number", unique_id) not in desired:
+                entity_registry.async_remove(entity_id)
 
         device_registry = dr.async_get(self.hass)
         devices = getattr(device_registry, "devices", {})
         rgbw_enabled = group_mode == XPORT_GROUP_MODE_RGBW
         rgb_plus_w_enabled = group_mode == XPORT_GROUP_MODE_RGB_PLUS_W
+        w_plus_w_enabled = group_mode == XPORT_GROUP_MODE_W_PLUS_W_PLUS_W_PLUS_W
         for device in list(getattr(devices, "values", lambda: [])()):
             identifiers = getattr(device, "identifiers", set())
             for domain, identifier in identifiers:
@@ -637,7 +661,10 @@ class IntellegyHubGpioManager:
                 if not rgbw_enabled and identifier == "xport_rgbw_dimmer":
                     device_registry.async_remove_device(device.id)
                     break
-                if not rgb_plus_w_enabled and identifier in {"xport_rgb_dimmer", "xport_w_dimmer"}:
+                if not rgb_plus_w_enabled and identifier == "xport_rgb_dimmer":
+                    device_registry.async_remove_device(device.id)
+                    break
+                if not (rgb_plus_w_enabled or w_plus_w_enabled) and identifier == "xport_w_dimmer":
                     device_registry.async_remove_device(device.id)
                     break
                 if identifier == "xport":

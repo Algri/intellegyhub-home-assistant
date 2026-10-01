@@ -12,6 +12,7 @@ from .const import (
     XPORT_PROFILE_OPTIONS,
     XPORT_GROUP_MODE_RGBW,
     XPORT_GROUP_MODE_RGB_PLUS_W,
+    XPORT_GROUP_MODE_W_PLUS_W_PLUS_W_PLUS_W,
     XPORT_PROFILE_UNIVERSAL_IO,
     XPORT_MODE_LABEL_OPTIONS,
     XPORT_MODE_LABELS,
@@ -23,6 +24,7 @@ from .entity import IntellegyHubGpioEntity, IntellegyHubXPortEntity
 XPORT_CONFIGURATION_LABELS = {
     XPORT_GROUP_MODE_RGBW: "RGBW",
     XPORT_GROUP_MODE_RGB_PLUS_W: "RGB + W",
+    XPORT_GROUP_MODE_W_PLUS_W_PLUS_W_PLUS_W: "W + W + W + W",
 }
 XPORT_CONFIGURATION_VALUES_BY_LABEL = {label: value for value, label in XPORT_CONFIGURATION_LABELS.items()}
 
@@ -36,7 +38,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     def sync_entities() -> None:
         desired = (
             set()
-            if normalize_xport_profile(manager.xport.get("group_mode")) in {XPORT_GROUP_MODE_RGBW, XPORT_GROUP_MODE_RGB_PLUS_W}
+            if normalize_xport_profile(manager.xport.get("group_mode")) in XPORT_CONFIGURATION_OPTIONS
             else set(range(1, 5))
         )
         for channel in sorted(desired - set(known)):
@@ -79,7 +81,7 @@ class IntellegyHubXPortModeSelect(IntellegyHubXPortEntity, SelectEntity):
 class IntellegyHubXPortProfileSelect(IntellegyHubGpioEntity, SelectEntity):
     _attr_translation_key = "xport_profile"
     _attr_unique_id = "intellegyhub_xport_profile"
-    _attr_name = "X-PORT Profile"
+    _attr_name = "X-PORT 1 Profile"
     _attr_options = XPORT_PROFILE_OPTIONS
     _attr_has_entity_name = False
 
@@ -107,7 +109,7 @@ class IntellegyHubXPortProfileSelect(IntellegyHubGpioEntity, SelectEntity):
 class IntellegyHubXPortConfigurationSelect(IntellegyHubGpioEntity, SelectEntity):
     _attr_translation_key = "xport_configuration"
     _attr_unique_id = "intellegyhub_xport_configuration"
-    _attr_name = "X-PORT Configuration"
+    _attr_name = "X-PORT 2 Mode"
     _attr_options = list(XPORT_CONFIGURATION_VALUES_BY_LABEL)
     _attr_has_entity_name = False
 

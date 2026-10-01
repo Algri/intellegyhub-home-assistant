@@ -31,6 +31,7 @@ class XPortGroupMode(StrEnum):
     UNIVERSAL_IO = "Universal I/O"
     RGBW_DIMMER = "RGBW Dimmer"
     RGB_PLUS_W = "RGB + W"
+    W_PLUS_W_PLUS_W_PLUS_W = "W + W + W + W"
 
     @classmethod
     def _missing_(cls, value: object) -> XPortGroupMode | None:
@@ -40,6 +41,8 @@ class XPortGroupMode(StrEnum):
             return cls.RGBW_DIMMER
         if value in {"RgbPlusW", "RGBPlusW"}:
             return cls.RGB_PLUS_W
+        if value in {"WPlusWPlusWPlusW", "WWWW"}:
+            return cls.W_PLUS_W_PLUS_W_PLUS_W
         return None
 
 
@@ -62,6 +65,11 @@ class Availability(StrEnum):
 WRITABLE_MODES = {XPortMode.DO, XPortMode.PWM}
 INPUT_MODES = {XPortMode.DI_EXTERNAL, XPortMode.DI_INTERNAL}
 COUNTER_MODES = {XPortMode.COUNTER_EXTERNAL, XPortMode.COUNTER_INTERNAL}
+GROUP_DIMMER_MODES = {
+    XPortGroupMode.RGBW_DIMMER,
+    XPortGroupMode.RGB_PLUS_W,
+    XPortGroupMode.W_PLUS_W_PLUS_W_PLUS_W,
+}
 
 
 @dataclass(frozen=True)
@@ -590,7 +598,7 @@ class XPortManager:
             state.updated_at = now
             self.channels[channel] = state
             await self.store.save(state)
-            if self.group_mode in {XPortGroupMode.RGBW_DIMMER, XPortGroupMode.RGB_PLUS_W}:
+            if self.group_mode in GROUP_DIMMER_MODES:
                 continue
             if availability == Availability.AVAILABLE and state.desired_mode != XPortMode.DISABLED:
                 restored_value = state.value
@@ -605,7 +613,7 @@ class XPortManager:
                     state.error = f"restore failed: {exc}"
                     state.updated_at = self._now()
                     await self.store.save(state)
-        if availability == Availability.AVAILABLE and self.group_mode in {XPortGroupMode.RGBW_DIMMER, XPortGroupMode.RGB_PLUS_W}:
+        if availability == Availability.AVAILABLE and self.group_mode in GROUP_DIMMER_MODES:
             await self._enable_led_dimmer_group(restore_values=True)
         self._stopping.clear()
         self._monitor_task = asyncio.create_task(self._monitor_inputs(), name="intellegy-xport-monitor")
@@ -644,7 +652,7 @@ class XPortManager:
     async def configure_group_mode(self, mode: XPortGroupMode) -> dict[str, Any]:
         async with self._lock:
             mode = XPortGroupMode(mode)
-            if mode in {XPortGroupMode.RGBW_DIMMER, XPortGroupMode.RGB_PLUS_W}:
+            if mode in GROUP_DIMMER_MODES:
                 if self.availability != Availability.AVAILABLE:
                     raise ValueError(self.error or "X-Port is not available")
                 if self.topology != XPortTopology.EXTENDED:
@@ -655,7 +663,7 @@ class XPortManager:
             await self._safe_shutdown_channels()
             self.group_mode = mode
             await self.store.save_group_mode(mode)
-            if mode in {XPortGroupMode.RGBW_DIMMER, XPortGroupMode.RGB_PLUS_W}:
+            if mode in GROUP_DIMMER_MODES:
                 await self._enable_led_dimmer_group(restore_values=False)
             else:
                 await self._enable_universal_io_profile()
@@ -727,7 +735,7 @@ class XPortManager:
     async def set_group_channel_value(self, channel: int, value: float) -> dict[str, Any]:
         async with self._lock:
             state = self._required(channel)
-            if self.group_mode not in {XPortGroupMode.RGBW_DIMMER, XPortGroupMode.RGB_PLUS_W}:
+            if self.group_mode not in GROUP_DIMMER_MODES:
                 return self._operation(state, "Rejected", "X-Port group dimmer is not enabled")
             if self.availability != Availability.AVAILABLE or self.topology != XPortTopology.EXTENDED:
                 return self._operation(state, "Rejected", self.error or "X-Port Extended is not available")

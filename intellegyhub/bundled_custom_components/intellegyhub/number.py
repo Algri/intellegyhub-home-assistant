@@ -7,7 +7,14 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, XPORT_GROUP_MODE_RGBW, XPORT_GROUP_MODE_RGB_PLUS_W, XPORT_MODE_PWM, normalize_xport_profile
+from .const import (
+    DOMAIN,
+    XPORT_GROUP_MODE_RGBW,
+    XPORT_GROUP_MODE_RGB_PLUS_W,
+    XPORT_GROUP_MODE_W_PLUS_W_PLUS_W_PLUS_W,
+    XPORT_MODE_PWM,
+    normalize_xport_profile,
+)
 from .entity import IntellegyHubGpioEntity, IntellegyHubXPortEntity, IntellegyHubXPortGroupEntity
 from .xport_entities import setup_xport_dynamic_platform
 
@@ -53,6 +60,13 @@ RGB_PLUS_W_CHANNELS = {
     4: ("w_white", "X4 White"),
 }
 
+W_PLUS_W_CHANNELS = {
+    1: ("w_x1", "X1 White"),
+    2: ("w_x2", "X2 White"),
+    3: ("w_x3", "X3 White"),
+    4: ("w_x4", "X4 White"),
+}
+
 
 def setup_xport_rgbw_numbers(entry: ConfigEntry, manager, async_add_entities: AddEntitiesCallback) -> None:
     known: dict[tuple[str, int], IntellegyHubXPortRgbwChannelNumber] = {}
@@ -64,6 +78,8 @@ def setup_xport_rgbw_numbers(entry: ConfigEntry, manager, async_add_entities: Ad
             desired = {(XPORT_GROUP_MODE_RGBW, channel) for channel in RGBW_CHANNELS}
         elif group_mode == XPORT_GROUP_MODE_RGB_PLUS_W:
             desired = {(XPORT_GROUP_MODE_RGB_PLUS_W, channel) for channel in RGB_PLUS_W_CHANNELS}
+        elif group_mode == XPORT_GROUP_MODE_W_PLUS_W_PLUS_W_PLUS_W:
+            desired = {(XPORT_GROUP_MODE_W_PLUS_W_PLUS_W_PLUS_W, channel) for channel in W_PLUS_W_CHANNELS}
         else:
             desired = set()
         for key in sorted(desired - set(known)):
@@ -122,9 +138,19 @@ class IntellegyHubXPortRgbwChannelNumber(IntellegyHubXPortGroupEntity, NumberEnt
         super().__init__(manager)
         self.channel = channel
         self.group_mode = normalize_xport_profile(group_mode)
-        channels = RGB_PLUS_W_CHANNELS if self.group_mode == XPORT_GROUP_MODE_RGB_PLUS_W else RGBW_CHANNELS
+        if self.group_mode == XPORT_GROUP_MODE_RGB_PLUS_W:
+            channels = RGB_PLUS_W_CHANNELS
+        elif self.group_mode == XPORT_GROUP_MODE_W_PLUS_W_PLUS_W_PLUS_W:
+            channels = W_PLUS_W_CHANNELS
+        else:
+            channels = RGBW_CHANNELS
         slug, name = channels[channel]
-        prefix = "intellegyhub_xport" if self.group_mode == XPORT_GROUP_MODE_RGB_PLUS_W else "intellegyhub_xport_rgbw"
+        if self.group_mode == XPORT_GROUP_MODE_RGBW:
+            prefix = "intellegyhub_xport_rgbw"
+        elif self.group_mode == XPORT_GROUP_MODE_W_PLUS_W_PLUS_W_PLUS_W:
+            prefix = "intellegyhub_xport_w"
+        else:
+            prefix = "intellegyhub_xport"
         self._attr_unique_id = f"{prefix}_{slug}"
         self._attr_name = name
 
@@ -132,18 +158,24 @@ class IntellegyHubXPortRgbwChannelNumber(IntellegyHubXPortGroupEntity, NumberEnt
     def group_identifier(self) -> str:
         if self.group_mode == XPORT_GROUP_MODE_RGB_PLUS_W:
             return "xport_w_dimmer" if self.channel == 4 else "xport_rgb_dimmer"
+        if self.group_mode == XPORT_GROUP_MODE_W_PLUS_W_PLUS_W_PLUS_W:
+            return "xport_w_dimmer"
         return "xport_rgbw_dimmer"
 
     @property
     def group_name(self) -> str:
         if self.group_mode == XPORT_GROUP_MODE_RGB_PLUS_W:
             return "X-Port W Dimmer" if self.channel == 4 else "X-Port RGB Dimmer"
+        if self.group_mode == XPORT_GROUP_MODE_W_PLUS_W_PLUS_W_PLUS_W:
+            return "X-Port W Dimmer"
         return "X-Port RGBW Dimmer"
 
     @property
     def group_model(self) -> str:
         if self.group_mode == XPORT_GROUP_MODE_RGB_PLUS_W:
             return "W Dimmer" if self.channel == 4 else "RGB Dimmer"
+        if self.group_mode == XPORT_GROUP_MODE_W_PLUS_W_PLUS_W_PLUS_W:
+            return "W Dimmer"
         return "RGBW Dimmer"
 
     @property

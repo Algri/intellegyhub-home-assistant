@@ -35,8 +35,8 @@ STATIC_ENTITY_DASHBOARD_NAMES: dict[str, str] = {
     "intellegyhub_buzzer_volume": "Buzzer Volume",
     "intellegyhub_buzzer_volume_light": "Buzzer Volume",
     "intellegyhub_buzzer_play": "Buzzer Play",
-    "intellegyhub_xport_profile": "X-PORT Profile",
-    "intellegyhub_xport_configuration": "X-PORT Configuration",
+    "intellegyhub_xport_profile": "X-PORT 1 Profile",
+    "intellegyhub_xport_configuration": "X-PORT 2 Mode",
     "intellegyhub_xport_rgbw": "Dimmer",
     "intellegyhub_xport_rgb": "Dimmer",
     "intellegyhub_xport_w": "Dimmer",
@@ -48,6 +48,14 @@ STATIC_ENTITY_DASHBOARD_NAMES: dict[str, str] = {
     "intellegyhub_xport_rgb_green": "X2 Green",
     "intellegyhub_xport_rgb_blue": "X3 Blue",
     "intellegyhub_xport_w_white": "X4 White",
+    "intellegyhub_xport_w_x1": "X1 White",
+    "intellegyhub_xport_w_x2": "X2 White",
+    "intellegyhub_xport_w_x3": "X3 White",
+    "intellegyhub_xport_w_x4": "X4 White",
+    "intellegyhub_xport_w_w_x1": "X1 White",
+    "intellegyhub_xport_w_w_x2": "X2 White",
+    "intellegyhub_xport_w_w_x3": "X3 White",
+    "intellegyhub_xport_w_w_x4": "X4 White",
 }
 
 STATIC_ENTITY_IDS: dict[str, str] = {
@@ -65,6 +73,14 @@ STATIC_ENTITY_IDS: dict[str, str] = {
     "intellegyhub_xport_rgb_green": "number.intellegyhub_xport_rgb_green",
     "intellegyhub_xport_rgb_blue": "number.intellegyhub_xport_rgb_blue",
     "intellegyhub_xport_w_white": "number.intellegyhub_xport_w_white",
+    "intellegyhub_xport_w_x1": "light.intellegyhub_xport_w_x1",
+    "intellegyhub_xport_w_x2": "light.intellegyhub_xport_w_x2",
+    "intellegyhub_xport_w_x3": "light.intellegyhub_xport_w_x3",
+    "intellegyhub_xport_w_x4": "light.intellegyhub_xport_w_x4",
+    "intellegyhub_xport_w_w_x1": "number.intellegyhub_xport_w_w_x1",
+    "intellegyhub_xport_w_w_x2": "number.intellegyhub_xport_w_w_x2",
+    "intellegyhub_xport_w_w_x3": "number.intellegyhub_xport_w_w_x3",
+    "intellegyhub_xport_w_w_x4": "number.intellegyhub_xport_w_w_x4",
 }
 
 XPORT_ENTITY_SUFFIX_NAMES = {

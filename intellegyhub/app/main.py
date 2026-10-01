@@ -203,7 +203,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.160 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.161 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -250,7 +250,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.160", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.161", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -491,6 +491,15 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .mode-option.active {
       background: var(--ha-menu-hover);
       color: var(--ha-strong);
+    }
+    .mode-option.disabled {
+      cursor: not-allowed;
+      color: var(--ha-secondary);
+      opacity: .72;
+    }
+    .mode-option.disabled:hover {
+      background: transparent;
+      color: var(--ha-secondary);
     }
     .active-mode {
       display: flex;
@@ -799,7 +808,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           <div id="xport-group-mode"></div>
         </div>
         <div id="xport-configuration-control" class="bus-power-control">
-          <label>Configuration</label>
+          <label>Mode</label>
           <div id="xport-configuration"></div>
         </div>
         <div id="xport-group-note" class="bus-note">RGBW Dimmer assigns X1-X4 as Red, Green, Blue, and White channels.</div>
@@ -1022,14 +1031,15 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       RGBPlusW: 'RGB + W'
     };
     const profileOrder = ['Universal I/O', 'LED Dimmer'];
-    const configurationOrder = ['RGBW Dimmer', 'RGB + W'];
+    const configurationOrder = ['RGBW Dimmer', 'RGB + W', 'W + W + W + W'];
     const profileLabels = {
       'Universal I/O': 'Universal I/O',
       'LED Dimmer': 'LED Dimmer'
     };
     const configurationLabels = {
       'RGBW Dimmer': 'RGBW',
-      'RGB + W': 'RGB + W'
+      'RGB + W': 'RGB + W',
+      'W + W + W + W': 'W + W + W + W'
     };
     const rgbwRoles = {
       1: 'Red',
@@ -1156,6 +1166,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       if (note) {
         if (currentMode === 'RGB + W') {
           note.textContent = 'RGB + W creates an RGB dimmer on X1-X3 and an independent white dimmer on X4.';
+        } else if (currentMode === 'W + W + W + W') {
+          note.textContent = 'W + W + W + W creates four independent white dimmers on X1-X4.';
         } else if (currentMode === 'RGBW Dimmer') {
           note.textContent = 'RGBW Dimmer assigns X1-X4 as Red, Green, Blue, and White channels.';
         } else {
@@ -1194,7 +1206,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       groupMode = normalizeGroupMode(groupMode);
       const locked = groupMode && groupMode !== 'Universal I/O';
       card.classList.toggle('locked', locked);
-      const desiredLabel = locked ? `${rgbwRoles[channel.channel] || 'RGBW'} channel` : labels[channel.desired_mode] || channel.desired_mode;
+      const desiredLabel = locked ? groupChannelModeLabel(groupMode, channel.channel) : labels[channel.desired_mode] || channel.desired_mode;
       const trigger = card.querySelector('.mode-trigger');
       if (trigger && trigger.textContent !== desiredLabel) {
         trigger.textContent = desiredLabel;
@@ -1226,7 +1238,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         String(channel.counter ?? '')
       ].join('|');
       if (body && body.dataset.bodyKey !== bodyKey) {
-        body.replaceChildren(locked ? renderLockedXPortBody(channel) : renderModeBody(channel));
+        body.replaceChildren(locked ? renderLockedXPortBody(channel, groupMode) : renderModeBody(channel));
         body.dataset.bodyKey = bodyKey;
       }
     }
@@ -1337,12 +1349,12 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       row.append(labelEl, valueEl);
       return row;
     }
-    function renderLockedXPortBody(channel) {
+    function renderLockedXPortBody(channel, groupMode) {
       const wrap = document.createElement('div');
       wrap.className = 'xport-control-row pwm';
       const percent = Math.round(Number(channel.value || 0) * 100);
       const label = document.createElement('span');
-      label.textContent = rgbwRoles[channel.channel] || 'Channel';
+      label.textContent = groupChannelSliderLabel(groupMode, channel.channel);
       const value = document.createElement('strong');
       value.textContent = `${percent}%`;
       const slider = document.createElement('input');
@@ -1451,6 +1463,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       if (mode === 'Independent') { return 'Universal I/O'; }
       if (mode === 'RgbwDimmer') { return 'RGBW Dimmer'; }
       if (mode === 'RgbPlusW' || mode === 'RGBPlusW') { return 'RGB + W'; }
+      if (mode === 'WPlusWPlusWPlusW' || mode === 'WWWW') { return 'W + W + W + W'; }
       return mode || 'Universal I/O';
     }
     function groupModeToProfile(mode) {
@@ -1458,12 +1471,27 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     function groupChannelActiveLabel(groupMode, channel) {
       if (groupMode === 'RGB + W') {
-        return channel === 4 ? 'W' : 'RGB';
+        return channel === 4 ? 'White' : 'RGB';
+      }
+      if (groupMode === 'W + W + W + W') {
+        return 'White';
       }
       if (groupMode === 'RGBW Dimmer') {
         return 'RGBW';
       }
       return groupMode;
+    }
+    function groupChannelModeLabel(groupMode, channel) {
+      if (groupMode === 'W + W + W + W') {
+        return 'White channel';
+      }
+      return `${rgbwRoles[channel] || 'RGBW'} channel`;
+    }
+    function groupChannelSliderLabel(groupMode, channel) {
+      if (groupMode === 'W + W + W + W') {
+        return 'White';
+      }
+      return rgbwRoles[channel] || 'Channel';
     }
     function renderProfileSelect(currentProfile) {
       const wrap = document.createElement('div');

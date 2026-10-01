@@ -53,10 +53,10 @@
         "name": "Mode"
       },
       "xport_profile": {
-        "name": "X-PORT Profile"
+        "name": "X-PORT 1 Profile"
       },
       "xport_configuration": {
-        "name": "X-PORT Configuration"
+        "name": "X-PORT 2 Mode"
       }
     },
     "sensor": {
@@ -102,6 +102,9 @@
       },
       "xport_rgbw": {
         "name": "Dimmer"
+      },
+      "xport_w_channel": {
+        "name": "White"
       }
     },
     "button": {
