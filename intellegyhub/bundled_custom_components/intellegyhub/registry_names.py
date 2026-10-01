@@ -66,6 +66,9 @@ STATIC_ENTITY_DASHBOARD_NAMES: dict[str, str] = {
     "intellegyhub_xport_w_w_x2": "X2 White",
     "intellegyhub_xport_w_w_x3": "X3 White",
     "intellegyhub_xport_w_w_x4": "X4 White",
+    "intellegyhub_xport_w_w_x1_x2": "X1-X2 White",
+    "intellegyhub_xport_w_w_x3_x4": "X3-X4 White",
+    "intellegyhub_xport_w_w_x1_x2_x3_x4": "White",
 }
 
 STATIC_ENTITY_IDS: dict[str, str] = {
@@ -94,6 +97,9 @@ STATIC_ENTITY_IDS: dict[str, str] = {
     "intellegyhub_xport_w_w_x2": "number.intellegyhub_xport_w_w_x2",
     "intellegyhub_xport_w_w_x3": "number.intellegyhub_xport_w_w_x3",
     "intellegyhub_xport_w_w_x4": "number.intellegyhub_xport_w_w_x4",
+    "intellegyhub_xport_w_w_x1_x2": "number.intellegyhub_xport_w_w_x1_x2",
+    "intellegyhub_xport_w_w_x3_x4": "number.intellegyhub_xport_w_w_x3_x4",
+    "intellegyhub_xport_w_w_x1_x2_x3_x4": "number.intellegyhub_xport_w_w_4w",
 }
 
 XPORT_ENTITY_SUFFIX_NAMES = {

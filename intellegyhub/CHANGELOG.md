@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.165
+
+- Add missing Home Assistant number sliders for linked X-Port white dimmer modes.
+
 ## 0.5.164
 
 - Add Home Assistant and backend support for linked X-Port white dimmer modes: `4×W`, `2×W + 2×W`, `2×W + W + W`, and `W + W + 2×W`.

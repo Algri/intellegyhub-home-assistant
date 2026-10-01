@@ -648,6 +648,7 @@ class IntellegyHubGpioManager:
             for channels in _linked_white_groups(group_mode):
                 suffix = "_".join(f"x{channel}" for channel in channels)
                 desired.add(("light", f"intellegyhub_xport_w_{suffix}"))
+                desired.add(("number", f"intellegyhub_xport_w_w_{suffix}"))
         else:
             for channel in range(1, 5):
                 mode = self.xport_channel(channel).get("confirmed_mode")
@@ -705,6 +706,11 @@ class IntellegyHubGpioManager:
                 entity_registry.async_remove(entity_id)
         for channel in range(1, 5):
             unique_id = f"intellegyhub_xport_w_w_x{channel}"
+            entity_id = entity_registry.async_get_entity_id("number", DOMAIN, unique_id)
+            if entity_id is not None and ("number", unique_id) not in desired:
+                entity_registry.async_remove(entity_id)
+        for suffix in ("x1_x2", "x3_x4", "x1", "x2", "x3", "x4", "x1_x2_x3_x4"):
+            unique_id = f"intellegyhub_xport_w_w_{suffix}"
             entity_id = entity_registry.async_get_entity_id("number", DOMAIN, unique_id)
             if entity_id is not None and ("number", unique_id) not in desired:
                 entity_registry.async_remove(entity_id)
