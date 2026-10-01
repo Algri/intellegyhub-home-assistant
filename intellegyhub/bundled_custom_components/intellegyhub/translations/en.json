@@ -54,6 +54,9 @@
       },
       "xport_profile": {
         "name": "X-PORT Profile"
+      },
+      "xport_configuration": {
+        "name": "X-PORT Configuration"
       }
     },
     "sensor": {

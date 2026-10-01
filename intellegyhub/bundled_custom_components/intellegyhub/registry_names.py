@@ -12,6 +12,8 @@ from .const import BUTTONS, CARRIER_OUTPUTS, DOMAIN, OUTPUTS
 DEVICE_DASHBOARD_NAMES: dict[str, str] = {
     "mainboard": "Controller",
     "xport_rgbw_dimmer": "X-Port RGBW Dimmer",
+    "xport_rgb_dimmer": "X-Port RGB Dimmer",
+    "xport_w_dimmer": "X-Port W Dimmer",
     "onewire_bus10_addr1a": "1-Wire Bus1",
     "onewire_bus10_addr1b": "1-Wire Bus2",
 }
@@ -34,21 +36,35 @@ STATIC_ENTITY_DASHBOARD_NAMES: dict[str, str] = {
     "intellegyhub_buzzer_volume_light": "Buzzer Volume",
     "intellegyhub_buzzer_play": "Buzzer Play",
     "intellegyhub_xport_profile": "X-PORT Profile",
+    "intellegyhub_xport_configuration": "X-PORT Configuration",
     "intellegyhub_xport_rgbw": "Dimmer",
+    "intellegyhub_xport_rgb": "Dimmer",
+    "intellegyhub_xport_w": "Dimmer",
     "intellegyhub_xport_rgbw_red": "X1 Red",
     "intellegyhub_xport_rgbw_green": "X2 Green",
     "intellegyhub_xport_rgbw_blue": "X3 Blue",
     "intellegyhub_xport_rgbw_white": "X4 White",
+    "intellegyhub_xport_rgb_red": "X1 Red",
+    "intellegyhub_xport_rgb_green": "X2 Green",
+    "intellegyhub_xport_rgb_blue": "X3 Blue",
+    "intellegyhub_xport_w_white": "X4 White",
 }
 
 STATIC_ENTITY_IDS: dict[str, str] = {
     "intellegyhub_buzzer_volume_light": "light.intellegyhub_buzzer_volume_light",
     "intellegyhub_xport_profile": "select.intellegyhub_xport_profile",
+    "intellegyhub_xport_configuration": "select.intellegyhub_xport_configuration",
     "intellegyhub_xport_rgbw": "light.intellegyhub_xport_rgbw",
+    "intellegyhub_xport_rgb": "light.intellegyhub_xport_rgb",
+    "intellegyhub_xport_w": "light.intellegyhub_xport_w",
     "intellegyhub_xport_rgbw_red": "number.intellegyhub_xport_rgbw_red",
     "intellegyhub_xport_rgbw_green": "number.intellegyhub_xport_rgbw_green",
     "intellegyhub_xport_rgbw_blue": "number.intellegyhub_xport_rgbw_blue",
     "intellegyhub_xport_rgbw_white": "number.intellegyhub_xport_rgbw_white",
+    "intellegyhub_xport_rgb_red": "number.intellegyhub_xport_rgb_red",
+    "intellegyhub_xport_rgb_green": "number.intellegyhub_xport_rgb_green",
+    "intellegyhub_xport_rgb_blue": "number.intellegyhub_xport_rgb_blue",
+    "intellegyhub_xport_w_white": "number.intellegyhub_xport_w_white",
 }
 
 XPORT_ENTITY_SUFFIX_NAMES = {

@@ -15,6 +15,7 @@ from .const import (
     XPORT_MODE_DO,
     XPORT_MODE_PWM,
     XPORT_GROUP_MODE_RGBW,
+    XPORT_GROUP_MODE_RGB_PLUS_W,
     normalize_xport_profile,
 )
 
@@ -69,7 +70,7 @@ def xport_desired_unique_ids(channel: int, mode: str | None) -> set[tuple[str, s
 def xport_desired_channels_for_suffix(manager, platform: Platform, suffix: str) -> set[int]:
     if not hasattr(manager, "xport_channel"):
         return set()
-    if normalize_xport_profile(getattr(manager, "xport", {}).get("group_mode")) == XPORT_GROUP_MODE_RGBW:
+    if normalize_xport_profile(getattr(manager, "xport", {}).get("group_mode")) in {XPORT_GROUP_MODE_RGBW, XPORT_GROUP_MODE_RGB_PLUS_W}:
         return set()
     platform_value = xport_platform_value(platform)
     channels: set[int] = set()

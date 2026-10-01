@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from homeassistant.components.light import ATTR_BRIGHTNESS, ATTR_RGBW_COLOR, ColorMode, LightEntity
+from homeassistant.components.light import ATTR_BRIGHTNESS, ATTR_RGB_COLOR, ATTR_RGBW_COLOR, ColorMode, LightEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, XPORT_GROUP_MODE_RGBW, XPORT_MODE_PWM, normalize_xport_profile
+from .const import DOMAIN, XPORT_GROUP_MODE_RGBW, XPORT_GROUP_MODE_RGB_PLUS_W, XPORT_MODE_PWM, normalize_xport_profile
 from .entity import IntellegyHubGpioEntity, IntellegyHubXPortEntity, IntellegyHubXPortGroupEntity
 from .xport_entities import setup_xport_dynamic_platform
 
@@ -16,6 +16,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     manager = hass.data[DOMAIN][entry.entry_id]
     async_add_entities([IntellegyHubBuzzerVolumeLight(manager)])
     setup_xport_rgbw_light(entry, manager, async_add_entities)
+    setup_xport_rgb_plus_w_lights(entry, manager, async_add_entities)
     setup_xport_dynamic_platform(
         entry,
         manager,
@@ -46,6 +47,27 @@ def setup_xport_rgbw_light(entry: ConfigEntry, manager, async_add_entities: AddE
 
     entry.async_on_unload(manager.async_add_listener(sync_entity))
     sync_entity()
+
+
+def setup_xport_rgb_plus_w_lights(entry: ConfigEntry, manager, async_add_entities: AddEntitiesCallback) -> None:
+    entities: dict[str, LightEntity] = {}
+
+    @callback
+    def sync_entities() -> None:
+        desired = {"rgb", "white"} if normalize_xport_profile(manager.xport.get("group_mode")) == XPORT_GROUP_MODE_RGB_PLUS_W else set()
+        for key in sorted(desired - set(entities)):
+            entity = IntellegyHubXPortRgbLight(manager) if key == "rgb" else IntellegyHubXPortWhiteLight(manager)
+            entities[key] = entity
+            async_add_entities([entity])
+        for key in sorted(set(entities) - desired):
+            entity = entities.pop(key)
+            manager.hass.async_create_task(
+                entity.async_remove(force_remove=True),
+                f"intellegyhub_remove_xport_rgb_plus_w_{key}",
+            )
+
+    entry.async_on_unload(manager.async_add_listener(sync_entities))
+    sync_entities()
 
 
 class IntellegyHubXPortPwmLight(IntellegyHubXPortEntity, LightEntity):
@@ -147,6 +169,114 @@ class IntellegyHubXPortRgbwLight(IntellegyHubXPortGroupEntity, LightEntity):
             max(0.0, min(1.0, float(self.manager.xport_channel(channel).get("value", 0))))
             for channel in range(1, 5)
         )
+
+
+class IntellegyHubXPortRgbLight(IntellegyHubXPortGroupEntity, LightEntity):
+    group_identifier = "xport_rgb_dimmer"
+    group_name = "X-Port RGB Dimmer"
+    group_model = "RGB Dimmer"
+    _attr_translation_key = "xport_rgb"
+    _attr_unique_id = "intellegyhub_xport_rgb"
+    _attr_suggested_object_id = "intellegyhub_xport_rgb"
+    _attr_name = "Dimmer"
+    _attr_supported_color_modes = {ColorMode.RGB}
+    _attr_color_mode = ColorMode.RGB
+    _attr_icon = "mdi:lightbulb"
+
+    @property
+    def available(self) -> bool:
+        return self.xport_available and normalize_xport_profile(self.manager.xport.get("group_mode")) == XPORT_GROUP_MODE_RGB_PLUS_W
+
+    @property
+    def is_on(self) -> bool:
+        return any(value > 0 for value in self._channel_values())
+
+    @property
+    def brightness(self) -> int | None:
+        level = max(self._channel_values())
+        if level <= 0:
+            return None
+        return max(1, min(255, round(level * 255)))
+
+    @property
+    def rgb_color(self) -> tuple[int, int, int] | None:
+        return tuple(max(0, min(255, round(value * 255))) for value in self._channel_values())
+
+    async def async_turn_on(self, **kwargs) -> None:
+        if not self.available:
+            raise HomeAssistantError("X-Port RGB Dimmer is not active")
+        values = self._channel_values()
+        rgb = kwargs.get(ATTR_RGB_COLOR)
+        brightness = kwargs.get(ATTR_BRIGHTNESS)
+        if rgb is not None:
+            values = tuple(max(0.0, min(1.0, int(part) / 255)) for part in rgb)
+        elif not any(values):
+            values = (1.0, 1.0, 1.0)
+        if brightness is not None:
+            scale = max(0.0, min(1.0, int(brightness) / 255))
+            current = max(values)
+            if current > 0:
+                values = tuple(max(0.0, min(1.0, value / current * scale)) for value in values)
+            else:
+                values = (scale, scale, scale)
+        await self.manager.async_set_xport_rgb(values)
+
+    async def async_turn_off(self, **kwargs) -> None:
+        if not self.available:
+            raise HomeAssistantError("X-Port RGB Dimmer is not active")
+        await self.manager.async_set_xport_rgb((0.0, 0.0, 0.0))
+
+    def _channel_values(self) -> tuple[float, float, float]:
+        return tuple(
+            max(0.0, min(1.0, float(self.manager.xport_channel(channel).get("value", 0))))
+            for channel in range(1, 4)
+        )
+
+
+class IntellegyHubXPortWhiteLight(IntellegyHubXPortGroupEntity, LightEntity):
+    group_identifier = "xport_w_dimmer"
+    group_name = "X-Port W Dimmer"
+    group_model = "W Dimmer"
+    _attr_translation_key = "xport_w"
+    _attr_unique_id = "intellegyhub_xport_w"
+    _attr_suggested_object_id = "intellegyhub_xport_w"
+    _attr_name = "Dimmer"
+    _attr_supported_color_modes = {ColorMode.BRIGHTNESS}
+    _attr_color_mode = ColorMode.BRIGHTNESS
+    _attr_icon = "mdi:lightbulb"
+
+    @property
+    def available(self) -> bool:
+        return self.xport_available and normalize_xport_profile(self.manager.xport.get("group_mode")) == XPORT_GROUP_MODE_RGB_PLUS_W
+
+    @property
+    def is_on(self) -> bool:
+        return self._value > 0
+
+    @property
+    def brightness(self) -> int | None:
+        if self._value <= 0:
+            return None
+        return max(1, min(255, round(self._value * 255)))
+
+    async def async_turn_on(self, **kwargs) -> None:
+        if not self.available:
+            raise HomeAssistantError("X-Port W Dimmer is not active")
+        brightness = kwargs.get(ATTR_BRIGHTNESS)
+        if brightness is None:
+            value = self._value or 1.0
+        else:
+            value = max(0.0, min(1.0, int(brightness) / 255))
+        await self.manager.async_set_xport_group_channel_value(4, value)
+
+    async def async_turn_off(self, **kwargs) -> None:
+        if not self.available:
+            raise HomeAssistantError("X-Port W Dimmer is not active")
+        await self.manager.async_set_xport_group_channel_value(4, 0.0)
+
+    @property
+    def _value(self) -> float:
+        return max(0.0, min(1.0, float(self.manager.xport_channel(4).get("value", 0))))
 
 
 class IntellegyHubBuzzerVolumeLight(IntellegyHubGpioEntity, LightEntity):

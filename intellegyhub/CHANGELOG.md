@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.160
+
+- Add the X-Port LED Dimmer configuration selector in the add-on UI and keep RGBW displayed as a configuration rather than a profile.
+- Expose RGB + W in Home Assistant as separate X-Port RGB Dimmer and X-Port W Dimmer devices with independent controls.
+
 ## 0.5.159
 
 - Split Board Diagnostics LED behavior so STE is the runtime heartbeat, NET is the WebSocket connection indicator, and ERR no longer reacts to WebSocket disconnects.

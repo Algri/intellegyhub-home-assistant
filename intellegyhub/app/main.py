@@ -203,7 +203,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.159 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.160 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -250,7 +250,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.159", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.160", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -596,7 +596,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       --xport-card-gap: 16px;
       --xport-toolbar-pad: 12px;
       display: grid;
-      grid-template-columns: calc(((100% + (2 * var(--xport-toolbar-pad))) - (3 * var(--xport-card-gap))) / 4 - var(--xport-toolbar-pad)) minmax(0, 1fr);
+      grid-template-columns: repeat(2, minmax(330px, calc(((100% + (2 * var(--xport-toolbar-pad))) - (3 * var(--xport-card-gap))) / 4 - var(--xport-toolbar-pad)))) minmax(0, 1fr);
       gap: var(--xport-card-gap);
       align-items: center;
     }
@@ -608,7 +608,12 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       padding-right: 0;
     }
     .xport-group-toolbar .bus-power-control .mode-select { width: 100%; min-width: 0; }
-    .xport-group-toolbar .bus-note { grid-column: 2; }
+    .xport-group-toolbar .bus-power-control.hidden { display: none; }
+    .xport-group-toolbar .bus-note { grid-column: 3; }
+    .xport-group-toolbar.config-hidden {
+      grid-template-columns: minmax(330px, calc(((100% + (2 * var(--xport-toolbar-pad))) - (3 * var(--xport-card-gap))) / 4 - var(--xport-toolbar-pad))) minmax(0, 1fr);
+    }
+    .xport-group-toolbar.config-hidden .bus-note { grid-column: 2; }
     .bus-note { color: var(--ha-secondary); font-size: 13px; line-height: 1.4; flex: 1 1 360px; align-self: center; }
     .bus-action { min-width: 142px; }
     .modules { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 18px; }
@@ -700,7 +705,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     pre.visible { display: block; }
     @media (max-width: 1300px) { .relay-grid { grid-template-columns: repeat(4, minmax(140px, 1fr)); } }
     @media (max-width: 1300px) { .overview-panel { grid-template-columns: 1fr; } .overview-identity { border-right: 0; border-bottom: 1px solid var(--ha-card-border); min-height: 260px; } }
-    @media (max-width: 1100px) { .ports, .carrier-io-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .xport-group-toolbar { grid-template-columns: calc(((100% + (2 * var(--xport-toolbar-pad))) - var(--xport-card-gap)) / 2 - var(--xport-toolbar-pad)) minmax(0, 1fr); } .relay-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); } }
+    @media (max-width: 1100px) { .ports, .carrier-io-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .xport-group-toolbar { grid-template-columns: repeat(2, calc(((100% + (2 * var(--xport-toolbar-pad))) - var(--xport-card-gap)) / 2 - var(--xport-toolbar-pad))); } .xport-group-toolbar.config-hidden { grid-template-columns: calc(((100% + (2 * var(--xport-toolbar-pad))) - var(--xport-card-gap)) / 2 - var(--xport-toolbar-pad)) minmax(0, 1fr); } .xport-group-toolbar .bus-note, .xport-group-toolbar.config-hidden .bus-note { grid-column: 1 / -1; } .relay-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); } }
     @media (max-width: 900px) { .diagnostic-led-grid, .diagnostic-rtc-grid, .buzzer-panel { grid-template-columns: 1fr; } .buzzer-actions { grid-template-columns: repeat(2, minmax(120px, 1fr)); grid-template-rows: auto; } .buzzer-actions .buzzer-group-title { grid-column: 1 / -1; } }
     @media (max-width: 620px) { body { padding: 10px; } .app-toolbar { justify-content: stretch; } .theme-switcher { width: 100%; justify-content: space-between; } .theme-choice { flex: 1; } .overview-identity { min-height: 260px; padding: 22px 18px; } .overview-wordmark { font-size: 22px; letter-spacing: .12em; } .overview-title-row { align-items: flex-start; flex-direction: column; gap: 14px; } .overview-title h1 { font-size: 34px; } .overview-title .subtitle { font-size: 16px; } .overview-facts { grid-template-columns: 88px minmax(0, 1fr); } .overview-facts dt, .overview-facts dd { font-size: 14px; } .overview-health { grid-template-columns: 1fr; gap: 18px; } .overview-health-item + .overview-health-item { border-left: 0; padding-left: 0; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+3) { border-right: 0; border-bottom: 1px solid var(--ha-card-border); } .overview-metric:nth-of-type(4) { border-bottom: 0; } .xport-panel { padding: 18px 14px; border-radius: 12px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .xport-group-toolbar { grid-template-columns: 1fr; } .xport-group-toolbar .bus-note { grid-column: 1; } .ports, .carrier-io-grid, .relay-grid { grid-template-columns: 1fr; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-row { grid-template-columns: 1fr; gap: 6px; } }
   </style>
@@ -793,7 +798,11 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           <label>Profile</label>
           <div id="xport-group-mode"></div>
         </div>
-        <div class="bus-note">RGBW Dimmer assigns X1-X4 as Red, Green, Blue, and White channels.</div>
+        <div id="xport-configuration-control" class="bus-power-control">
+          <label>Configuration</label>
+          <div id="xport-configuration"></div>
+        </div>
+        <div id="xport-group-note" class="bus-note">RGBW Dimmer assigns X1-X4 as Red, Green, Blue, and White channels.</div>
       </div>
       <div id="ports" class="ports"></div>
     </section>
@@ -1006,10 +1015,22 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     const groupModeLabels = {
       'Universal I/O': 'Universal I/O',
       'RGBW Dimmer': 'RGBW Dimmer',
+      'RGB + W': 'RGB + W',
       Independent: 'Universal I/O',
-      RgbwDimmer: 'RGBW Dimmer'
+      RgbwDimmer: 'RGBW Dimmer',
+      RgbPlusW: 'RGB + W',
+      RGBPlusW: 'RGB + W'
     };
-    const groupModeOrder = ['Universal I/O', 'RGBW Dimmer'];
+    const profileOrder = ['Universal I/O', 'LED Dimmer'];
+    const configurationOrder = ['RGBW Dimmer', 'RGB + W'];
+    const profileLabels = {
+      'Universal I/O': 'Universal I/O',
+      'LED Dimmer': 'LED Dimmer'
+    };
+    const configurationLabels = {
+      'RGBW Dimmer': 'RGBW',
+      'RGB + W': 'RGB + W'
+    };
     const rgbwRoles = {
       1: 'Red',
       2: 'Green',
@@ -1106,11 +1127,40 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     function updateXPortGroupMode(payload) {
       const target = document.getElementById('xport-group-mode');
       const currentMode = normalizeGroupMode(payload.group_mode);
-      const availableModes = payload.group_modes || groupModeOrder;
-      const key = `${currentMode}|${availableModes.join(',')}`;
+      const profile = groupModeToProfile(currentMode);
+      const toolbar = target.closest('.xport-group-toolbar');
+      const key = `${profile}|${currentMode}`;
       if (target.dataset.key !== key) {
-        target.replaceChildren(renderGroupModeSelect(currentMode, availableModes));
+        target.replaceChildren(renderProfileSelect(profile));
         target.dataset.key = key;
+      }
+      const configControl = document.getElementById('xport-configuration-control');
+      const configTarget = document.getElementById('xport-configuration');
+      if (configControl && configTarget) {
+        const showConfig = profile === 'LED Dimmer';
+        if (toolbar) {
+          toolbar.classList.toggle('config-hidden', !showConfig);
+        }
+        configControl.classList.toggle('hidden', !showConfig);
+        const configKey = `${currentMode}|${showConfig}`;
+        if (showConfig && configTarget.dataset.key !== configKey) {
+          configTarget.replaceChildren(renderConfigurationSelect(currentMode));
+          configTarget.dataset.key = configKey;
+        }
+        if (!showConfig) {
+          configTarget.replaceChildren();
+          configTarget.dataset.key = configKey;
+        }
+      }
+      const note = document.getElementById('xport-group-note');
+      if (note) {
+        if (currentMode === 'RGB + W') {
+          note.textContent = 'RGB + W creates an RGB dimmer on X1-X3 and an independent white dimmer on X4.';
+        } else if (currentMode === 'RGBW Dimmer') {
+          note.textContent = 'RGBW Dimmer assigns X1-X4 as Red, Green, Blue, and White channels.';
+        } else {
+          note.textContent = 'Universal I/O lets each X-Port channel be configured independently.';
+        }
       }
     }
     function renderXPortCard(channel, modes) {
@@ -1161,7 +1211,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         option.classList.toggle('active', option.dataset.mode === channel.desired_mode);
       });
       const activeValue = card.querySelector('.active-mode-value');
-      const confirmedLabel = locked ? 'RGBW Dimmer' : labels[channel.confirmed_mode] || channel.confirmed_mode;
+      const confirmedLabel = locked ? groupChannelActiveLabel(groupMode, channel.channel) : labels[channel.confirmed_mode] || channel.confirmed_mode;
       if (activeValue && activeValue.textContent !== confirmedLabel) {
         activeValue.textContent = confirmedLabel;
         activeValue.title = confirmedLabel;
@@ -1400,15 +1450,28 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     function normalizeGroupMode(mode) {
       if (mode === 'Independent') { return 'Universal I/O'; }
       if (mode === 'RgbwDimmer') { return 'RGBW Dimmer'; }
+      if (mode === 'RgbPlusW' || mode === 'RGBPlusW') { return 'RGB + W'; }
       return mode || 'Universal I/O';
     }
-    function renderGroupModeSelect(currentMode, modes) {
+    function groupModeToProfile(mode) {
+      return normalizeGroupMode(mode) === 'Universal I/O' ? 'Universal I/O' : 'LED Dimmer';
+    }
+    function groupChannelActiveLabel(groupMode, channel) {
+      if (groupMode === 'RGB + W') {
+        return channel === 4 ? 'W' : 'RGB';
+      }
+      if (groupMode === 'RGBW Dimmer') {
+        return 'RGBW';
+      }
+      return groupMode;
+    }
+    function renderProfileSelect(currentProfile) {
       const wrap = document.createElement('div');
       wrap.className = 'mode-select';
       const trigger = document.createElement('button');
       trigger.type = 'button';
       trigger.className = 'mode-trigger';
-      trigger.textContent = groupModeLabels[currentMode] || currentMode;
+      trigger.textContent = profileLabels[currentProfile] || currentProfile;
       trigger.onclick = () => {
         document.querySelectorAll('.mode-select.open').forEach((item) => {
           if (item !== wrap) { item.classList.remove('open'); }
@@ -1418,14 +1481,43 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
 
       const menu = document.createElement('div');
       menu.className = 'mode-menu';
-      const normalizedModes = modes.map(normalizeGroupMode);
-      const orderedModes = groupModeOrder.filter((mode) => normalizedModes.includes(mode));
-      for (const mode of orderedModes) {
+      for (const profile of profileOrder) {
+        const option = document.createElement('button');
+        option.type = 'button';
+        option.dataset.mode = profile;
+        option.className = `mode-option ${profile === currentProfile ? 'active' : ''}`;
+        option.textContent = profileLabels[profile] || profile;
+        option.onclick = () => {
+          wrap.classList.remove('open');
+          setGroupMode(profile === 'LED Dimmer' ? 'RGBW Dimmer' : 'Universal I/O');
+        };
+        menu.appendChild(option);
+      }
+      wrap.append(trigger, menu);
+      return wrap;
+    }
+    function renderConfigurationSelect(currentMode) {
+      const wrap = document.createElement('div');
+      wrap.className = 'mode-select';
+      const trigger = document.createElement('button');
+      trigger.type = 'button';
+      trigger.className = 'mode-trigger';
+      trigger.textContent = configurationLabels[currentMode] || groupModeLabels[currentMode] || currentMode;
+      trigger.onclick = () => {
+        document.querySelectorAll('.mode-select.open').forEach((item) => {
+          if (item !== wrap) { item.classList.remove('open'); }
+        });
+        wrap.classList.toggle('open');
+      };
+
+      const menu = document.createElement('div');
+      menu.className = 'mode-menu';
+      for (const mode of configurationOrder) {
         const option = document.createElement('button');
         option.type = 'button';
         option.dataset.mode = mode;
         option.className = `mode-option ${mode === currentMode ? 'active' : ''}`;
-        option.textContent = groupModeLabels[mode] || mode;
+        option.textContent = configurationLabels[mode] || groupModeLabels[mode] || mode;
         option.onclick = () => {
           wrap.classList.remove('open');
           setGroupMode(mode);

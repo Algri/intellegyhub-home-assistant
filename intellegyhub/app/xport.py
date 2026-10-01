@@ -30,6 +30,7 @@ class XPortMode(StrEnum):
 class XPortGroupMode(StrEnum):
     UNIVERSAL_IO = "Universal I/O"
     RGBW_DIMMER = "RGBW Dimmer"
+    RGB_PLUS_W = "RGB + W"
 
     @classmethod
     def _missing_(cls, value: object) -> XPortGroupMode | None:
@@ -37,6 +38,8 @@ class XPortGroupMode(StrEnum):
             return cls.UNIVERSAL_IO
         if value == "RgbwDimmer":
             return cls.RGBW_DIMMER
+        if value in {"RgbPlusW", "RGBPlusW"}:
+            return cls.RGB_PLUS_W
         return None
 
 
@@ -587,7 +590,7 @@ class XPortManager:
             state.updated_at = now
             self.channels[channel] = state
             await self.store.save(state)
-            if self.group_mode == XPortGroupMode.RGBW_DIMMER:
+            if self.group_mode in {XPortGroupMode.RGBW_DIMMER, XPortGroupMode.RGB_PLUS_W}:
                 continue
             if availability == Availability.AVAILABLE and state.desired_mode != XPortMode.DISABLED:
                 restored_value = state.value
@@ -602,8 +605,8 @@ class XPortManager:
                     state.error = f"restore failed: {exc}"
                     state.updated_at = self._now()
                     await self.store.save(state)
-        if availability == Availability.AVAILABLE and self.group_mode == XPortGroupMode.RGBW_DIMMER:
-            await self._enable_rgbw_group(restore_values=True)
+        if availability == Availability.AVAILABLE and self.group_mode in {XPortGroupMode.RGBW_DIMMER, XPortGroupMode.RGB_PLUS_W}:
+            await self._enable_led_dimmer_group(restore_values=True)
         self._stopping.clear()
         self._monitor_task = asyncio.create_task(self._monitor_inputs(), name="intellegy-xport-monitor")
 
@@ -641,19 +644,19 @@ class XPortManager:
     async def configure_group_mode(self, mode: XPortGroupMode) -> dict[str, Any]:
         async with self._lock:
             mode = XPortGroupMode(mode)
-            if mode == XPortGroupMode.RGBW_DIMMER:
+            if mode in {XPortGroupMode.RGBW_DIMMER, XPortGroupMode.RGB_PLUS_W}:
                 if self.availability != Availability.AVAILABLE:
                     raise ValueError(self.error or "X-Port is not available")
                 if self.topology != XPortTopology.EXTENDED:
-                    raise ValueError("RGBW Dimmer requires X-Port Extended topology with PCA9632 0x62")
+                    raise ValueError(f"{mode.value} requires X-Port Extended topology with PCA9632 0x62")
             if mode == self.group_mode:
                 return {"group_mode": self.group_mode, "status": "Succeeded", "xport": self.snapshot()}
             await self.store.save_profile_channels(self.group_mode, list(self.channels.values()))
             await self._safe_shutdown_channels()
             self.group_mode = mode
             await self.store.save_group_mode(mode)
-            if mode == XPortGroupMode.RGBW_DIMMER:
-                await self._enable_rgbw_group(restore_values=False)
+            if mode in {XPortGroupMode.RGBW_DIMMER, XPortGroupMode.RGB_PLUS_W}:
+                await self._enable_led_dimmer_group(restore_values=False)
             else:
                 await self._enable_universal_io_profile()
             if self._publisher:
@@ -724,7 +727,7 @@ class XPortManager:
     async def set_group_channel_value(self, channel: int, value: float) -> dict[str, Any]:
         async with self._lock:
             state = self._required(channel)
-            if self.group_mode != XPortGroupMode.RGBW_DIMMER:
+            if self.group_mode not in {XPortGroupMode.RGBW_DIMMER, XPortGroupMode.RGB_PLUS_W}:
                 return self._operation(state, "Rejected", "X-Port group dimmer is not enabled")
             if self.availability != Availability.AVAILABLE or self.topology != XPortTopology.EXTENDED:
                 return self._operation(state, "Rejected", self.error or "X-Port Extended is not available")
@@ -737,7 +740,7 @@ class XPortManager:
             await self._publish_state(state)
             return self._operation(state, "Succeeded", None)
 
-    async def _enable_rgbw_group(self, restore_values: bool) -> None:
+    async def _enable_led_dimmer_group(self, restore_values: bool) -> None:
         for channel in range(1, 5):
             state = self._required(channel)
             restored_value = state.value if restore_values else 0
