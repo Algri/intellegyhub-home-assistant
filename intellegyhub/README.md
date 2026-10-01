@@ -10,6 +10,8 @@ Default options:
 ```yaml
 diagnostics:
   carrier_monitoring_poll_interval_seconds: 30
+  ste_heartbeat_on_seconds: 0.2
+  ste_heartbeat_off_seconds: 1.8
 onewire:
   bus1_poll_interval_seconds: 30
   bus2_poll_interval_seconds: 30
@@ -29,6 +31,25 @@ hardware PWM beep after the runtime starts successfully.
 When `buzzer.shutdown_enabled` is true, a confirmed Power button shutdown plays
 the same configured GPIO18 beep first at fixed 80% volume, waits until it
 finishes, and only then sends the host shutdown command.
+
+## Board Diagnostics LEDs
+
+The Board Diagnostics page controls the onboard `STE`, `NET`, and `ERR` LEDs.
+The enable/disable state for each diagnostic LED feature is stored in the add-on
+SQLite database and is restored after restart.
+
+`STE LED` is the runtime heartbeat indicator. It blinks while the add-on runtime
+is running and the STE feature is enabled. It does not depend on the UI or Home
+Assistant WebSocket connection.
+
+`NET LED` is the WebSocket connection indicator:
+
+- connected: solid on;
+- reconnect grace period: blinking;
+- timeout/error: off.
+
+`ERR LED` is reserved for real hardware/runtime errors. WebSocket disconnects do
+not drive `ERR LED`; they are indicated only by `NET LED`.
 
 The 1-Wire polling toggles in the Ingress UI enable or disable periodic
 temperature polling per 1-Wire bus. The interval for each bus is configured with

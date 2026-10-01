@@ -493,6 +493,8 @@ configuration is ready for IHC-1400 hardware. Optional user-facing settings are:
 ```yaml
 diagnostics:
   carrier_monitoring_poll_interval_seconds: 30
+  ste_heartbeat_on_seconds: 0.2
+  ste_heartbeat_off_seconds: 1.8
 onewire:
   bus1_poll_interval_seconds: 30
   bus2_poll_interval_seconds: 30
@@ -508,6 +510,15 @@ buzzer:
 
 8. Start the add-on.
 9. Open the add-on logs and confirm the app reports hardware ready.
+
+Board Diagnostics LED behavior:
+
+- `STE LED` is the runtime heartbeat and blinks while the add-on runtime is running. It does not depend on the UI or Home Assistant WebSocket connection.
+- `NET LED` is the WebSocket indicator: solid on when connected, blinking during reconnect grace, and off after timeout.
+- `ERR LED` is reserved for real hardware/runtime errors. WebSocket disconnects do not drive `ERR LED`.
+
+The diagnostic LED feature toggles are stored in the add-on database and restored
+after restart.
 
 For the current CM4 diagnostic build, the add-on maps:
 

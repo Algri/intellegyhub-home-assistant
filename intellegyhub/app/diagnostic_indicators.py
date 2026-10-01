@@ -189,7 +189,7 @@ class DiagnosticIndicatorManager:
 
     async def _apply_ste(self) -> None:
         await self._stop_heartbeat()
-        if not self.settings.ste_heartbeat_enabled or self._websocket_status() != "connected":
+        if not self.settings.ste_heartbeat_enabled:
             await self._set_output("ste", False)
             return
         self._heartbeat_task = asyncio.create_task(self._heartbeat_loop(), name="intellegyhub-ste-heartbeat")
@@ -210,10 +210,7 @@ class DiagnosticIndicatorManager:
 
     async def _apply_err(self) -> None:
         await self._stop_err_blink()
-        if not self.settings.err_indicator_enabled or self._websocket_status() != "error":
-            await self._set_output("err", False)
-            return
-        self._err_blink_task = asyncio.create_task(self._err_blink_loop(), name="intellegyhub-err-indicator")
+        await self._set_output("err", False)
 
     async def _heartbeat_loop(self) -> None:
         try:

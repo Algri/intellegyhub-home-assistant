@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.159
+
+- Split Board Diagnostics LED behavior so STE is the runtime heartbeat, NET is the WebSocket connection indicator, and ERR no longer reacts to WebSocket disconnects.
+- Remove the user-facing WebSocket grace option from add-on configuration while keeping NET retry indication internal.
+
 ## 0.5.158
 
 - Keep STE LED off during WebSocket reconnect grace while NET blinks until the connection timeout expires.
