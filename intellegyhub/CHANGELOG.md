@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.169
+
+- Show the controller Variant as `Standard` without X-Port and `Universal` when X-Port is installed.
+- Collapse the X-Port panel height when the optional module is not installed.
+
 ## 0.5.168
 
 - Show a user-friendly X-Port status in the add-on UI when the optional module is not installed.

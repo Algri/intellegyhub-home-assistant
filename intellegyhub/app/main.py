@@ -203,7 +203,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.168 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.169 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -250,7 +250,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.168", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.169", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -408,7 +408,6 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       background: var(--ha-card);
       box-shadow: 0 2px 4px rgba(0, 0, 0, .22);
       padding: 24px;
-      min-height: 410px;
     }
     .module-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 22px; }
     .eyebrow { color: var(--ha-primary); font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; }
@@ -420,7 +419,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .ports { display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 16px; }
     .bus-toolbar + .ports { margin-top: 16px; }
     .notice.hidden { display: none; }
-    .ports.hidden { display: none; }
+    .ports.hidden { display: none !important; }
     .xport-unavailable {
       margin-top: 16px;
       border: 1px solid var(--ha-card-border);
@@ -1090,6 +1089,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       4: 'White'
     };
     let latestAppInfo = { uptime_seconds: 0 };
+    let latestXPort = null;
     let selectedTheme = 'auto';
     const themeMedia = window.matchMedia('(prefers-color-scheme: dark)');
     function resolvedTheme(theme) {
@@ -1158,6 +1158,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       }
     }
     function paintXPort(payload) {
+      latestXPort = payload || null;
+      refreshCarrierEdition();
       document.getElementById('xport-status').textContent = formatXPortStatus(payload);
       updateXPortGroupMode(payload);
       const ports = document.getElementById('ports');
@@ -1785,7 +1787,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       document.getElementById('carrier-identity-serial').textContent = cleanIdentityValue(identity.serial_number);
       document.getElementById('carrier-identity-hardware').textContent = formatHardware(identity.hardware_version, identity.hardware_revision);
       document.getElementById('carrier-identity-software').textContent = formatVersion(identity.software_version);
-      document.getElementById('carrier-identity-variant').textContent = cleanIdentityValue(identity.variant);
+      refreshCarrierEdition(identity);
       document.getElementById('carrier-uptime').textContent = formatUptime(appInfo && appInfo.uptime_seconds);
       const monitoring = carrier && carrier.monitoring ? carrier.monitoring : {};
       const temperature = monitoring.temperature || {};
@@ -1818,6 +1820,18 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     function cleanIdentityValue(value) {
       const text = String(value || '').trim();
       return text || '--';
+    }
+    function refreshCarrierEdition(identity = null) {
+      const target = document.getElementById('carrier-identity-variant');
+      if (!target) { return; }
+      target.textContent = formatCarrierEdition(identity);
+    }
+    function formatCarrierEdition(identity = null) {
+      if (latestXPort) {
+        const missing = latestXPort.topology === 'NotInstalled' || latestXPort.availability === 'OptionalMissing';
+        return missing ? 'Standard' : 'Universal';
+      }
+      return cleanIdentityValue(identity && identity.variant);
     }
     function formatUptime(seconds) {
       const total = Math.max(0, Number(seconds || 0));
