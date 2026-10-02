@@ -695,14 +695,17 @@ class XPortManager:
                 state = self._required(channel)
                 return self._operation(state, "Rejected", "X-Port channels are locked by group mode")
             state = self._required(channel)
+            if self.availability != Availability.AVAILABLE and mode != XPortMode.DISABLED:
+                state.error = self._unavailable_message()
+                state.availability = self.availability
+                state.confirmed_mode = XPortMode.DISABLED
+                state.updated_at = self._now()
+                await self.store.save(state)
+                return self._operation(state, "Rejected", state.error)
             state.desired_mode = mode
             state.revision = max(state.revision + 1, revision or 0)
             state.updated_at = self._now()
             await self.store.save(state)
-            if self.availability != Availability.AVAILABLE and mode != XPortMode.DISABLED:
-                state.error = self.error or "XPORT_UNAVAILABLE"
-                await self.store.save(state)
-                return self._operation(state, "Rejected", state.error)
             try:
                 await self.hardware.disable_channel(channel)
                 state.confirmed_mode = XPortMode.DISABLED
@@ -821,6 +824,15 @@ class XPortManager:
             state.updated_at = self._now()
             await self.store.save(state)
         await self.store.save_profile_channels(self.group_mode, list(self.channels.values()))
+
+    def _unavailable_message(self) -> str:
+        if self.availability == Availability.OPTIONAL_MISSING:
+            return "X-Port module is not installed"
+        if self.availability == Availability.INVALID_CONFIGURATION:
+            return self.error or "X-Port hardware configuration is invalid"
+        if self.availability == Availability.FAULTED:
+            return self.error or "X-Port hardware is faulted"
+        return self.error or "X-Port is not available"
 
     async def _safe_shutdown_channels(self) -> None:
         for channel in range(1, 5):

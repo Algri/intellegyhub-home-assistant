@@ -618,14 +618,16 @@ class IntellegyHubGpioManager:
     @callback
     def _remove_stale_xport_registry_entries(self) -> None:
         desired: set[tuple[str, str]] = set()
-        desired.add(("select", "intellegyhub_xport_profile"))
-        desired.add(("select", "intellegyhub_xport_configuration"))
+        xport_available = self.xport.get("availability", "Available") == "Available"
         group_mode = normalize_xport_profile(self.xport.get("group_mode"))
-        if group_mode == XPORT_GROUP_MODE_RGBW:
+        if xport_available:
+            desired.add(("select", "intellegyhub_xport_profile"))
+            desired.add(("select", "intellegyhub_xport_configuration"))
+        if xport_available and group_mode == XPORT_GROUP_MODE_RGBW:
             desired.add(("light", "intellegyhub_xport_rgbw"))
             for color in ("red", "green", "blue", "white"):
                 desired.add(("number", f"intellegyhub_xport_rgbw_{color}"))
-        elif group_mode == XPORT_GROUP_MODE_RGB_PLUS_W:
+        elif xport_available and group_mode == XPORT_GROUP_MODE_RGB_PLUS_W:
             desired.add(("light", "intellegyhub_xport_rgb"))
             desired.add(("light", "intellegyhub_xport_w"))
             for unique_id in (
@@ -635,11 +637,11 @@ class IntellegyHubGpioManager:
                 "intellegyhub_xport_w_white",
             ):
                 desired.add(("number", unique_id))
-        elif group_mode == XPORT_GROUP_MODE_W_PLUS_W_PLUS_W_PLUS_W:
+        elif xport_available and group_mode == XPORT_GROUP_MODE_W_PLUS_W_PLUS_W_PLUS_W:
             for channel in range(1, 5):
                 desired.add(("light", f"intellegyhub_xport_w_x{channel}"))
                 desired.add(("number", f"intellegyhub_xport_w_w_x{channel}"))
-        elif group_mode in {
+        elif xport_available and group_mode in {
             XPORT_GROUP_MODE_TWO_W_PLUS_TWO_W,
             XPORT_GROUP_MODE_TWO_W_PLUS_W_PLUS_W,
             XPORT_GROUP_MODE_W_PLUS_W_PLUS_TWO_W,
@@ -649,7 +651,7 @@ class IntellegyHubGpioManager:
                 suffix = "_".join(f"x{channel}" for channel in channels)
                 desired.add(("light", f"intellegyhub_xport_w_{suffix}"))
                 desired.add(("number", f"intellegyhub_xport_w_w_{suffix}"))
-        else:
+        elif xport_available:
             for channel in range(1, 5):
                 mode = self.xport_channel(channel).get("confirmed_mode")
                 desired.update(xport_desired_unique_ids(channel, mode))
@@ -673,6 +675,9 @@ class IntellegyHubGpioManager:
         config_entity_id = entity_registry.async_get_entity_id("select", DOMAIN, "intellegyhub_xport_configuration")
         if config_entity_id is not None and ("select", "intellegyhub_xport_configuration") not in desired:
             entity_registry.async_remove(config_entity_id)
+        profile_entity_id = entity_registry.async_get_entity_id("select", DOMAIN, "intellegyhub_xport_profile")
+        if profile_entity_id is not None and ("select", "intellegyhub_xport_profile") not in desired:
+            entity_registry.async_remove(profile_entity_id)
         rgbw_entity_id = entity_registry.async_get_entity_id("light", DOMAIN, "intellegyhub_xport_rgbw")
         if rgbw_entity_id is not None and ("light", "intellegyhub_xport_rgbw") not in desired:
             entity_registry.async_remove(rgbw_entity_id)
@@ -717,18 +722,34 @@ class IntellegyHubGpioManager:
 
         device_registry = dr.async_get(self.hass)
         devices = getattr(device_registry, "devices", {})
-        rgbw_enabled = group_mode == XPORT_GROUP_MODE_RGBW
-        rgb_plus_w_enabled = group_mode == XPORT_GROUP_MODE_RGB_PLUS_W
-        w_plus_w_enabled = group_mode == XPORT_GROUP_MODE_W_PLUS_W_PLUS_W_PLUS_W
+        rgbw_enabled = xport_available and group_mode == XPORT_GROUP_MODE_RGBW
+        rgb_plus_w_enabled = xport_available and group_mode == XPORT_GROUP_MODE_RGB_PLUS_W
+        w_plus_w_enabled = xport_available and group_mode == XPORT_GROUP_MODE_W_PLUS_W_PLUS_W_PLUS_W
         active_linked_white_devices = {
             f"xport_w_{'_'.join(f'x{channel}' for channel in channels)}_dimmer"
             for channels in _linked_white_groups(group_mode)
-        }
+        } if xport_available else set()
         for device in list(getattr(devices, "values", lambda: [])()):
             identifiers = getattr(device, "identifiers", set())
             for domain, identifier in identifiers:
                 if domain != DOMAIN:
                     continue
+                if (
+                    not xport_available
+                    and isinstance(identifier, str)
+                    and (
+                        identifier in {f"xport_{channel}" for channel in range(1, 5)}
+                        or identifier in {
+                            "xport",
+                            "xport_rgbw_dimmer",
+                            "xport_rgb_dimmer",
+                            "xport_w_dimmer",
+                        }
+                        or (identifier.startswith("xport_w_") and identifier.endswith("_dimmer"))
+                    )
+                ):
+                    device_registry.async_remove_device(device.id)
+                    break
                 if rgbw_enabled and identifier in {f"xport_{channel}" for channel in range(1, 5)}:
                     device_registry.async_remove_device(device.id)
                     break

@@ -203,7 +203,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.166 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.167 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -250,7 +250,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.166", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.167", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -419,6 +419,22 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .notice { color: var(--ha-secondary); font-size: 14px; line-height: 1.45; margin: 0 0 20px; overflow-wrap: anywhere; }
     .ports { display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 16px; }
     .bus-toolbar + .ports { margin-top: 16px; }
+    .ports.hidden { display: none; }
+    .xport-unavailable {
+      margin-top: 16px;
+      border: 1px solid var(--ha-card-border);
+      border-radius: 10px;
+      background: var(--ha-surface);
+      padding: 16px;
+      color: var(--ha-muted);
+      font-size: 14px;
+    }
+    .xport-unavailable.hidden { display: none; }
+    .xport-unavailable strong {
+      display: block;
+      color: var(--ha-text);
+      margin-bottom: 6px;
+    }
     .port-card { border: 1px solid var(--ha-card-border); border-radius: 12px; background: var(--ha-surface); padding: 20px; min-height: 228px; }
     .port-card.locked { opacity: .92; }
     .port-card.locked .active-row { grid-template-columns: minmax(0, 1fr); }
@@ -813,6 +829,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         </div>
         <div id="xport-group-note" class="bus-note">RGBW Dimmer assigns X1-X4 as Red, Green, Blue, and White channels.</div>
       </div>
+      <div id="xport-unavailable" class="xport-unavailable hidden"></div>
       <div id="ports" class="ports"></div>
     </section>
     <section class="extension-panel">
@@ -1142,6 +1159,13 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       document.getElementById('xport-status').textContent = `X-PORT: ${payload.topology} - ${payload.availability}`;
       updateXPortGroupMode(payload);
       const ports = document.getElementById('ports');
+      const unavailable = payload.availability !== 'Available';
+      updateXPortUnavailableNotice(payload, unavailable);
+      ports.classList.toggle('hidden', unavailable);
+      if (unavailable) {
+        ports.replaceChildren();
+        return;
+      }
       const seen = new Set();
       for (const channel of payload.channels) {
         const key = String(channel.channel);
@@ -1161,10 +1185,11 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       const target = document.getElementById('xport-group-mode');
       const currentMode = normalizeGroupMode(payload.group_mode);
       const profile = groupModeToProfile(currentMode);
+      const unavailable = payload.availability !== 'Available';
       const toolbar = target.closest('.xport-group-toolbar');
-      const key = `${profile}|${currentMode}`;
+      const key = `${profile}|${currentMode}|${unavailable}`;
       if (target.dataset.key !== key) {
-        target.replaceChildren(renderProfileSelect(profile));
+        target.replaceChildren(renderProfileSelect(profile, unavailable));
         target.dataset.key = key;
       }
       const configControl = document.getElementById('xport-configuration-control');
@@ -1176,9 +1201,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           toolbar.classList.toggle('config-hidden', !showConfig);
         }
         configControl.classList.toggle('hidden', !showConfig);
-        const configKey = `${currentMode}|${showConfig}`;
+        const configKey = `${currentMode}|${showConfig}|${unavailable}`;
         if (showConfig && configTarget.dataset.key !== configKey) {
-          configTarget.replaceChildren(renderConfigurationSelect(currentMode));
+          configTarget.replaceChildren(renderConfigurationSelect(currentMode, unavailable));
           configTarget.dataset.key = configKey;
         }
         if (!showConfig) {
@@ -1206,6 +1231,28 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           note.textContent = 'Universal I/O lets each X-Port channel be configured independently.';
         }
       }
+    }
+    function updateXPortUnavailableNotice(payload, unavailable) {
+      const notice = document.getElementById('xport-unavailable');
+      if (!notice) { return; }
+      notice.classList.toggle('hidden', !unavailable);
+      if (!unavailable) {
+        notice.replaceChildren();
+        return;
+      }
+      const title = document.createElement('strong');
+      title.textContent = payload.availability === 'OptionalMissing'
+        ? 'Module not installed'
+        : 'Module unavailable';
+      const detail = document.createElement('span');
+      if (payload.availability === 'OptionalMissing') {
+        detail.textContent = 'The X-Port slot is empty. Install the optional module to configure X1-X4.';
+      } else if (payload.error) {
+        detail.textContent = payload.error;
+      } else {
+        detail.textContent = 'X-Port controls are disabled until the module becomes available.';
+      }
+      notice.replaceChildren(title, detail);
     }
     function renderXPortCard(channel, modes) {
       const card = document.createElement('article');
@@ -1555,14 +1602,17 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       }
       return rgbwRoles[channel] || 'Channel';
     }
-    function renderProfileSelect(currentProfile) {
+    function renderProfileSelect(currentProfile, disabled = false) {
       const wrap = document.createElement('div');
-      wrap.className = 'mode-select';
+      wrap.className = `mode-select ${disabled ? 'locked' : ''}`;
       const trigger = document.createElement('button');
       trigger.type = 'button';
       trigger.className = 'mode-trigger';
       trigger.textContent = profileLabels[currentProfile] || currentProfile;
+      trigger.disabled = disabled;
+      trigger.title = disabled ? 'X-Port module is not installed' : '';
       trigger.onclick = () => {
+        if (disabled) { return; }
         document.querySelectorAll('.mode-select.open').forEach((item) => {
           if (item !== wrap) { item.classList.remove('open'); }
         });
@@ -1586,14 +1636,17 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       wrap.append(trigger, menu);
       return wrap;
     }
-    function renderConfigurationSelect(currentMode) {
+    function renderConfigurationSelect(currentMode, disabled = false) {
       const wrap = document.createElement('div');
-      wrap.className = 'mode-select';
+      wrap.className = `mode-select ${disabled ? 'locked' : ''}`;
       const trigger = document.createElement('button');
       trigger.type = 'button';
       trigger.className = 'mode-trigger';
       trigger.textContent = configurationLabels[currentMode] || groupModeLabels[currentMode] || currentMode;
+      trigger.disabled = disabled;
+      trigger.title = disabled ? 'X-Port module is not installed' : '';
       trigger.onclick = () => {
+        if (disabled) { return; }
         document.querySelectorAll('.mode-select.open').forEach((item) => {
           if (item !== wrap) { item.classList.remove('open'); }
         });

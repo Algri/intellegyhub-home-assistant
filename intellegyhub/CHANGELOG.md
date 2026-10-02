@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.167
+
+- Hide unavailable X-Port channel controls when the optional module is missing and clean stale X-Port devices from Home Assistant.
+
 ## 0.5.166
 
 - Rename the main Home Assistant controller device to `IHC-1400 Controller` and simplify its model metadata to `IHC-1400`.
