@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.166
+
+- Rename the main Home Assistant controller device to `IHC-1400 Controller` and simplify its model metadata to `IHC-1400`.
+
 ## 0.5.165
 
 - Add missing Home Assistant number sliders for linked X-Port white dimmer modes.

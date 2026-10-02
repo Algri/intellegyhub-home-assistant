@@ -10,7 +10,7 @@ from homeassistant.helpers import entity_registry as er
 from .const import BUTTONS, CARRIER_OUTPUTS, DOMAIN, OUTPUTS
 
 DEVICE_DASHBOARD_NAMES: dict[str, str] = {
-    "mainboard": "Controller",
+    "mainboard": "IHC-1400 Controller",
     "xport_rgbw_dimmer": "X-Port RGBW Dimmer",
     "xport_rgb_dimmer": "X-Port RGB Dimmer",
     "xport_w_dimmer": "X-Port W Dimmer",
