@@ -203,7 +203,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.167 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.168 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -250,7 +250,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.167", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.168", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -419,6 +419,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .notice { color: var(--ha-secondary); font-size: 14px; line-height: 1.45; margin: 0 0 20px; overflow-wrap: anywhere; }
     .ports { display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 16px; }
     .bus-toolbar + .ports { margin-top: 16px; }
+    .notice.hidden { display: none; }
     .ports.hidden { display: none; }
     .xport-unavailable {
       margin-top: 16px;
@@ -639,6 +640,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       grid-template-columns: minmax(330px, calc(((100% + (2 * var(--xport-toolbar-pad))) - (3 * var(--xport-card-gap))) / 4 - var(--xport-toolbar-pad))) minmax(0, 1fr);
     }
     .xport-group-toolbar.config-hidden .bus-note { grid-column: 2; }
+    .xport-group-toolbar.hidden { display: none; }
     .bus-note { color: var(--ha-secondary); font-size: 13px; line-height: 1.4; flex: 1 1 360px; align-self: center; }
     .bus-action { min-width: 142px; }
     .modules { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 18px; }
@@ -817,7 +819,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         </div>
         <div class="transport">REST</div>
       </div>
-      <p class="notice">When a port mode changes, the previous channel mode is safely shut down first. Selected modes are stored on the Hardware Host and restored after restart.</p>
+      <p id="xport-mode-notice" class="notice">When a port mode changes, the previous channel mode is safely shut down first. Selected modes are stored on the Hardware Host and restored after restart.</p>
       <div class="extension-actions bus-toolbar xport-group-toolbar">
         <div class="bus-power-control">
           <label>Profile</label>
@@ -1156,11 +1158,12 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       }
     }
     function paintXPort(payload) {
-      document.getElementById('xport-status').textContent = `X-PORT: ${payload.topology} - ${payload.availability}`;
+      document.getElementById('xport-status').textContent = formatXPortStatus(payload);
       updateXPortGroupMode(payload);
       const ports = document.getElementById('ports');
       const unavailable = payload.availability !== 'Available';
       updateXPortUnavailableNotice(payload, unavailable);
+      document.getElementById('xport-mode-notice')?.classList.toggle('hidden', unavailable);
       ports.classList.toggle('hidden', unavailable);
       if (unavailable) {
         ports.replaceChildren();
@@ -1181,12 +1184,30 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if (!seen.has(card.dataset.xportChannel)) { card.remove(); }
       });
     }
+    function formatXPortStatus(payload) {
+      if (payload.topology === 'NotInstalled' && payload.availability === 'OptionalMissing') {
+        return 'X-PORT: Module not installed';
+      }
+      if (payload.availability === 'InvalidConfiguration') {
+        return 'X-PORT: Invalid configuration';
+      }
+      if (payload.availability === 'Faulted') {
+        return 'X-PORT: Faulted';
+      }
+      if (payload.availability === 'Available') {
+        return `X-PORT: ${payload.topology} - Available`;
+      }
+      return `X-PORT: ${payload.topology || 'Unknown'}`;
+    }
     function updateXPortGroupMode(payload) {
       const target = document.getElementById('xport-group-mode');
       const currentMode = normalizeGroupMode(payload.group_mode);
       const profile = groupModeToProfile(currentMode);
       const unavailable = payload.availability !== 'Available';
       const toolbar = target.closest('.xport-group-toolbar');
+      if (toolbar) {
+        toolbar.classList.toggle('hidden', unavailable);
+      }
       const key = `${profile}|${currentMode}|${unavailable}`;
       if (target.dataset.key !== key) {
         target.replaceChildren(renderProfileSelect(profile, unavailable));

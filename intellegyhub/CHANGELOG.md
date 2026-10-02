@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.168
+
+- Show a user-friendly X-Port status in the add-on UI when the optional module is not installed.
+
 ## 0.5.167
 
 - Hide unavailable X-Port channel controls when the optional module is missing and clean stale X-Port devices from Home Assistant.
