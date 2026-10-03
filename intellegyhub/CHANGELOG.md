@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.170
+
+- Align the X-Port mode toolbar dropdowns with the channel cards and restore spacing above the X1-X4 cards.
+
 ## 0.5.169
 
 - Show the controller Variant as `Standard` without X-Port and `Universal` when X-Port is installed.

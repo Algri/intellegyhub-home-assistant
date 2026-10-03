@@ -203,7 +203,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.169 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.170 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -250,7 +250,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         finally:
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.169", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.170", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -416,8 +416,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .status { color: var(--ha-success); font-size: 14px; font-weight: 500; }
     .transport { border: 1px solid var(--ha-primary); color: var(--ha-primary); background: transparent; border-radius: 999px; padding: 6px 14px; font-size: 12px; font-weight: 500; margin-top: 38px; }
     .notice { color: var(--ha-secondary); font-size: 14px; line-height: 1.45; margin: 0 0 20px; overflow-wrap: anywhere; }
-    .ports { display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 16px; }
-    .bus-toolbar + .ports { margin-top: 16px; }
+    .ports { display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 16px; margin-top: 16px; }
     .notice.hidden { display: none; }
     .ports.hidden { display: none !important; }
     .xport-unavailable {
@@ -619,9 +618,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .bus-power-control .mode-select { width: min(270px, 62vw); }
     .xport-group-toolbar {
       --xport-card-gap: 16px;
-      --xport-toolbar-pad: 12px;
       display: grid;
-      grid-template-columns: repeat(2, minmax(330px, calc(((100% + (2 * var(--xport-toolbar-pad))) - (3 * var(--xport-card-gap))) / 4 - var(--xport-toolbar-pad)))) minmax(0, 1fr);
+      grid-template-columns: repeat(4, minmax(220px, 1fr));
       gap: var(--xport-card-gap);
       align-items: center;
     }
@@ -634,11 +632,11 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     .xport-group-toolbar .bus-power-control .mode-select { width: 100%; min-width: 0; }
     .xport-group-toolbar .bus-power-control.hidden { display: none; }
-    .xport-group-toolbar .bus-note { grid-column: 3; }
+    .xport-group-toolbar .bus-note { grid-column: 3 / -1; }
     .xport-group-toolbar.config-hidden {
-      grid-template-columns: minmax(330px, calc(((100% + (2 * var(--xport-toolbar-pad))) - (3 * var(--xport-card-gap))) / 4 - var(--xport-toolbar-pad))) minmax(0, 1fr);
+      grid-template-columns: repeat(4, minmax(220px, 1fr));
     }
-    .xport-group-toolbar.config-hidden .bus-note { grid-column: 2; }
+    .xport-group-toolbar.config-hidden .bus-note { grid-column: 2 / -1; }
     .xport-group-toolbar.hidden { display: none; }
     .bus-note { color: var(--ha-secondary); font-size: 13px; line-height: 1.4; flex: 1 1 360px; align-self: center; }
     .bus-action { min-width: 142px; }
@@ -731,9 +729,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     pre.visible { display: block; }
     @media (max-width: 1300px) { .relay-grid { grid-template-columns: repeat(4, minmax(140px, 1fr)); } }
     @media (max-width: 1300px) { .overview-panel { grid-template-columns: 1fr; } .overview-identity { border-right: 0; border-bottom: 1px solid var(--ha-card-border); min-height: 260px; } }
-    @media (max-width: 1100px) { .ports, .carrier-io-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .xport-group-toolbar { grid-template-columns: repeat(2, calc(((100% + (2 * var(--xport-toolbar-pad))) - var(--xport-card-gap)) / 2 - var(--xport-toolbar-pad))); } .xport-group-toolbar.config-hidden { grid-template-columns: calc(((100% + (2 * var(--xport-toolbar-pad))) - var(--xport-card-gap)) / 2 - var(--xport-toolbar-pad)) minmax(0, 1fr); } .xport-group-toolbar .bus-note, .xport-group-toolbar.config-hidden .bus-note { grid-column: 1 / -1; } .relay-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); } }
+    @media (max-width: 1100px) { .ports, .carrier-io-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .xport-group-toolbar, .xport-group-toolbar.config-hidden { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .xport-group-toolbar .bus-note, .xport-group-toolbar.config-hidden .bus-note { grid-column: 1 / -1; } .relay-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); } }
     @media (max-width: 900px) { .diagnostic-led-grid, .diagnostic-rtc-grid, .buzzer-panel { grid-template-columns: 1fr; } .buzzer-actions { grid-template-columns: repeat(2, minmax(120px, 1fr)); grid-template-rows: auto; } .buzzer-actions .buzzer-group-title { grid-column: 1 / -1; } }
-    @media (max-width: 620px) { body { padding: 10px; } .app-toolbar { justify-content: stretch; } .theme-switcher { width: 100%; justify-content: space-between; } .theme-choice { flex: 1; } .overview-identity { min-height: 260px; padding: 22px 18px; } .overview-wordmark { font-size: 22px; letter-spacing: .12em; } .overview-title-row { align-items: flex-start; flex-direction: column; gap: 14px; } .overview-title h1 { font-size: 34px; } .overview-title .subtitle { font-size: 16px; } .overview-facts { grid-template-columns: 88px minmax(0, 1fr); } .overview-facts dt, .overview-facts dd { font-size: 14px; } .overview-health { grid-template-columns: 1fr; gap: 18px; } .overview-health-item + .overview-health-item { border-left: 0; padding-left: 0; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+3) { border-right: 0; border-bottom: 1px solid var(--ha-card-border); } .overview-metric:nth-of-type(4) { border-bottom: 0; } .xport-panel { padding: 18px 14px; border-radius: 12px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .xport-group-toolbar { grid-template-columns: 1fr; } .xport-group-toolbar .bus-note { grid-column: 1; } .ports, .carrier-io-grid, .relay-grid { grid-template-columns: 1fr; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-row { grid-template-columns: 1fr; gap: 6px; } }
+    @media (max-width: 620px) { body { padding: 10px; } .app-toolbar { justify-content: stretch; } .theme-switcher { width: 100%; justify-content: space-between; } .theme-choice { flex: 1; } .overview-identity { min-height: 260px; padding: 22px 18px; } .overview-wordmark { font-size: 22px; letter-spacing: .12em; } .overview-title-row { align-items: flex-start; flex-direction: column; gap: 14px; } .overview-title h1 { font-size: 34px; } .overview-title .subtitle { font-size: 16px; } .overview-facts { grid-template-columns: 88px minmax(0, 1fr); } .overview-facts dt, .overview-facts dd { font-size: 14px; } .overview-health { grid-template-columns: 1fr; gap: 18px; } .overview-health-item + .overview-health-item { border-left: 0; padding-left: 0; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+3) { border-right: 0; border-bottom: 1px solid var(--ha-card-border); } .overview-metric:nth-of-type(4) { border-bottom: 0; } .xport-panel { padding: 18px 14px; border-radius: 12px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .xport-group-toolbar, .xport-group-toolbar.config-hidden { grid-template-columns: 1fr; } .xport-group-toolbar .bus-note, .xport-group-toolbar.config-hidden .bus-note { grid-column: 1; } .ports, .carrier-io-grid, .relay-grid { grid-template-columns: 1fr; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-row { grid-template-columns: 1fr; gap: 6px; } }
   </style>
 </head>
 <body>
