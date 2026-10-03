@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.171
+
+- Add RS-485 MIO-8 template-driven Modbus RTU backend polling, scan, relay write/read-back, DI polling, relay mode control, template CRUD, and `/dev/ttyAMA3`/`/dev/ttyAMA5` add-on device mappings.
+
 ## 0.5.170
 
 - Align the X-Port mode toolbar dropdowns with the channel cards and restore spacing above the X1-X4 cards.

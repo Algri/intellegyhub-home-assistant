@@ -10,13 +10,14 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 
 from .backends import MockGpioBackend, RealGpiodBackend
 from .carrier import APP_VERSION
 from .config import load_config
+from .rs485 import Rs485Manager, Rs485Store
 from .rtc import HostRtc, MockRtc
 from .runtime import AppRuntime
 from .xport import XPortGroupMode, XPortMode
@@ -64,6 +65,10 @@ class OneWireBridgeEnabledPayload(BaseModel):
     enabled: bool
 
 
+class Rs485DeviceEnabledPayload(BaseModel):
+    enabled: bool
+
+
 class BuzzerTestPayload(BaseModel):
     frequency: int = 2000
     duration_ms: int = 300
@@ -93,6 +98,18 @@ class DiagnosticIndicatorPayload(BaseModel):
 
 class UiThemePayload(BaseModel):
     theme: Literal["auto", "light", "dark"]
+
+
+class Rs485BusPayload(BaseModel):
+    serial_port: str = "/dev/ttyAMA3"
+    baudrate: int = 9600
+    parity: str = "none"
+    stop_bits: int = 1
+    template_id: str | None = None
+
+
+class Rs485CapabilityPayload(BaseModel):
+    value: bool | int | float | str
 
 
 def collect_device_diagnostics() -> dict[str, list[str]]:
@@ -154,6 +171,13 @@ def is_mock_enabled() -> bool:
     )
 
 
+def is_development_ui_enabled() -> bool:
+    return (
+        is_mock_enabled()
+        or os.environ.get("INTELLEGY_DEVELOPMENT_UI", "").lower() in {"1", "true", "yes"}
+    )
+
+
 def _health_payload(current: AppRuntime) -> dict:
     snapshot = current.snapshot()
     carrier = snapshot.get("carrier", {})
@@ -203,7 +227,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.170 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.171 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -244,16 +268,21 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 power_button_shutdown_enabled=config.power_button_shutdown_enabled,
                 power_button_shutdown_hold_seconds=config.power_button_shutdown_hold_seconds,
             )
+        await app.state.rs485.start()
         await app.state.runtime.start()
         try:
             yield
         finally:
+            await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.170", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.171", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
+    rs485_store_path = getattr(getattr(runtime, "ui_store", None), "path", None) if runtime is not None else None
+    rs485_mock = is_mock_enabled() or (runtime is not None and isinstance(runtime.backend, MockGpioBackend))
+    app.state.rs485 = Rs485Manager(store=Rs485Store(rs485_store_path), mock=rs485_mock)
 
     def runtime_or_503() -> AppRuntime:
         current: AppRuntime = app.state.runtime
@@ -294,7 +323,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
 
     @app.get("/", response_class=HTMLResponse)
     async def index() -> str:
-        return """
+        html = """
 <!doctype html>
 <html lang="en">
 <head>
@@ -581,13 +610,21 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     .toggle.readonly,
     .toggle.readonly:hover,
-    .toggle.readonly:focus-visible {
+    .toggle.readonly:focus-visible,
+    .toggle:disabled,
+    .toggle:disabled:hover,
+    .toggle:disabled:focus-visible {
       background: #5f6368;
       outline: none;
+      cursor: default;
+      opacity: .55;
     }
     .toggle.readonly.on,
     .toggle.readonly.on:hover,
-    .toggle.readonly.on:focus-visible {
+    .toggle.readonly.on:focus-visible,
+    .toggle.on:disabled,
+    .toggle.on:disabled:hover,
+    .toggle.on:disabled:focus-visible {
       background: var(--ha-primary);
     }
     .slider-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
@@ -640,6 +677,129 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .xport-group-toolbar.hidden { display: none; }
     .bus-note { color: var(--ha-secondary); font-size: 13px; line-height: 1.4; flex: 1 1 360px; align-self: center; }
     .bus-action { min-width: 142px; }
+    .rs485-toolbar {
+      --rs485-label-height: 16px;
+      --rs485-control-height: 42px;
+      display: grid;
+      grid-template-columns: minmax(260px, 1.35fr) repeat(3, minmax(150px, .85fr)) minmax(170px, .9fr) minmax(150px, 1fr);
+      gap: 12px;
+      align-items: end;
+    }
+    .rs485-development-section { display: __RS485_DEVELOPMENT_DISPLAY__; }
+    .rs485-toolbar + .rs485-layout { margin-top: 18px; }
+    .rs485-field {
+      min-width: 0;
+      display: grid;
+      grid-template-rows: var(--rs485-label-height, 16px) var(--rs485-control-height, 42px);
+      gap: 8px;
+      align-items: end;
+    }
+    .rs485-field label {
+      height: var(--rs485-label-height, 16px);
+      margin: 0;
+      color: var(--ha-text);
+      line-height: var(--rs485-label-height, 16px);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .rs485-field select,
+    .rs485-field input {
+      width: 100%;
+      height: var(--rs485-control-height, 42px);
+      min-height: var(--rs485-control-height, 42px);
+      box-sizing: border-box;
+      border: 1px solid var(--ha-row-border);
+      border-radius: 8px;
+      background: var(--ha-field);
+      color: var(--ha-text);
+      padding: 0 10px;
+      font-weight: 700;
+      line-height: var(--rs485-control-height, 42px);
+      min-width: 0;
+    }
+    .rs485-field input[type="number"] { appearance: textfield; }
+    .rs485-field input[type="number"]::-webkit-outer-spin-button,
+    .rs485-field input[type="number"]::-webkit-inner-spin-button { appearance: none; margin: 0; }
+    .rs485-field .mode-select { width: 100%; }
+    .rs485-field .mode-trigger {
+      width: 100%;
+      height: var(--rs485-control-height, 42px);
+      min-height: var(--rs485-control-height, 42px);
+      box-sizing: border-box;
+      display: flex;
+      align-items: center;
+      line-height: var(--rs485-control-height, 42px);
+      padding-top: 0;
+      padding-bottom: 0;
+    }
+    .rs485-actions { display: flex; gap: 10px; align-items: center; justify-content: flex-end; flex-wrap: nowrap; height: var(--rs485-control-height, 42px); align-self: end; min-width: 0; }
+    .rs485-actions button { height: var(--rs485-control-height, 42px); min-height: var(--rs485-control-height, 42px); min-width: 70px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; }
+    .rs485-layout { display: grid; grid-template-columns: minmax(300px, .9fr) minmax(420px, 1.6fr); gap: 16px; align-items: start; }
+    .rs485-panel { border: 1px solid var(--ha-card-border); border-radius: 12px; background: var(--ha-surface); padding: 16px; min-width: 0; }
+    .rs485-panel + .rs485-panel { margin-top: 16px; }
+    .rs485-panel-title { color: var(--ha-secondary); font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 14px; }
+    .rs485-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+    .rs485-panel-head .rs485-panel-title { margin-bottom: 0; }
+    .rs485-clear-button { min-height: 30px; min-width: 64px; padding: 4px 10px; }
+    .rs485-table { display: grid; gap: 10px; }
+    .rs485-table-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 42px; border: 1px solid var(--ha-row-border); border-radius: 8px; padding: 8px 10px; background: var(--ha-row); }
+    .rs485-table-row.scan { grid-template-columns: minmax(92px, .6fr) minmax(110px, 1fr) minmax(92px, .7fr) auto; }
+    .rs485-table-row.configured { grid-template-columns: minmax(0, 1fr) auto; min-height: 64px; align-items: center; }
+    .rs485-table-row.configured { cursor: pointer; }
+    .rs485-table-row.configured:focus-visible { outline: 2px solid var(--ha-primary); outline-offset: 2px; }
+    .rs485-table-row.selected { border-color: var(--ha-primary); background: rgba(3, 169, 244, .10); }
+    .rs485-table-row button { min-width: 76px; }
+    .rs485-table-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rs485-row-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; min-width: 0; align-items: center; }
+    .rs485-row-actions button { min-width: 78px; height: 42px; min-height: 42px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; }
+    .rs485-device-summary { display: grid; gap: 6px; min-width: 0; }
+    .rs485-device-title { color: var(--ha-text); font-size: 15px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rs485-device-meta { display: flex; gap: 12px; flex-wrap: wrap; color: var(--ha-secondary); font-size: 13px; line-height: 1.35; min-width: 0; }
+    .rs485-label { color: var(--ha-secondary); font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+    .rs485-primary { font-weight: 800; color: var(--ha-text); }
+    .rs485-empty { color: var(--ha-secondary); font-size: 13px; line-height: 1.45; border: 1px solid var(--ha-row-border); border-radius: 8px; padding: 12px; background: var(--ha-row); overflow-wrap: anywhere; }
+    .rs485-detail-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; margin-bottom: 16px; }
+    .rs485-detail-meta { color: var(--ha-secondary); font-size: 13px; line-height: 1.5; }
+    .rs485-detail-stack { display: grid; gap: 16px; }
+    .rs485-template-strip { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: center; border: 1px solid var(--ha-row-border); border-radius: 10px; padding: 10px 12px; background: var(--ha-row); }
+    .rs485-template-strip strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rs485-template-strip span { color: var(--ha-secondary); font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+    .rs485-template-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 54px; border: 1px solid var(--ha-row-border); border-radius: 8px; padding: 8px 10px; background: var(--ha-row); }
+    .rs485-template-row strong { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rs485-template-row .rs485-device-meta { margin-top: 4px; }
+    .rs485-capability-grid { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) 150px; gap: 16px; align-items: start; }
+    .rs485-capability-group { min-width: 0; }
+    .rs485-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+    .rs485-panel-head .rs485-panel-title { margin: 0; }
+    .rs485-polling-caption { color: var(--ha-secondary); font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+    .rs485-polling-strip { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto; gap: 14px; align-items: center; border: 1px solid var(--ha-row-border); border-radius: 10px; padding: 12px; background: var(--ha-row); }
+    .rs485-polling-title { color: var(--ha-primary); font-size: 12px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; margin-bottom: 6px; }
+    .rs485-polling-line { display: flex; gap: 12px; flex-wrap: wrap; color: var(--ha-secondary); font-size: 13px; line-height: 1.45; }
+    .rs485-polling-line strong { color: var(--ha-text); }
+    .rs485-polling-toggle { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 92px; }
+    .rs485-stale { opacity: .62; }
+    .rs485-capability-group .relay-row + .relay-row { margin-top: 10px; }
+    .rs485-capability-group .rs485-mode-row + .rs485-mode-row { margin-top: 10px; }
+    .rs485-device-settings { --rs485-label-height: 16px; --rs485-control-height: 42px; display: grid; grid-template-columns: repeat(4, minmax(130px, 1fr)) auto; gap: 12px; align-items: end; border: 1px solid var(--ha-row-border); border-radius: 10px; padding: 12px; background: var(--ha-row); }
+    .rs485-device-settings .rs485-actions { justify-content: flex-end; }
+    .rs485-device-settings .rs485-actions button { min-width: 64px; }
+    .rs485-device-settings .rs485-field input[readonly] { color: var(--ha-secondary); }
+    .rs485-mode-row { height: 42px; min-height: 42px; display: flex; align-items: center; }
+    .rs485-mode-row .mode-select { width: 100%; }
+    .rs485-mode-row .mode-trigger { width: 100%; height: 42px; min-height: 42px; box-sizing: border-box; display: flex; align-items: center; line-height: 42px; padding: 0 28px 0 10px; }
+    .rs485-select-row { grid-template-columns: minmax(0, 1fr) minmax(130px, .7fr); }
+    .rs485-select-row select {
+      width: 100%;
+      height: 34px;
+      border: 1px solid var(--ha-row-border);
+      border-radius: 8px;
+      background: var(--ha-field);
+      color: var(--ha-text);
+      padding: 0 8px;
+      font-weight: 700;
+      min-width: 0;
+    }
     .modules { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 18px; }
     .module-card { border: 1px solid var(--ha-card-border); border-radius: 12px; background: var(--ha-surface); padding: 18px; }
     .module-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; margin-bottom: 18px; }
@@ -655,6 +815,12 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .relay-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .state-text { min-width: 30px; text-align: right; color: var(--ha-secondary); font-size: 12px; font-weight: 800; letter-spacing: .04em; }
     .state-text.on { color: var(--ha-primary); }
+    .rs485-mode-row .mode-trigger::after {
+      right: 12px;
+      top: 16px;
+      width: 7px;
+      height: 7px;
+    }
     .carrier-io-grid { display: grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 16px; margin-top: 18px; }
     .carrier-io-card { border: 1px solid var(--ha-card-border); border-radius: 12px; background: var(--ha-surface); padding: 16px; min-width: 0; }
     .carrier-io-title { font-size: 17px; font-weight: 800; margin-bottom: 14px; }
@@ -727,11 +893,11 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     pre { display: none; min-height: 180px; max-height: 360px; overflow: auto; border: 1px solid var(--ha-card-border); border-radius: 8px; padding: 14px; background: var(--ha-pre); color: #e5edf7; font-size: 13px; }
     pre.visible { display: block; }
-    @media (max-width: 1300px) { .relay-grid { grid-template-columns: repeat(4, minmax(140px, 1fr)); } }
+    @media (max-width: 1300px) { .relay-grid { grid-template-columns: repeat(4, minmax(140px, 1fr)); } .rs485-toolbar { grid-template-columns: repeat(3, minmax(180px, 1fr)); } .rs485-actions { justify-content: flex-start; } }
     @media (max-width: 1300px) { .overview-panel { grid-template-columns: 1fr; } .overview-identity { border-right: 0; border-bottom: 1px solid var(--ha-card-border); min-height: 260px; } }
-    @media (max-width: 1100px) { .ports, .carrier-io-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .xport-group-toolbar, .xport-group-toolbar.config-hidden { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .xport-group-toolbar .bus-note, .xport-group-toolbar.config-hidden .bus-note { grid-column: 1 / -1; } .relay-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); } }
+    @media (max-width: 1100px) { .ports, .carrier-io-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .xport-group-toolbar, .xport-group-toolbar.config-hidden { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .xport-group-toolbar .bus-note, .xport-group-toolbar.config-hidden .bus-note { grid-column: 1 / -1; } .relay-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); } .rs485-layout { grid-template-columns: 1fr; } .rs485-capability-grid, .rs485-device-settings, .rs485-polling-strip { grid-template-columns: 1fr; } }
     @media (max-width: 900px) { .diagnostic-led-grid, .diagnostic-rtc-grid, .buzzer-panel { grid-template-columns: 1fr; } .buzzer-actions { grid-template-columns: repeat(2, minmax(120px, 1fr)); grid-template-rows: auto; } .buzzer-actions .buzzer-group-title { grid-column: 1 / -1; } }
-    @media (max-width: 620px) { body { padding: 10px; } .app-toolbar { justify-content: stretch; } .theme-switcher { width: 100%; justify-content: space-between; } .theme-choice { flex: 1; } .overview-identity { min-height: 260px; padding: 22px 18px; } .overview-wordmark { font-size: 22px; letter-spacing: .12em; } .overview-title-row { align-items: flex-start; flex-direction: column; gap: 14px; } .overview-title h1 { font-size: 34px; } .overview-title .subtitle { font-size: 16px; } .overview-facts { grid-template-columns: 88px minmax(0, 1fr); } .overview-facts dt, .overview-facts dd { font-size: 14px; } .overview-health { grid-template-columns: 1fr; gap: 18px; } .overview-health-item + .overview-health-item { border-left: 0; padding-left: 0; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+3) { border-right: 0; border-bottom: 1px solid var(--ha-card-border); } .overview-metric:nth-of-type(4) { border-bottom: 0; } .xport-panel { padding: 18px 14px; border-radius: 12px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .xport-group-toolbar, .xport-group-toolbar.config-hidden { grid-template-columns: 1fr; } .xport-group-toolbar .bus-note, .xport-group-toolbar.config-hidden .bus-note { grid-column: 1; } .ports, .carrier-io-grid, .relay-grid { grid-template-columns: 1fr; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-row { grid-template-columns: 1fr; gap: 6px; } }
+    @media (max-width: 620px) { body { padding: 10px; } .app-toolbar { justify-content: stretch; } .theme-switcher { width: 100%; justify-content: space-between; } .theme-choice { flex: 1; } .overview-identity { min-height: 260px; padding: 22px 18px; } .overview-wordmark { font-size: 22px; letter-spacing: .12em; } .overview-title-row { align-items: flex-start; flex-direction: column; gap: 14px; } .overview-title h1 { font-size: 34px; } .overview-title .subtitle { font-size: 16px; } .overview-facts { grid-template-columns: 88px minmax(0, 1fr); } .overview-facts dt, .overview-facts dd { font-size: 14px; } .overview-health { grid-template-columns: 1fr; gap: 18px; } .overview-health-item + .overview-health-item { border-left: 0; padding-left: 0; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+3) { border-right: 0; border-bottom: 1px solid var(--ha-card-border); } .overview-metric:nth-of-type(4) { border-bottom: 0; } .xport-panel { padding: 18px 14px; border-radius: 12px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .xport-group-toolbar, .xport-group-toolbar.config-hidden { grid-template-columns: 1fr; } .xport-group-toolbar .bus-note, .xport-group-toolbar.config-hidden .bus-note { grid-column: 1; } .ports, .carrier-io-grid, .relay-grid, .rs485-toolbar { grid-template-columns: 1fr; } .rs485-table-row, .rs485-table-row.scan, .rs485-table-row.configured { grid-template-columns: 1fr; align-items: stretch; } .rs485-row-actions { justify-content: flex-start; } .rs485-detail-head { flex-direction: column; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-row { grid-template-columns: 1fr; gap: 6px; } }
   </style>
 </head>
 <body>
@@ -851,6 +1017,91 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         <div class="bus-note">Power control: MCP23017 / I2C-10 / 0x20 / GPB7</div>
       </div>
       <div id="modules" class="modules"></div>
+    </section>
+    <section class="extension-panel rs485-development-section">
+      <div class="module-row">
+        <div>
+          <div class="eyebrow">RS-485</div>
+          <h1>RS-485 Devices</h1>
+          <div class="subtitle">Template-driven Modbus RTU modules</div>
+          <div id="rs485-status" class="status">RS-485: Template UI placeholder</div>
+        </div>
+        <div class="transport">RS-485</div>
+      </div>
+      <p class="notice">RS-485 devices are configured from device templates. Scan results are not added until the device is explicitly configured.</p>
+      <div class="extension-actions bus-toolbar rs485-toolbar">
+        <div class="rs485-field">
+          <label>Serial port</label>
+          <div id="rs485-serial-port" class="mode-select" data-value="/dev/ttyAMA3"></div>
+        </div>
+        <div class="rs485-field">
+          <label>Baudrate</label>
+          <div id="rs485-baudrate" class="mode-select" data-value="9600"></div>
+        </div>
+        <div class="rs485-field">
+          <label>Parity</label>
+          <div id="rs485-parity" class="mode-select" data-value="None"></div>
+        </div>
+        <div class="rs485-field">
+          <label>Stop bits</label>
+          <div id="rs485-stopbits" class="mode-select" data-value="1"></div>
+        </div>
+        <div class="rs485-field">
+          <label>Device template</label>
+          <div id="rs485-template" class="mode-select" data-value="mio-8"></div>
+        </div>
+        <div class="rs485-actions">
+          <button type="button" onclick="scanRs485Mock()">Scan</button>
+          <button type="button" onclick="refreshRs485Devices()">Refresh</button>
+        </div>
+      </div>
+      <div class="rs485-layout">
+        <div>
+          <article class="rs485-panel">
+            <div class="rs485-panel-head">
+              <div class="rs485-panel-title">Scan Results</div>
+              <button type="button" class="rs485-clear-button" onclick="clearRs485MockScan()">Clear</button>
+            </div>
+            <div id="rs485-scan-results" class="rs485-table">
+              <div class="rs485-table-row">
+                <span>Address</span>
+                <span>Template</span>
+                <span>Status</span>
+                <button type="button" disabled>Add</button>
+              </div>
+              <div class="rs485-empty">No scan has been run. Backend RS-485 scan support will populate responding slave addresses and matching templates here.</div>
+            </div>
+          </article>
+          <article class="rs485-panel">
+            <div class="rs485-panel-title">Configured Devices</div>
+            <div id="rs485-configured-devices" class="rs485-table">
+              <div class="rs485-table-row">
+                <span>MIO-8 #1</span>
+                <span>MIO-8</span>
+                <span>Offline</span>
+                <button type="button" disabled>Remove</button>
+              </div>
+              <div class="rs485-empty">Placeholder configured device. Runtime persistence and polling are not connected yet.</div>
+            </div>
+          </article>
+          <article class="rs485-panel">
+            <div class="rs485-panel-head">
+              <div class="rs485-panel-title">Device Templates</div>
+              <div class="rs485-row-actions">
+                <button type="button" class="rs485-clear-button" onclick="document.getElementById('rs485-template-upload').click()">Upload</button>
+                <button type="button" class="rs485-clear-button" onclick="reloadRs485Templates()">Reload</button>
+              </div>
+            </div>
+            <input id="rs485-template-upload" type="file" accept=".yaml,.yml,application/x-yaml,text/yaml,text/plain" hidden onchange="uploadRs485Template(this)">
+            <div id="rs485-device-templates" class="rs485-table">
+              <div class="rs485-empty">Templates are loading...</div>
+            </div>
+          </article>
+        </div>
+        <article id="rs485-device-detail" class="rs485-panel">
+          <div class="rs485-empty">Select or add an RS-485 device to view its relay outputs, digital inputs, modes, and device settings.</div>
+        </article>
+      </div>
     </section>
     <section class="extension-panel">
       <div class="module-row">
@@ -1143,6 +1394,12 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       try { payload = JSON.parse(text); } catch { payload = text; }
       if (!response.ok) { throw payload; }
       return payload;
+    }
+    function errorDetail(error) {
+      if (!error) return 'unknown error';
+      if (typeof error === 'string') return error;
+      if (error.detail) return error.detail;
+      return JSON.stringify(error);
     }
     async function renderXPort() {
       const output = document.getElementById('output');
@@ -2320,6 +2577,561 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         window.setTimeout(connectEvents, 2000);
       };
     }
+    function rs485ControlValue(id) {
+      const element = document.getElementById(id);
+      return element ? (element.dataset.value || element.value || '') : '';
+    }
+    function closeModeSelects(except) {
+      document.querySelectorAll('.mode-select.open').forEach((item) => {
+        if (item !== except) { item.classList.remove('open'); }
+      });
+    }
+    function renderRs485Select(id, options, value, onChange) {
+      const wrap = document.getElementById(id);
+      if (!wrap || !options.length) return;
+      const selected = options.find((option) => option.value === value) || options[0];
+      wrap.className = 'mode-select';
+      wrap.dataset.value = selected.value;
+      wrap.innerHTML = '';
+      const trigger = document.createElement('button');
+      trigger.type = 'button';
+      trigger.className = 'mode-trigger';
+      trigger.textContent = selected.label;
+      trigger.onclick = () => {
+        closeModeSelects(wrap);
+        wrap.classList.toggle('open');
+      };
+      const menu = document.createElement('div');
+      menu.className = 'mode-menu';
+      options.forEach((option) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `mode-option ${option.value === selected.value ? 'active' : ''}`;
+        button.textContent = option.label;
+        button.onclick = () => {
+          wrap.dataset.value = option.value;
+          wrap.classList.remove('open');
+          renderRs485Select(id, options, option.value, onChange);
+          if (onChange) onChange(option.value);
+        };
+        menu.appendChild(button);
+      });
+      wrap.append(trigger, menu);
+    }
+    function rs485InlineSelect(options, value, onChangeCall, disabled = false) {
+      if (!options.length) return '<div class="rs485-empty">No options</div>';
+      const selected = options.find((option) => option.value === value) || options[0];
+      const buttons = options.map((option) => `
+        <button type="button" class="mode-option ${option.value === selected.value ? 'active' : ''}" onclick="${onChangeCall(option.value)}" ${disabled ? 'disabled' : ''}>${option.label}</button>
+      `).join('');
+      return `
+        <div class="mode-select">
+          <button type="button" class="mode-trigger" onclick="closeModeSelects(this.parentElement); this.parentElement.classList.toggle('open')" ${disabled ? 'disabled' : ''}>${selected.label}</button>
+          <div class="mode-menu">${buttons}</div>
+        </div>`;
+    }
+
+    let rs485ApiState = null;
+    let rs485SelectedId = null;
+    const rs485PendingSettings = {};
+    const RS485_SERIAL_OPTIONS = [
+      { value: '/dev/ttyAMA3', label: 'RS-485 CH1 (/dev/ttyAMA3)' },
+      { value: '/dev/ttyAMA5', label: 'RS-485 CH2 (/dev/ttyAMA5)' }
+    ];
+    const RS485_BAUDRATE_OPTIONS = ['4800', '9600', '19200', '38400', '57600', '115200', '128000', '256000'].map((value) => ({ value, label: value }));
+    const RS485_PARITY_OPTIONS = [
+      { value: 'none', label: 'None' },
+      { value: 'even', label: 'Even' },
+      { value: 'odd', label: 'Odd' }
+    ];
+    const RS485_STOP_BITS_OPTIONS = ['1', '2'].map((value) => ({ value, label: value }));
+
+    function rs485Template(templateId) {
+      const fullTemplates = rs485ApiState && rs485ApiState.template_details || [];
+      const summaries = rs485ApiState && rs485ApiState.templates || [];
+      return fullTemplates.find((template) => template.template_id === templateId) || summaries.find((template) => template.template_id === templateId) || null;
+    }
+    function rs485TemplateLabel(templateId) {
+      const template = rs485Template(templateId);
+      return template ? template.model : templateId;
+    }
+    function rs485CurrentSerialPort() {
+      return rs485ControlValue('rs485-serial-port') || (rs485ApiState && rs485ApiState.bus && rs485ApiState.bus.serial_port) || '/dev/ttyAMA3';
+    }
+    function rs485BusPayload() {
+      return {
+        serial_port: rs485CurrentSerialPort(),
+        baudrate: Number(rs485ControlValue('rs485-baudrate') || 9600),
+        parity: rs485ControlValue('rs485-parity') || 'none',
+        stop_bits: Number(rs485ControlValue('rs485-stopbits') || 1),
+        template_id: rs485ControlValue('rs485-template') || 'mio-8'
+      };
+    }
+    function rs485TemplateOptions() {
+      const templates = rs485ApiState && rs485ApiState.templates && rs485ApiState.templates.length ? rs485ApiState.templates : [{ template_id: 'mio-8', model: 'MIO-8' }];
+      return templates.map((template) => ({ value: template.template_id, label: template.model }));
+    }
+    function initRs485MockControls() {
+      const bus = rs485ApiState && rs485ApiState.bus ? rs485ApiState.bus : {
+        serial_port: '/dev/ttyAMA3',
+        baudrate: 9600,
+        parity: 'none',
+        stop_bits: 1
+      };
+      renderRs485Select('rs485-serial-port', RS485_SERIAL_OPTIONS, bus.serial_port || '/dev/ttyAMA3', saveRs485BusSettings);
+      renderRs485Select('rs485-baudrate', RS485_BAUDRATE_OPTIONS, String(bus.baudrate || 9600), saveRs485BusSettings);
+      renderRs485Select('rs485-parity', RS485_PARITY_OPTIONS, bus.parity || 'none', saveRs485BusSettings);
+      renderRs485Select('rs485-stopbits', RS485_STOP_BITS_OPTIONS, String(bus.stop_bits || 1), saveRs485BusSettings);
+      renderRs485Select('rs485-template', rs485TemplateOptions(), rs485TemplateOptions()[0].value, renderRs485Mock);
+    }
+    function loadRs485Mock() {
+      return renderRs485Mock();
+    }
+    async function saveRs485BusSettings() {
+      try {
+        const payload = await requestJson('api/v1/rs485/bus', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(rs485BusPayload())
+        });
+        paintRs485(payload);
+      } catch (error) {
+        document.getElementById('rs485-status').textContent = 'RS-485: bus settings save failed';
+      }
+    }
+    async function scanRs485Mock() {
+      try {
+        const payload = await requestJson('api/v1/rs485/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(rs485BusPayload())
+        });
+        paintRs485(payload);
+      } catch (error) {
+        document.getElementById('rs485-status').textContent = 'RS-485: scan failed';
+      }
+    }
+    async function refreshRs485Devices() {
+      try {
+        const payload = await requestJson('api/v1/rs485/refresh', { method: 'POST' });
+        paintRs485(payload);
+      } catch (error) {
+        document.getElementById('rs485-status').textContent = 'RS-485: refresh failed';
+      }
+    }
+    async function reloadRs485Templates() {
+      try {
+        await requestJson('api/v1/rs485/templates/reload', { method: 'POST' });
+        await renderRs485Mock();
+        document.getElementById('rs485-status').textContent = 'RS-485: templates reloaded';
+      } catch (error) {
+        document.getElementById('rs485-status').textContent = 'RS-485: template reload failed';
+      }
+    }
+    async function uploadRs485Template(input) {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      try {
+        const payload = await requestJson(`api/v1/rs485/templates/upload?filename=${encodeURIComponent(file.name)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-yaml' },
+          body: await file.arrayBuffer()
+        });
+        input.value = '';
+        paintRs485(payload);
+      } catch (error) {
+        input.value = '';
+        document.getElementById('rs485-status').textContent = `RS-485: template upload failed - ${errorDetail(error)}`;
+      }
+    }
+    async function deleteRs485Template(templateId) {
+      try {
+        const payload = await requestJson(`api/v1/rs485/templates/${encodeURIComponent(templateId)}`, { method: 'DELETE' });
+        paintRs485(payload);
+      } catch (error) {
+        document.getElementById('rs485-status').textContent = `RS-485: template delete failed - ${errorDetail(error)}`;
+      }
+    }
+    async function clearRs485MockScan() {
+      const scanResults = document.getElementById('rs485-scan-results');
+      const currentPort = rs485CurrentSerialPort();
+      if (rs485ApiState) rs485ApiState.scanned = (rs485ApiState.scanned || []).filter((item) => item.serial_port !== currentPort);
+      if (scanResults) scanResults.innerHTML = '<div class="rs485-empty">Scan results cleared. Press Scan to check mock Modbus addresses.</div>';
+      document.getElementById('rs485-status').textContent = 'RS-485: scan results cleared';
+    }
+    async function addRs485MockDevice(scanId) {
+      try {
+        const payload = await requestJson(`api/v1/rs485/devices/${encodeURIComponent(scanId)}/add`, { method: 'POST' });
+        paintRs485(payload);
+      } catch (error) {
+        document.getElementById('rs485-status').textContent = 'RS-485: add failed';
+      }
+    }
+    async function removeRs485MockDevice(deviceId) {
+      try {
+        const payload = await requestJson(`api/v1/rs485/devices/${encodeURIComponent(deviceId)}`, { method: 'DELETE' });
+        paintRs485(payload);
+      } catch (error) {
+        document.getElementById('rs485-status').textContent = 'RS-485: remove failed';
+      }
+    }
+    function selectRs485MockDevice(deviceId) {
+      rs485SelectedId = deviceId;
+      paintRs485(rs485ApiState);
+    }
+    async function setRs485PollingEnabled(deviceId, enabled) {
+      try {
+        const payload = await requestJson(`api/v1/rs485/devices/${encodeURIComponent(deviceId)}/enabled`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled })
+        });
+        paintRs485(payload);
+      } catch (error) {
+        document.getElementById('rs485-status').textContent = `RS-485: polling toggle failed - ${errorDetail(error)}`;
+      }
+    }
+    async function toggleRs485MockCollapse(deviceId) {
+      try {
+        const payload = await requestJson(`api/v1/rs485/devices/${encodeURIComponent(deviceId)}/collapse`, { method: 'POST' });
+        paintRs485(payload);
+      } catch (error) {
+        document.getElementById('rs485-status').textContent = 'RS-485: collapse failed';
+      }
+    }
+    async function setRs485Capability(deviceId, capabilityId, value) {
+      try {
+        const payload = await requestJson(`api/v1/rs485/devices/${encodeURIComponent(deviceId)}/capabilities/${encodeURIComponent(capabilityId)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value })
+        });
+        paintRs485(payload);
+      } catch (error) {
+        document.getElementById('rs485-status').textContent = 'RS-485: capability update failed';
+      }
+    }
+    function setRs485PendingSetting(deviceId, capabilityId, value) {
+      if (!rs485PendingSettings[deviceId]) rs485PendingSettings[deviceId] = {};
+      rs485PendingSettings[deviceId][capabilityId] = value;
+      document.getElementById('rs485-status').textContent = 'RS-485: device settings pending';
+    }
+    async function applyRs485DeviceSettings(deviceId) {
+      const originalDeviceId = deviceId;
+      const pending = rs485PendingSettings[deviceId] || {};
+      const entries = Object.entries(pending);
+      if (!entries.length) {
+        document.getElementById('rs485-status').textContent = 'RS-485: no pending device settings';
+        return;
+      }
+      try {
+        let payload = rs485ApiState;
+        for (const [capabilityId, value] of entries) {
+          payload = await requestJson(`api/v1/rs485/devices/${encodeURIComponent(deviceId)}/capabilities/${encodeURIComponent(capabilityId)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ value })
+          });
+          deviceId = payload.selected_id || deviceId;
+        }
+        delete rs485PendingSettings[originalDeviceId];
+        paintRs485(payload);
+      } catch (error) {
+        document.getElementById('rs485-status').textContent = 'RS-485: apply failed';
+      }
+    }
+    async function renderRs485Mock() {
+      try {
+        const payload = await requestJson('api/v1/rs485');
+        paintRs485(payload);
+      } catch (error) {
+        document.getElementById('rs485-status').textContent = 'RS-485: backend unavailable';
+      }
+    }
+    function paintRs485(payload) {
+      if (!payload) return;
+      rs485ApiState = payload;
+      const currentPort = rs485CurrentSerialPort();
+      const devices = (payload.devices || []).filter((device) => device.serial_port === currentPort);
+      if (!rs485SelectedId || !devices.some((device) => device.id === rs485SelectedId)) {
+        const selectedOnPort = devices.find((device) => device.id === payload.selected_id);
+        rs485SelectedId = (selectedOnPort && selectedOnPort.id) || (devices[0] && devices[0].id) || null;
+      }
+      document.getElementById('rs485-status').textContent = payload.status || 'RS-485: template-driven mock';
+      initRs485MockControls();
+      paintRs485ScanResults();
+      paintRs485ConfiguredDevices();
+      paintRs485Templates();
+      paintRs485Detail();
+    }
+    function paintRs485ScanResults() {
+      const scanResults = document.getElementById('rs485-scan-results');
+      if (!scanResults || !rs485ApiState) return;
+      const currentPort = rs485CurrentSerialPort();
+      const rows = (rs485ApiState.scanned || []).filter((item) => !item.configured && item.serial_port === currentPort);
+      scanResults.innerHTML = rows.length
+        ? rows.map((item) => `
+            <div class="rs485-table-row scan">
+              <span><span class="rs485-label">Slave</span> <span class="rs485-primary">${item.slave_address}</span></span>
+              <span>${rs485TemplateLabel(item.template_id)}</span>
+              <span>${item.confidence || item.status || 'Found'}</span>
+              <div class="rs485-row-actions">
+                <button type="button" onclick="addRs485MockDevice('${item.id}')">Add</button>
+              </div>
+            </div>`).join('')
+        : '<div class="rs485-empty">No scan results. Press Scan to search the Modbus slave address range on the selected RS-485 bus.</div>';
+    }
+    function paintRs485ConfiguredDevices() {
+      const configured = document.getElementById('rs485-configured-devices');
+      if (!configured || !rs485ApiState) return;
+      const currentPort = rs485CurrentSerialPort();
+      const devices = (rs485ApiState.devices || []).filter((device) => device.serial_port === currentPort);
+      configured.innerHTML = devices.length
+        ? devices.map((device) => `
+            <div class="rs485-table-row configured ${device.id === rs485SelectedId ? 'selected' : ''}" role="button" tabindex="0" aria-selected="${device.id === rs485SelectedId ? 'true' : 'false'}" onclick="selectRs485MockDevice('${device.id}')" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectRs485MockDevice('${device.id}'); }">
+              <div class="rs485-device-summary">
+                <div class="rs485-device-title">${device.name}</div>
+                <div class="rs485-device-meta">
+                  <span>${rs485TemplateLabel(device.template_id)}</span>
+                  <span>${device.serial_port}</span>
+                  <span><span class="rs485-label">Slave</span> <span class="rs485-primary">${device.slave_address}</span></span>
+                  <span>${rs485ApiState.mock ? 'Mock' : 'Modbus'}</span>
+                </div>
+              </div>
+              <div class="rs485-row-actions">
+                <button type="button" class="danger-button" onclick="event.stopPropagation(); removeRs485MockDevice('${device.id}')">Remove</button>
+              </div>
+            </div>`).join('')
+        : '<div class="rs485-empty">No configured devices yet. Scan and add one or more modules.</div>';
+    }
+    function paintRs485Templates() {
+      const target = document.getElementById('rs485-device-templates');
+      if (!target || !rs485ApiState) return;
+      const templates = rs485ApiState.template_details || [];
+      const errors = rs485ApiState.template_errors || [];
+      const rows = templates.map((template) => {
+        return `
+          <div class="rs485-template-row">
+            <div>
+              <strong>${template.model}</strong>
+              <div class="rs485-device-meta">
+                <span>${template.template_id}</span>
+                <span>${template.manufacturer}</span>
+                <span>${template.protocol}</span>
+                <span>${template.source || 'built-in'}</span>
+              </div>
+            </div>
+            <div class="rs485-row-actions">
+              <button type="button" class="danger-button" onclick="deleteRs485Template('${template.template_id}')">Delete</button>
+            </div>
+          </div>`;
+      });
+      const errorRows = errors.map((error) => `
+        <div class="rs485-empty">Template ${error.template}: ${error.error}</div>
+      `);
+      target.innerHTML = rows.concat(errorRows).join('') || '<div class="rs485-empty">No RS-485 templates loaded.</div>';
+    }
+    function paintRs485Detail() {
+      const detail = document.getElementById('rs485-device-detail');
+      if (!detail || !rs485ApiState) return;
+      const currentPort = rs485CurrentSerialPort();
+      const devices = (rs485ApiState.devices || []).filter((device) => device.serial_port === currentPort);
+      const selected = devices.find((device) => device.id === rs485SelectedId) || devices[0];
+      if (!selected) {
+        detail.innerHTML = '<div class="rs485-empty">Select or add an RS-485 device to view its template-rendered capabilities.</div>';
+        return;
+      }
+      rs485SelectedId = selected.id;
+      const template = rs485Template(selected.template_id);
+      if (!template) {
+        detail.innerHTML = `<div class="rs485-empty">Template ${selected.template_id} is not loaded.</div>`;
+        return;
+      }
+      const grouped = rs485GroupedCapabilities(template);
+      const allCapabilities = Object.values(grouped).flat();
+      const deviceSettings = grouped.device_settings || [];
+      const inputs = (grouped.inputs || allCapabilities).filter((item) => item.type === 'binary_input' || item.type === 'sensor');
+      const outputs = (grouped.outputs || allCapabilities).filter((item) => item.type === 'switch');
+      const modes = (grouped.control_modes || allCapabilities).filter((item) => item.type === 'select' && item.group !== 'device_settings');
+      const runtime = rs485Runtime(selected);
+      const writable = rs485DeviceWritable(selected);
+      detail.innerHTML = `
+        <div class="rs485-detail-head">
+          <div>
+            <div class="module-title">${selected.name}</div>
+            <div class="rs485-detail-meta">${template.manufacturer} - ${template.model} - Serial: ${selected.serial_port} - Slave: ${selected.slave_address} - ${selected.baudrate} ${selected.parity} ${selected.stop_bits} stop - ${rs485ApiState.mock ? 'Mock' : 'Modbus'}</div>
+          </div>
+          <span class="status-pill ${runtime.online === false ? 'offline' : ''}">${runtime.online === false ? 'Offline' : (rs485ApiState.mock ? 'Mock' : 'Online')}</span>
+        </div>
+        <div class="rs485-detail-stack">
+          <div class="rs485-polling-strip">
+            <div>
+              <div class="rs485-polling-title">Polling</div>
+              <div class="rs485-polling-line">
+                <span>State: <strong>${rs485PollingCaption(selected, 'state', 'Live')}</strong></span>
+                <span>Modes: <strong>${rs485PollingCaption(selected, 'modes', '2 s')}</strong></span>
+                <span>Settings: <strong>${rs485PollingCaption(selected, 'settings', 'On demand')}</strong></span>
+              </div>
+            </div>
+            <div class="rs485-polling-line">${rs485RuntimeSummary(selected)}</div>
+            <div class="rs485-polling-toggle">
+              <span class="state-text ${selected.enabled !== false ? 'on' : ''}">${selected.enabled !== false ? 'ON' : 'OFF'}</span>
+              <button class="toggle ${selected.enabled !== false ? 'on' : ''}" type="button" onclick="setRs485PollingEnabled('${selected.id}', ${selected.enabled === false})"><span>${selected.enabled !== false ? 'ON' : 'OFF'}</span></button>
+            </div>
+          </div>
+          <div class="rs485-template-strip">
+            <strong>Template: ${template.template_id} / ${template.model}</strong>
+          </div>
+          ${deviceSettings.length ? `
+            <div class="rs485-capability-group">
+              <div class="rs485-panel-head">
+                <div class="rs485-panel-title">Device Settings</div>
+                <div class="rs485-polling-caption">${rs485PollingCaption(selected, 'settings', 'On demand')}</div>
+              </div>
+              <div class="rs485-device-settings">
+                ${deviceSettings.map((capability) => renderRs485FieldCapability(selected, capability)).join('')}
+                <div class="rs485-actions">
+                  <button type="button" onclick="applyRs485DeviceSettings('${selected.id}')" ${writable ? '' : 'disabled'}>Apply</button>
+                  <button type="button" onclick="refreshRs485Devices()">Read</button>
+                </div>
+              </div>
+            </div>` : ''}
+          <div class="rs485-capability-grid">
+            <div class="rs485-capability-group">
+              <div class="rs485-panel-head">
+                <div class="rs485-panel-title">${(template.groups && template.groups.inputs && template.groups.inputs.name) || 'Digital Inputs'}</div>
+                <div class="rs485-polling-caption">${rs485PollingCaption(selected, 'state', 'Live')}</div>
+              </div>
+              ${inputs.map((capability) => renderRs485RowCapability(selected, capability)).join('') || '<div class="rs485-empty">No input capabilities.</div>'}
+            </div>
+            <div class="rs485-capability-group">
+              <div class="rs485-panel-head">
+                <div class="rs485-panel-title">${(template.groups && template.groups.outputs && template.groups.outputs.name) || 'Relay Outputs'}</div>
+                <div class="rs485-polling-caption">${rs485PollingCaption(selected, 'state', 'Live')}</div>
+              </div>
+              ${outputs.map((capability) => renderRs485RowCapability(selected, capability)).join('') || '<div class="rs485-empty">No output capabilities.</div>'}
+            </div>
+            <div class="rs485-capability-group">
+              <div class="rs485-panel-head">
+                <div class="rs485-panel-title">Mode</div>
+                <div class="rs485-polling-caption">${rs485PollingCaption(selected, 'modes', '2 s')}</div>
+              </div>
+              ${modes.map((capability) => renderRs485ModeCapability(selected, capability)).join('') || '<div class="rs485-empty">No mode capabilities.</div>'}
+            </div>
+          </div>
+        </div>`;
+    }
+    function rs485GroupedCapabilities(template) {
+      const groups = {};
+      Object.entries(template.capabilities || {})
+        .map(([id, capability]) => ({ id, ...capability }))
+        .sort((a, b) => (a.order || 0) - (b.order || 0))
+        .forEach((capability) => {
+          const group = capability.group || 'main';
+          if (!groups[group]) groups[group] = [];
+          groups[group].push(capability);
+        });
+      return groups;
+    }
+    function rs485TemplateStats(template) {
+      return {
+        groups: Object.keys(template.groups || {}).length,
+        capabilities: Object.keys(template.capabilities || {}).length,
+        points: Object.keys(template.points || {}).length
+      };
+    }
+    function rs485Runtime(device) {
+      return device.runtime || { online: true, polling: 'live', groups: {} };
+    }
+    function rs485RuntimeGroup(device, groupId) {
+      const runtime = rs485Runtime(device);
+      return (runtime.groups && runtime.groups[groupId]) || {};
+    }
+    function rs485PollingCaption(device, groupId, fallback) {
+      const group = rs485RuntimeGroup(device, groupId);
+      if (group.mode === 'on_demand') return 'On demand';
+      if (group.interval_ms) return `Live ${group.interval_ms} ms`;
+      return fallback;
+    }
+    function rs485RuntimeTime(value) {
+      if (!value) return 'never';
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? value : date.toLocaleTimeString();
+    }
+    function rs485RuntimeSummary(device) {
+      const runtime = rs485Runtime(device);
+      const state = runtime.online ? (runtime.polling || 'live') : 'offline';
+      const parts = [
+        `<span>Polling: <strong>${state}</strong></span>`,
+        `<span>Last update: <strong>${rs485RuntimeTime(runtime.last_update)}</strong></span>`,
+        `<span>Last seen: <strong>${rs485RuntimeTime(runtime.last_seen)}</strong></span>`
+      ];
+      if (runtime.last_error) parts.push(`<span>Error: <strong>${runtime.last_error}</strong></span>`);
+      return parts.join('');
+    }
+    function rs485DeviceWritable(device) {
+      const runtime = rs485Runtime(device);
+      return runtime.online !== false && runtime.polling !== 'error' && runtime.polling !== 'offline';
+    }
+    function renderRs485RowCapability(device, capability) {
+      const value = device.values ? device.values[capability.id] : undefined;
+      const writable = rs485DeviceWritable(device);
+      const staleClass = writable ? '' : ' rs485-stale';
+      if (capability.type === 'switch') {
+        const on = Boolean(value);
+        return `
+          <div class="relay-row${staleClass}">
+            <span>${capability.name}</span>
+            <span class="state-text ${on ? 'on' : ''}">${on ? 'ON' : 'OFF'}</span>
+            <button class="toggle ${on ? 'on' : ''}" type="button" onclick="setRs485Capability('${device.id}', '${capability.id}', ${!on})" ${writable ? '' : 'disabled'}><span>${on ? 'ON' : 'OFF'}</span></button>
+          </div>`;
+      }
+      const on = Boolean(value);
+      if (capability.type === 'binary_input') {
+        return `
+          <div class="relay-row">
+            <span>${capability.name}</span>
+            <span class="state-text ${on ? 'on' : ''}">${on ? 'ON' : 'OFF'}</span>
+            <button class="toggle readonly ${on ? 'on' : ''}" type="button" disabled><span>${on ? 'ACTIVE' : 'INACTIVE'}</span></button>
+          </div>`;
+      }
+      return `
+        <div class="relay-row">
+          <span>${capability.name}</span>
+          <span class="state-text">${value ?? 'Mock'}${capability.unit ? ' ' + capability.unit : ''}</span>
+        </div>`;
+    }
+    function renderRs485ModeCapability(device, capability) {
+      const value = device.values ? device.values[capability.id] : undefined;
+      const options = (capability.options || []).map((option) => ({ value: option.id, label: option.name }));
+      const writable = rs485DeviceWritable(device);
+      return `<div class="rs485-mode-row${writable ? '' : ' rs485-stale'}">${rs485InlineSelect(options, value || (options[0] && options[0].value), (nextValue) => `setRs485Capability('${device.id}', '${capability.id}', '${nextValue}')`, !writable)}</div>`;
+    }
+    function renderRs485FieldCapability(device, capability) {
+      const pending = rs485PendingSettings[device.id] || {};
+      const value = Object.prototype.hasOwnProperty.call(pending, capability.id) ? pending[capability.id] : (device.values ? device.values[capability.id] : '');
+      if (capability.type === 'select') {
+        const options = (capability.options || []).map((option) => ({ value: option.id, label: option.name }));
+        return `
+          <div class="rs485-field">
+            <label>${capability.name}</label>
+            ${rs485InlineSelect(options, value || (options[0] && options[0].value), (nextValue) => `setRs485PendingSetting('${device.id}', '${capability.id}', '${nextValue}')`, !rs485DeviceWritable(device))}
+          </div>`;
+      }
+      if (capability.type === 'number') {
+        return `
+          <div class="rs485-field">
+            <label>${capability.name}</label>
+            <input type="number" min="${capability.min || 1}" max="${capability.max || 247}" value="${value}" onchange="setRs485PendingSetting('${device.id}', '${capability.id}', this.value)" ${rs485DeviceWritable(device) ? '' : 'disabled'}>
+          </div>`;
+      }
+      return `
+        <div class="rs485-field">
+          <label>${capability.name}</label>
+          <input type="text" value="${value ?? 'Mock'}" readonly>
+        </div>`;
+    }
+
     let diagnosticIndicators = {
       ste: { heartbeat_enabled: false },
       net: { indicator_enabled: false },
@@ -2578,6 +3390,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     renderXPort();
     renderCarrierIO();
     renderExtensions();
+    loadRs485Mock();
+    initRs485MockControls();
+    renderRs485Mock();
     renderOneWire();
     renderBuzzerStatus();
     refreshRtc();
@@ -2586,6 +3401,10 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
 </body>
 </html>
 """
+        return html.replace(
+            "__RS485_DEVELOPMENT_DISPLAY__",
+            "block" if is_development_ui_enabled() else "none",
+        )
 
     @app.get("/favicon.ico", include_in_schema=False)
     async def favicon() -> FileResponse:
@@ -2625,6 +3444,87 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     @app.put("/api/v1/ui/theme")
     async def put_ui_theme(payload: UiThemePayload) -> dict:
         return await runtime_or_503().set_ui_theme(payload.theme)
+
+    @app.get("/api/v1/rs485/templates")
+    async def get_rs485_templates() -> dict:
+        return app.state.rs485.templates_snapshot()
+
+    @app.get("/api/v1/rs485/templates/{template_id}")
+    async def get_rs485_template(template_id: str) -> dict:
+        try:
+            return app.state.rs485.template_snapshot(template_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="template not found") from exc
+
+    @app.post("/api/v1/rs485/templates/reload")
+    async def post_rs485_templates_reload() -> dict:
+        return app.state.rs485.registry.reload()
+
+    @app.post("/api/v1/rs485/templates/upload")
+    async def post_rs485_template_upload(request: Request, filename: str = "template.yaml") -> dict:
+        try:
+            data = await request.body()
+            return await app.state.rs485.upload_template(filename, data)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.delete("/api/v1/rs485/templates/{template_id}")
+    async def delete_rs485_template(template_id: str) -> dict:
+        try:
+            return await app.state.rs485.delete_template(template_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.get("/api/v1/rs485")
+    async def get_rs485() -> dict:
+        return app.state.rs485.snapshot()
+
+    @app.put("/api/v1/rs485/bus")
+    async def put_rs485_bus(payload: Rs485BusPayload) -> dict:
+        return await app.state.rs485.save_bus(payload.model_dump())
+
+    @app.post("/api/v1/rs485/scan")
+    async def post_rs485_scan(payload: Rs485BusPayload) -> dict:
+        return await app.state.rs485.scan(payload.model_dump())
+
+    @app.post("/api/v1/rs485/refresh")
+    async def post_rs485_refresh() -> dict:
+        return await app.state.rs485.refresh()
+
+    @app.post("/api/v1/rs485/devices/{scan_id}/add")
+    async def post_rs485_device_add(scan_id: str) -> dict:
+        try:
+            return await app.state.rs485.add_device(scan_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.delete("/api/v1/rs485/devices/{device_id}")
+    async def delete_rs485_device(device_id: str) -> dict:
+        try:
+            return await app.state.rs485.remove_device(device_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.put("/api/v1/rs485/devices/{device_id}/capabilities/{capability_id}")
+    async def put_rs485_capability(device_id: str, capability_id: str, payload: Rs485CapabilityPayload) -> dict:
+        try:
+            return await app.state.rs485.set_capability(device_id, capability_id, payload.value)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/api/v1/rs485/devices/{device_id}/collapse")
+    async def post_rs485_device_collapse(device_id: str) -> dict:
+        try:
+            return await app.state.rs485.toggle_collapsed(device_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.put("/api/v1/rs485/devices/{device_id}/enabled")
+    async def put_rs485_device_enabled(device_id: str, payload: Rs485DeviceEnabledPayload) -> dict:
+        try:
+            return await app.state.rs485.set_device_enabled(device_id, payload.enabled)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     @app.get("/api/v1/xport")
     async def get_xport() -> dict:

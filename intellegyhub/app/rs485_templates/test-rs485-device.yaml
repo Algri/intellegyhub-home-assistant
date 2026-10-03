@@ -1,0 +1,79 @@
+schema_version: 1
+
+device:
+  template_id: test-rs485-device
+  manufacturer: IntellegyHUB
+  model: Test RS-485 Device
+  name: Test RS-485 Device
+  description: Development-only RS-485 template proof
+  protocol: modbus_rtu
+
+communication:
+  baudrate:
+    default: 9600
+    allowed:
+      - 9600
+  parity:
+    default: none
+    allowed:
+      - none
+  stop_bits:
+    default: 1
+    allowed:
+      - 1
+  slave_address:
+    default: 1
+    min: 1
+    max: 247
+
+groups:
+  main:
+    name: Main
+    order: 10
+
+points:
+  output:
+    table: coil
+    address: 0
+    data_type: bool
+    access: read_write
+    read_function: 0x01
+    write_function: 0x05
+
+  input:
+    table: discrete_input
+    address: 0
+    data_type: bool
+    access: read
+    read_function: 0x02
+
+  temperature:
+    table: input_register
+    address: 10
+    data_type: int16
+    access: read
+    read_function: 0x04
+    scale: 0.1
+
+capabilities:
+  output:
+    type: switch
+    name: Output
+    group: main
+    order: 10
+    source: output
+
+  input:
+    type: binary_input
+    name: Input
+    group: main
+    order: 20
+    source: input
+
+  temperature:
+    type: sensor
+    name: Temperature
+    group: main
+    order: 30
+    source: temperature
+    unit: C

@@ -1,0 +1,224 @@
+schema_version: 1
+
+device:
+  template_id: mio-8
+  manufacturer: IntellegyHUB
+  model: MIO-8
+  name: MIO-8
+  description: 8-channel RS-485 relay module with 8 digital inputs
+  protocol: modbus_rtu
+  protocol_revision: development_protocol_v2
+
+communication:
+  baudrate:
+    factory_default: 9600
+    allowed: [4800, 9600, 19200, 38400, 57600, 115200, 128000, 256000]
+
+  parity:
+    factory_default: none
+    allowed: [none, even, odd]
+
+  stop_bits:
+    factory_default: 1
+    device_writable: false
+
+  slave_address:
+    factory_default: 1
+    min: 1
+    max: 255
+
+discovery:
+  strategy: selected_template
+  probe:
+    function: 0x03
+    address: 0x8000
+    count: 1
+    expect:
+      success: true
+
+polling:
+  groups:
+    state:
+      interval_ms: 250
+    modes:
+      interval_ms: 2000
+    settings:
+      mode: on_demand
+
+groups:
+  outputs:
+    name: Relay Outputs
+    order: 10
+
+  inputs:
+    name: Digital Inputs
+    order: 20
+
+  control_modes:
+    name: Relay Control Modes
+    order: 30
+
+  device_settings:
+    name: Device Settings
+    order: 40
+
+points:
+  relay_1: { table: coil, address: 0x0000, data_type: bool, access: read_write, read_function: 0x01, write_function: 0x05, poll_group: state }
+  relay_2: { table: coil, address: 0x0001, data_type: bool, access: read_write, read_function: 0x01, write_function: 0x05, poll_group: state }
+  relay_3: { table: coil, address: 0x0002, data_type: bool, access: read_write, read_function: 0x01, write_function: 0x05, poll_group: state }
+  relay_4: { table: coil, address: 0x0003, data_type: bool, access: read_write, read_function: 0x01, write_function: 0x05, poll_group: state }
+  relay_5: { table: coil, address: 0x0004, data_type: bool, access: read_write, read_function: 0x01, write_function: 0x05, poll_group: state }
+  relay_6: { table: coil, address: 0x0005, data_type: bool, access: read_write, read_function: 0x01, write_function: 0x05, poll_group: state }
+  relay_7: { table: coil, address: 0x0006, data_type: bool, access: read_write, read_function: 0x01, write_function: 0x05, poll_group: state }
+  relay_8: { table: coil, address: 0x0007, data_type: bool, access: read_write, read_function: 0x01, write_function: 0x05, poll_group: state }
+
+  di_1: { table: discrete_input, address: 0x0000, data_type: bool, access: read, read_function: 0x02, poll_group: state }
+  di_2: { table: discrete_input, address: 0x0001, data_type: bool, access: read, read_function: 0x02, poll_group: state }
+  di_3: { table: discrete_input, address: 0x0002, data_type: bool, access: read, read_function: 0x02, poll_group: state }
+  di_4: { table: discrete_input, address: 0x0003, data_type: bool, access: read, read_function: 0x02, poll_group: state }
+  di_5: { table: discrete_input, address: 0x0004, data_type: bool, access: read, read_function: 0x02, poll_group: state }
+  di_6: { table: discrete_input, address: 0x0005, data_type: bool, access: read, read_function: 0x02, poll_group: state }
+  di_7: { table: discrete_input, address: 0x0006, data_type: bool, access: read, read_function: 0x02, poll_group: state }
+  di_8: { table: discrete_input, address: 0x0007, data_type: bool, access: read, read_function: 0x02, poll_group: state }
+
+  relay_1_control_mode: &mode_point
+    table: holding_register
+    address: 0x1000
+    data_type: uint16
+    access: read_write
+    read_function: 0x03
+    write_function: 0x06
+    poll_group: modes
+    map: &mode_map
+      0: normal
+      1: linkage
+      2: toggle
+      3: edge_trigger
+
+  relay_2_control_mode: { <<: *mode_point, address: 0x1001 }
+  relay_3_control_mode: { <<: *mode_point, address: 0x1002 }
+  relay_4_control_mode: { <<: *mode_point, address: 0x1003 }
+  relay_5_control_mode: { <<: *mode_point, address: 0x1004 }
+  relay_6_control_mode: { <<: *mode_point, address: 0x1005 }
+  relay_7_control_mode: { <<: *mode_point, address: 0x1006 }
+  relay_8_control_mode: { <<: *mode_point, address: 0x1007 }
+
+  uart_parity:
+    table: holding_register
+    address: 0x2000
+    data_type: uint16
+    access: read_write
+    read_function: 0x03
+    write_function: 0x06
+    poll_group: settings
+    mask: 0xFF00
+    shift: 8
+    read_modify_write: true
+    map:
+      0: none
+      1: even
+      2: odd
+
+  uart_baudrate:
+    table: holding_register
+    address: 0x2000
+    data_type: uint16
+    access: read_write
+    read_function: 0x03
+    write_function: 0x06
+    poll_group: settings
+    mask: 0x00FF
+    shift: 0
+    read_modify_write: true
+    map:
+      0: 4800
+      1: 9600
+      2: 19200
+      3: 38400
+      4: 57600
+      5: 115200
+      6: 128000
+      7: 256000
+
+  device_address:
+    table: holding_register
+    address: 0x4000
+    data_type: uint16
+    access: read_write
+    read_function: 0x03
+    write_function: 0x06
+    poll_group: settings
+    min: 1
+    max: 255
+
+  software_version:
+    table: holding_register
+    address: 0x8000
+    data_type: uint16
+    access: read
+    read_function: 0x03
+    poll_group: settings
+    scale: 0.01
+
+capabilities:
+  relay_1: { type: switch, name: Relay 1, group: outputs, order: 10, source: relay_1 }
+  relay_2: { type: switch, name: Relay 2, group: outputs, order: 20, source: relay_2 }
+  relay_3: { type: switch, name: Relay 3, group: outputs, order: 30, source: relay_3 }
+  relay_4: { type: switch, name: Relay 4, group: outputs, order: 40, source: relay_4 }
+  relay_5: { type: switch, name: Relay 5, group: outputs, order: 50, source: relay_5 }
+  relay_6: { type: switch, name: Relay 6, group: outputs, order: 60, source: relay_6 }
+  relay_7: { type: switch, name: Relay 7, group: outputs, order: 70, source: relay_7 }
+  relay_8: { type: switch, name: Relay 8, group: outputs, order: 80, source: relay_8 }
+
+  di_1: { type: binary_input, name: DI 1, group: inputs, order: 10, source: di_1 }
+  di_2: { type: binary_input, name: DI 2, group: inputs, order: 20, source: di_2 }
+  di_3: { type: binary_input, name: DI 3, group: inputs, order: 30, source: di_3 }
+  di_4: { type: binary_input, name: DI 4, group: inputs, order: 40, source: di_4 }
+  di_5: { type: binary_input, name: DI 5, group: inputs, order: 50, source: di_5 }
+  di_6: { type: binary_input, name: DI 6, group: inputs, order: 60, source: di_6 }
+  di_7: { type: binary_input, name: DI 7, group: inputs, order: 70, source: di_7 }
+  di_8: { type: binary_input, name: DI 8, group: inputs, order: 80, source: di_8 }
+
+  relay_1_control_mode: &mode_capability
+    type: select
+    name: Relay 1 Control Mode
+    group: control_modes
+    order: 10
+    source: relay_1_control_mode
+    options: &mode_options
+      - { id: normal, name: Normal }
+      - { id: linkage, name: Linkage }
+      - { id: toggle, name: Toggle }
+      - { id: edge_trigger, name: Edge Trigger }
+
+  relay_2_control_mode: { <<: *mode_capability, name: Relay 2 Control Mode, order: 20, source: relay_2_control_mode }
+  relay_3_control_mode: { <<: *mode_capability, name: Relay 3 Control Mode, order: 30, source: relay_3_control_mode }
+  relay_4_control_mode: { <<: *mode_capability, name: Relay 4 Control Mode, order: 40, source: relay_4_control_mode }
+  relay_5_control_mode: { <<: *mode_capability, name: Relay 5 Control Mode, order: 50, source: relay_5_control_mode }
+  relay_6_control_mode: { <<: *mode_capability, name: Relay 6 Control Mode, order: 60, source: relay_6_control_mode }
+  relay_7_control_mode: { <<: *mode_capability, name: Relay 7 Control Mode, order: 70, source: relay_7_control_mode }
+  relay_8_control_mode: { <<: *mode_capability, name: Relay 8 Control Mode, order: 80, source: relay_8_control_mode }
+
+  device_baudrate:
+    type: select
+    name: Device Baudrate
+    group: device_settings
+    order: 10
+    source: uart_baudrate
+
+  device_parity:
+    type: select
+    name: Device Parity
+    group: device_settings
+    order: 20
+    source: uart_parity
+
+  device_address:
+    type: number
+    name: Device Address
+    group: device_settings
+    order: 30
+    source: device_address
+    min: 1
+    max: 255
+    step: 1
