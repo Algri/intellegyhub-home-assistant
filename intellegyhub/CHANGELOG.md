@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.174
+
+- Add the missing `pyserial` runtime dependency required by `pymodbus` for real RS-485 Modbus RTU serial scans.
+
 ## 0.5.173
 
 - Improve RS-485 scan diagnostics and support both `pymodbus` `device_id` and `slave` keyword variants so MIO-8 discovery probes are sent on real hardware.
