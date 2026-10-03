@@ -402,8 +402,10 @@ class Rs485Store:
 class Rs485ModbusTransport:
     def __init__(self) -> None:
         self._lock = asyncio.Lock()
+        self.last_error: str | None = None
 
     async def probe(self, bus: dict[str, Any], template: Rs485Template, slave_address: int) -> bool:
+        self.last_error = None
         probe = template.discovery.get("probe") if isinstance(template.discovery, dict) else None
         if isinstance(probe, dict):
             point = {
@@ -416,14 +418,16 @@ class Rs485ModbusTransport:
             try:
                 await self.read_point(bus, {**point, "count": count}, slave_address)
                 return True
-            except RuntimeError:
+            except Exception as exc:
+                self.last_error = str(exc)
                 return False
         for point in template.points.values():
             if point.get("access") in {"read", "read_write"}:
                 try:
                     await self.read_point(bus, point, slave_address)
                     return True
-                except RuntimeError:
+                except Exception as exc:
+                    self.last_error = str(exc)
                     return False
         return False
 
@@ -463,17 +467,17 @@ class Rs485ModbusTransport:
             address = int(point["address"])
             count = int(point.get("count") or 1)
             if table == "coil":
-                result = client.read_coils(address=address, count=count, slave=slave_address)
+                result = self._call_modbus(client.read_coils, slave_address, address=address, count=count)
                 bits = _result_bits(result)
                 return bool(bits[0])
             if table == "discrete_input":
-                result = client.read_discrete_inputs(address=address, count=count, slave=slave_address)
+                result = self._call_modbus(client.read_discrete_inputs, slave_address, address=address, count=count)
                 bits = _result_bits(result)
                 return bool(bits[0])
             if table == "holding_register":
-                result = client.read_holding_registers(address=address, count=count, slave=slave_address)
+                result = self._call_modbus(client.read_holding_registers, slave_address, address=address, count=count)
             elif table == "input_register":
-                result = client.read_input_registers(address=address, count=count, slave=slave_address)
+                result = self._call_modbus(client.read_input_registers, slave_address, address=address, count=count)
             else:
                 raise RuntimeError(f"unsupported Modbus table {table}")
             register = int(_result_registers(result)[0])
@@ -489,22 +493,30 @@ class Rs485ModbusTransport:
             table = point["table"]
             address = int(point["address"])
             if table == "coil":
-                result = client.write_coil(address=address, value=bool(value), slave=slave_address)
+                result = self._call_modbus(client.write_coil, slave_address, address=address, value=bool(value))
                 _raise_on_error(result)
                 return
             if table != "holding_register":
                 raise RuntimeError(f"Modbus table {table} is not writable")
             encoded = encode_register_value(point, value)
             if point.get("read_modify_write"):
-                current_result = client.read_holding_registers(address=address, count=1, slave=slave_address)
+                current_result = self._call_modbus(client.read_holding_registers, slave_address, address=address, count=1)
                 current = int(_result_registers(current_result)[0])
                 mask = int(point.get("mask", 0xFFFF))
                 shift = int(point.get("shift", 0))
                 encoded = (current & ~mask) | ((encoded << shift) & mask)
-            result = client.write_register(address=address, value=encoded, slave=slave_address)
+            result = self._call_modbus(client.write_register, slave_address, address=address, value=encoded)
             _raise_on_error(result)
         finally:
             client.close()
+
+    def _call_modbus(self, method, slave_address: int, **kwargs):
+        try:
+            return method(**kwargs, device_id=slave_address)
+        except TypeError as exc:
+            if "device_id" not in str(exc):
+                raise
+            return method(**kwargs, slave=slave_address)
 
 
 class Rs485Manager:
@@ -522,6 +534,7 @@ class Rs485Manager:
         self.bus = default_bus_settings()
         self.devices: dict[str, Rs485Device] = {}
         self.scanned: list[dict[str, Any]] = []
+        self.scan_errors: list[dict[str, Any]] = []
         self._poll_task: asyncio.Task | None = None
         self._poll_tick_seconds = 0.05
         self._poll_due: dict[tuple[str, str], float] = {}
@@ -586,8 +599,10 @@ class Rs485Manager:
         default_template = requested_template if requested_template in self.registry.templates else next(iter(self.registry.templates), "mio-8")
         template = self.registry.get(default_template)
         addresses = [1, 2] if self.mock else template_slave_addresses(template)
+        scanned_count = len(addresses)
         current_port = self.bus["serial_port"]
         self.scanned = [item for item in self.scanned if item.get("serial_port") != current_port]
+        self.scan_errors = [item for item in self.scan_errors if item.get("serial_port") != current_port]
         found_count = 0
         for found in addresses:
             scan_id = _device_id(current_port, found)
@@ -598,7 +613,19 @@ class Rs485Manager:
                 matched = await self.transport.probe(self.bus, template, found)
                 if not matched:
                     status = "No response"
-                    confidence = "No supported response"
+                    error = getattr(self.transport, "last_error", None) or "No supported response"
+                    confidence = error
+                    if len(self.scan_errors) < 8:
+                        self.scan_errors.append(
+                            {
+                                "serial_port": current_port,
+                                "slave_address": found,
+                                "template_id": default_template,
+                                "error": error,
+                            }
+                        )
+                    if is_fatal_scan_error(error):
+                        break
                 else:
                     confidence = "Template probe"
             if not self.mock and status == "No response":
@@ -616,7 +643,14 @@ class Rs485Manager:
             )
             found_count += 1
         mode = "mock scan" if self.mock else "scan"
-        return self.snapshot(status=f"RS-485: {mode} found {found_count} result(s) on {current_port}")
+        if found_count:
+            return self.snapshot(
+                status=f"RS-485: {mode} scanned {scanned_count} address(es), found {found_count} result(s) on {current_port}"
+            )
+        suffix = f": {self.scan_errors[0]['error']}" if self.scan_errors else ""
+        return self.snapshot(
+            status=f"RS-485: {mode} scanned {scanned_count} address(es), found 0 result(s) on {current_port}{suffix}"
+        )
 
     async def add_device(self, scan_id: str) -> dict[str, Any]:
         scan = next((item for item in self.scanned if item["id"] == scan_id), None)
@@ -785,6 +819,7 @@ class Rs485Manager:
             ],
             "template_errors": templates["errors"],
             "scanned": list(self.scanned),
+            "scan_errors": list(self.scan_errors),
             "devices": devices,
             "selected_id": selected_id or (current_port_devices[0]["id"] if current_port_devices else (devices[0]["id"] if devices else None)),
             "mock": self.mock,
@@ -910,6 +945,22 @@ def template_slave_addresses(template: Rs485Template) -> list[int]:
     maximum = int(settings.get("max") or 247)
     maximum = min(255, max(minimum, maximum))
     return list(range(minimum, maximum + 1))
+
+
+def is_fatal_scan_error(error: str) -> bool:
+    text = error.lower()
+    return any(
+        marker in text
+        for marker in (
+            "pymodbus is not installed",
+            "unable to open",
+            "no such file",
+            "permission",
+            "access denied",
+            "unexpected keyword",
+            "got an unexpected",
+        )
+    )
 
 
 def _table_for_read_function(function_code: int) -> str:

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.173
+
+- Improve RS-485 scan diagnostics and support both `pymodbus` `device_id` and `slave` keyword variants so MIO-8 discovery probes are sent on real hardware.
+
 ## 0.5.172
 
 - Show the RS-485 devices panel in production add-on UI and remove stale placeholder text now that the MIO-8 backend is connected.

@@ -220,7 +220,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.172 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.173 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -269,7 +269,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
             await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.172", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.173", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -2861,6 +2861,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       if (!scanResults || !rs485ApiState) return;
       const currentPort = rs485CurrentSerialPort();
       const rows = (rs485ApiState.scanned || []).filter((item) => !item.configured && item.serial_port === currentPort);
+      const errors = (rs485ApiState.scan_errors || []).filter((item) => item.serial_port === currentPort);
       scanResults.innerHTML = rows.length
         ? rows.map((item) => `
             <div class="rs485-table-row scan">
@@ -2871,7 +2872,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 <button type="button" onclick="addRs485MockDevice('${item.id}')">Add</button>
               </div>
             </div>`).join('')
-        : '<div class="rs485-empty">No scan results. Press Scan to search the Modbus slave address range on the selected RS-485 bus.</div>';
+        : (errors.length
+            ? `<div class="rs485-empty">No scan results. First errors: ${errors.slice(0, 4).map((item) => `Slave ${item.slave_address}: ${item.error}`).join('; ')}</div>`
+            : '<div class="rs485-empty">No scan results. Press Scan to search the Modbus slave address range on the selected RS-485 bus.</div>');
     }
     function paintRs485ConfiguredDevices() {
       const configured = document.getElementById('rs485-configured-devices');
