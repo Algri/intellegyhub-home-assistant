@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.172
+
+- Show the RS-485 devices panel in production add-on UI and remove stale placeholder text now that the MIO-8 backend is connected.
+
 ## 0.5.171
 
 - Add RS-485 MIO-8 template-driven Modbus RTU backend polling, scan, relay write/read-back, DI polling, relay mode control, template CRUD, and `/dev/ttyAMA3`/`/dev/ttyAMA5` add-on device mappings.

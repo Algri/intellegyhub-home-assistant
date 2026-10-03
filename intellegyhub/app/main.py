@@ -171,13 +171,6 @@ def is_mock_enabled() -> bool:
     )
 
 
-def is_development_ui_enabled() -> bool:
-    return (
-        is_mock_enabled()
-        or os.environ.get("INTELLEGY_DEVELOPMENT_UI", "").lower() in {"1", "true", "yes"}
-    )
-
-
 def _health_payload(current: AppRuntime) -> dict:
     snapshot = current.snapshot()
     carrier = snapshot.get("carrier", {})
@@ -227,7 +220,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.171 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.172 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -276,7 +269,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
             await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.171", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.172", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -685,7 +678,6 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       gap: 12px;
       align-items: end;
     }
-    .rs485-development-section { display: __RS485_DEVELOPMENT_DISPLAY__; }
     .rs485-toolbar + .rs485-layout { margin-top: 18px; }
     .rs485-field {
       min-width: 0;
@@ -1018,13 +1010,13 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       </div>
       <div id="modules" class="modules"></div>
     </section>
-    <section class="extension-panel rs485-development-section">
+    <section class="extension-panel">
       <div class="module-row">
         <div>
           <div class="eyebrow">RS-485</div>
           <h1>RS-485 Devices</h1>
           <div class="subtitle">Template-driven Modbus RTU modules</div>
-          <div id="rs485-status" class="status">RS-485: Template UI placeholder</div>
+          <div id="rs485-status" class="status">RS-485: loading...</div>
         </div>
         <div class="transport">RS-485</div>
       </div>
@@ -1069,7 +1061,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 <span>Status</span>
                 <button type="button" disabled>Add</button>
               </div>
-              <div class="rs485-empty">No scan has been run. Backend RS-485 scan support will populate responding slave addresses and matching templates here.</div>
+              <div class="rs485-empty">No scan has been run. Press Scan to search the selected RS-485 bus.</div>
             </div>
           </article>
           <article class="rs485-panel">
@@ -1081,7 +1073,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 <span>Offline</span>
                 <button type="button" disabled>Remove</button>
               </div>
-              <div class="rs485-empty">Placeholder configured device. Runtime persistence and polling are not connected yet.</div>
+              <div class="rs485-empty">No configured devices yet. Scan and add one or more modules.</div>
             </div>
           </article>
           <article class="rs485-panel">
@@ -3401,10 +3393,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
 </body>
 </html>
 """
-        return html.replace(
-            "__RS485_DEVELOPMENT_DISPLAY__",
-            "block" if is_development_ui_enabled() else "none",
-        )
+        return html
 
     @app.get("/favicon.ico", include_in_schema=False)
     async def favicon() -> FileResponse:
