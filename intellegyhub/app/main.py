@@ -220,7 +220,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.174 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.175 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -269,7 +269,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
             await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.174", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.175", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -751,6 +751,23 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .rs485-label { color: var(--ha-secondary); font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
     .rs485-primary { font-weight: 800; color: var(--ha-text); }
     .rs485-empty { color: var(--ha-secondary); font-size: 13px; line-height: 1.45; border: 1px solid var(--ha-row-border); border-radius: 8px; padding: 12px; background: var(--ha-row); overflow-wrap: anywhere; }
+    .rs485-console-log {
+      display: block;
+      margin: 10px 0 0;
+      min-height: calc(1.45em * 5 + 24px);
+      max-height: 280px;
+      overflow: auto;
+      border: 1px solid var(--ha-row-border);
+      border-radius: 8px;
+      background: var(--ha-pre);
+      color: var(--ha-text);
+      padding: 12px;
+      font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
     .rs485-detail-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; margin-bottom: 16px; }
     .rs485-detail-meta { color: var(--ha-secondary); font-size: 13px; line-height: 1.5; }
     .rs485-detail-stack { display: grid; gap: 16px; }
@@ -1043,7 +1060,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           <div id="rs485-template" class="mode-select" data-value="mio-8"></div>
         </div>
         <div class="rs485-actions">
-          <button type="button" onclick="scanRs485Mock()">Scan</button>
+          <button id="rs485-scan-button" type="button" onclick="scanRs485Mock()">Scan</button>
+          <button id="rs485-stop-button" type="button" onclick="stopRs485Scan()" disabled>Stop</button>
           <button type="button" onclick="refreshRs485Devices()">Refresh</button>
         </div>
       </div>
@@ -1063,6 +1081,14 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
               </div>
               <div class="rs485-empty">No scan has been run. Press Scan to search the selected RS-485 bus.</div>
             </div>
+          </article>
+          <article class="rs485-panel">
+            <div class="rs485-panel-head">
+              <div class="rs485-panel-title">Scan Log</div>
+              <button type="button" class="rs485-clear-button" onclick="clearRs485ScanLog()">Clear</button>
+            </div>
+            <div id="rs485-scan-progress" class="rs485-empty">Scan is idle.</div>
+            <pre id="rs485-scan-log" class="rs485-console-log">No scan log yet.</pre>
           </article>
           <article class="rs485-panel">
             <div class="rs485-panel-title">Configured Devices</div>
@@ -2625,6 +2651,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
 
     let rs485ApiState = null;
     let rs485SelectedId = null;
+    let rs485ScanPollTimer = null;
     const rs485PendingSettings = {};
     const RS485_SERIAL_OPTIONS = [
       { value: '/dev/ttyAMA3', label: 'RS-485 CH1 (/dev/ttyAMA3)' },
@@ -2699,9 +2726,37 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           body: JSON.stringify(rs485BusPayload())
         });
         paintRs485(payload);
+        startRs485ScanPolling();
       } catch (error) {
         document.getElementById('rs485-status').textContent = 'RS-485: scan failed';
       }
+    }
+    async function stopRs485Scan() {
+      try {
+        const payload = await requestJson('api/v1/rs485/scan/stop', { method: 'POST' });
+        paintRs485(payload);
+      } catch (error) {
+        document.getElementById('rs485-status').textContent = `RS-485: stop failed - ${errorDetail(error)}`;
+      }
+    }
+    function startRs485ScanPolling() {
+      if (rs485ScanPollTimer) return;
+      rs485ScanPollTimer = window.setInterval(async () => {
+        try {
+          const payload = await requestJson('api/v1/rs485');
+          paintRs485(payload);
+          const running = payload.scan_state && payload.scan_state.running;
+          if (!running && rs485ScanPollTimer) {
+            window.clearInterval(rs485ScanPollTimer);
+            rs485ScanPollTimer = null;
+          }
+        } catch (error) {
+          if (rs485ScanPollTimer) {
+            window.clearInterval(rs485ScanPollTimer);
+            rs485ScanPollTimer = null;
+          }
+        }
+      }, 500);
     }
     async function refreshRs485Devices() {
       try {
@@ -2750,6 +2805,12 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       if (rs485ApiState) rs485ApiState.scanned = (rs485ApiState.scanned || []).filter((item) => item.serial_port !== currentPort);
       if (scanResults) scanResults.innerHTML = '<div class="rs485-empty">Scan results cleared. Press Scan to check mock Modbus addresses.</div>';
       document.getElementById('rs485-status').textContent = 'RS-485: scan results cleared';
+    }
+    function clearRs485ScanLog() {
+      const currentPort = rs485CurrentSerialPort();
+      if (rs485ApiState) rs485ApiState.scan_log = (rs485ApiState.scan_log || []).filter((item) => item.serial_port !== currentPort);
+      paintRs485ScanLog();
+      document.getElementById('rs485-status').textContent = 'RS-485: scan log cleared';
     }
     async function addRs485MockDevice(scanId) {
       try {
@@ -2852,6 +2913,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       document.getElementById('rs485-status').textContent = payload.status || 'RS-485: template-driven mock';
       initRs485MockControls();
       paintRs485ScanResults();
+      paintRs485ScanLog();
       paintRs485ConfiguredDevices();
       paintRs485Templates();
       paintRs485Detail();
@@ -2875,6 +2937,39 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         : (errors.length
             ? `<div class="rs485-empty">No scan results. First errors: ${errors.slice(0, 4).map((item) => `Slave ${item.slave_address}: ${item.error}`).join('; ')}</div>`
             : '<div class="rs485-empty">No scan results. Press Scan to search the Modbus slave address range on the selected RS-485 bus.</div>');
+    }
+    function paintRs485ScanLog() {
+      const progress = document.getElementById('rs485-scan-progress');
+      const logTarget = document.getElementById('rs485-scan-log');
+      const scanButton = document.getElementById('rs485-scan-button');
+      const stopButton = document.getElementById('rs485-stop-button');
+      if (!rs485ApiState) return;
+      const currentPort = rs485CurrentSerialPort();
+      const state = rs485ApiState.scan_state || {};
+      const running = Boolean(state.running && state.serial_port === currentPort);
+      if (scanButton) scanButton.disabled = running;
+      if (stopButton) stopButton.disabled = !running;
+      if (progress) {
+        progress.innerHTML = running
+          ? `Scanning ${state.serial_port}: slave <strong>${state.current_address || '--'}</strong> / ${state.total || '--'} | scanned ${state.scanned || 0} | found ${state.found || 0}${state.last_error ? ` | ${state.last_error}` : ''}`
+          : 'Scan is idle.';
+      }
+      if (!logTarget) return;
+      const rows = (rs485ApiState.scan_log || []).filter((item) => item.serial_port === currentPort).slice(-80).reverse();
+      logTarget.textContent = rows.length ? rows.map(rs485ScanLogLine).join('\\n') : 'No scan log yet.';
+    }
+    function rs485ScanLogLine(item) {
+      const parts = [`${rs485LogTime(item.ts)}`, `slave ${String(item.slave_address).padStart(3, ' ')}`, item.result || '--'];
+      if (item.tx_hex) parts.push(`TX ${item.tx_hex}`);
+      if (item.rx_hex) parts.push(`RX ${item.rx_hex}`);
+      if (item.rx_detail) parts.push(item.rx_detail);
+      if (item.message) parts.push(item.message);
+      return parts.join(' | ');
+    }    function rs485LogTime(value) {
+      if (!value) return '--:--:--';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return value;
+      return date.toLocaleTimeString([], { hour12: false });
     }
     function paintRs485ConfiguredDevices() {
       const configured = document.getElementById('rs485-configured-devices');
@@ -3478,6 +3573,10 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     @app.post("/api/v1/rs485/scan")
     async def post_rs485_scan(payload: Rs485BusPayload) -> dict:
         return await app.state.rs485.scan(payload.model_dump())
+
+    @app.post("/api/v1/rs485/scan/stop")
+    async def post_rs485_scan_stop() -> dict:
+        return await app.state.rs485.stop_scan()
 
     @app.post("/api/v1/rs485/refresh")
     async def post_rs485_refresh() -> dict:

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.175
+
+- Add RS-485 scan stop/progress handling and a console-style scan log that shows Modbus probe TX/RX frames.
+- Keep the RS-485 scan log visible at a minimum five-line height in the add-on UI.
+
 ## 0.5.174
 
 - Add the missing `pyserial` runtime dependency required by `pymodbus` for real RS-485 Modbus RTU serial scans.

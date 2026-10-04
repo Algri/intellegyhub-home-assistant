@@ -403,28 +403,58 @@ class Rs485ModbusTransport:
     def __init__(self) -> None:
         self._lock = asyncio.Lock()
         self.last_error: str | None = None
+        self.last_tx_hex: str | None = None
+        self.last_rx_hex: str | None = None
+        self.last_rx_detail: str | None = None
 
     async def probe(self, bus: dict[str, Any], template: Rs485Template, slave_address: int) -> bool:
         self.last_error = None
+        self.last_tx_hex = None
+        self.last_rx_hex = None
+        self.last_rx_detail = None
         probe = template.discovery.get("probe") if isinstance(template.discovery, dict) else None
         if isinstance(probe, dict):
+            function = int(probe.get("function", 0x03))
+            address = int(probe.get("address"))
+            count = int(probe.get("count") or 1)
+            self.last_tx_hex = modbus_rtu_read_request_hex(slave_address, function, address, count)
             point = {
-                "table": _table_for_read_function(int(probe.get("function", 0x03))),
-                "address": int(probe.get("address")),
+                "table": _table_for_read_function(function),
+                "address": address,
                 "data_type": "uint16",
                 "access": "read",
             }
-            count = int(probe.get("count") or 1)
             try:
-                await self.read_point(bus, {**point, "count": count}, slave_address)
+                value = await self.read_point(bus, {**point, "count": count}, slave_address)
+                register = int(round(float(value) / float(point.get("scale", 1)))) if "scale" in point else int(value)
+                self.last_rx_hex = modbus_rtu_read_register_response_hex(slave_address, function, [register])
+                self.last_rx_detail = f"register=0x{register:04X}"
                 return True
             except Exception as exc:
                 self.last_error = str(exc)
                 return False
-        for point in template.points.values():
+        fallback_points = []
+        software_version = template.points.get("software_version")
+        if isinstance(software_version, dict):
+            fallback_points.append(software_version)
+        fallback_points.extend(
+            point
+            for point in template.points.values()
+            if point is not software_version and point.get("table") in {"holding_register", "input_register"}
+        )
+        fallback_points.extend(point for point in template.points.values() if point not in fallback_points)
+        for point in fallback_points:
             if point.get("access") in {"read", "read_write"}:
+                function = int(point.get("read_function") or (0x04 if point.get("table") == "input_register" else 0x03))
+                count = int(point.get("count") or 1)
+                if point.get("table") in {"holding_register", "input_register"}:
+                    self.last_tx_hex = modbus_rtu_read_request_hex(slave_address, function, int(point.get("address")), count)
                 try:
-                    await self.read_point(bus, point, slave_address)
+                    value = await self.read_point(bus, point, slave_address)
+                    if point.get("table") in {"holding_register", "input_register"}:
+                        register = encode_register_value(point, value)
+                        self.last_rx_hex = modbus_rtu_read_register_response_hex(slave_address, function, [register])
+                        self.last_rx_detail = f"register=0x{register:04X}"
                     return True
                 except Exception as exc:
                     self.last_error = str(exc)
@@ -454,8 +484,8 @@ class Rs485ModbusTransport:
             parity=_modbus_parity(str(bus["parity"])),
             stopbits=int(bus["stop_bits"]),
             bytesize=8,
-            timeout=0.7,
-            retries=1,
+            timeout=0.15,
+            retries=0,
         )
 
     def _read_point_sync(self, bus: dict[str, Any], point: dict[str, Any], slave_address: int) -> Any:
@@ -535,6 +565,10 @@ class Rs485Manager:
         self.devices: dict[str, Rs485Device] = {}
         self.scanned: list[dict[str, Any]] = []
         self.scan_errors: list[dict[str, Any]] = []
+        self.scan_log: list[dict[str, Any]] = []
+        self.scan_state: dict[str, Any] = {"running": False, "stop_requested": False}
+        self.status = "RS-485: template-driven mock"
+        self._scan_task: asyncio.Task | None = None
         self._poll_task: asyncio.Task | None = None
         self._poll_tick_seconds = 0.05
         self._poll_due: dict[tuple[str, str], float] = {}
@@ -549,6 +583,7 @@ class Rs485Manager:
             self._poll_task = asyncio.create_task(self._poll_loop())
 
     async def stop(self) -> None:
+        await self.stop_scan()
         if self._poll_task is None:
             return
         self._poll_task.cancel()
@@ -557,6 +592,10 @@ class Rs485Manager:
         except asyncio.CancelledError:
             pass
         self._poll_task = None
+
+    async def stop_scan(self) -> dict[str, Any]:
+        self.scan_state["stop_requested"] = True
+        return self.snapshot(status="RS-485: scan stop requested")
 
     def templates_snapshot(self) -> dict[str, Any]:
         return self.registry.snapshot()
@@ -593,6 +632,14 @@ class Rs485Manager:
         return self.snapshot()
 
     async def scan(self, settings: dict[str, Any]) -> dict[str, Any]:
+        if not self.mock:
+            if self._scan_task and not self._scan_task.done():
+                return self.snapshot(status="RS-485: scan already running")
+            self._scan_task = asyncio.create_task(self._scan_impl(settings))
+            return self.snapshot(status="RS-485: scan started")
+        return await self._scan_impl(settings)
+
+    async def _scan_impl(self, settings: dict[str, Any]) -> dict[str, Any]:
         self.bus = normalize_bus_settings(settings)
         await self.store.save_bus(self.bus)
         requested_template = str(settings.get("template_id") or "")
@@ -603,54 +650,129 @@ class Rs485Manager:
         current_port = self.bus["serial_port"]
         self.scanned = [item for item in self.scanned if item.get("serial_port") != current_port]
         self.scan_errors = [item for item in self.scan_errors if item.get("serial_port") != current_port]
+        self.scan_log = [item for item in self.scan_log if item.get("serial_port") != current_port]
+        self.scan_state = {
+            "running": True,
+            "stop_requested": False,
+            "serial_port": current_port,
+            "template_id": default_template,
+            "current_address": None,
+            "scanned": 0,
+            "total": scanned_count,
+            "found": 0,
+            "last_error": None,
+        }
         found_count = 0
-        for found in addresses:
-            scan_id = _device_id(current_port, found)
-            already = scan_id in self.devices
-            status = "Configured" if already else "Found"
-            confidence = "Mock match"
-            if not self.mock:
-                matched = await self.transport.probe(self.bus, template, found)
-                if not matched:
-                    status = "No response"
-                    error = getattr(self.transport, "last_error", None) or "No supported response"
-                    confidence = error
-                    if len(self.scan_errors) < 8:
-                        self.scan_errors.append(
-                            {
-                                "serial_port": current_port,
-                                "slave_address": found,
-                                "template_id": default_template,
-                                "error": error,
-                            }
+        stopped = False
+        try:
+            for found in addresses:
+                if self.scan_state.get("stop_requested"):
+                    stopped = True
+                    self._append_scan_log(current_port, found, "stopped", "Scan stopped by user")
+                    break
+                self.scan_state["current_address"] = found
+                scan_id = _device_id(current_port, found)
+                already = scan_id in self.devices
+                status = "Configured" if already else "Found"
+                confidence = "Mock match"
+                if not self.mock:
+                    matched = await self.transport.probe(self.bus, template, found)
+                    tx_hex = getattr(self.transport, "last_tx_hex", None)
+                    rx_hex = getattr(self.transport, "last_rx_hex", None)
+                    rx_detail = getattr(self.transport, "last_rx_detail", None)
+                    if not matched:
+                        status = "No response"
+                        error = getattr(self.transport, "last_error", None) or "No supported response"
+                        confidence = error
+                        self.scan_state["last_error"] = error
+                        self._append_scan_log(
+                            current_port,
+                            found,
+                            "timeout",
+                            error,
+                            tx_hex=tx_hex,
+                            rx_hex=rx_hex,
+                            rx_detail=rx_detail,
                         )
-                    if is_fatal_scan_error(error):
-                        break
-                else:
-                    confidence = "Template probe"
-            if not self.mock and status == "No response":
-                continue
-            self.scanned.append(
-                {
-                    "id": scan_id,
-                    "serial_port": current_port,
-                    "slave_address": found,
-                    "template_id": default_template,
-                    "status": status,
-                    "confidence": confidence,
-                    "configured": already,
-                }
-            )
-            found_count += 1
+                        if len(self.scan_errors) < 8:
+                            self.scan_errors.append(
+                                {
+                                    "serial_port": current_port,
+                                    "slave_address": found,
+                                    "template_id": default_template,
+                                    "error": error,
+                                }
+                            )
+                        if is_fatal_scan_error(error):
+                            break
+                    else:
+                        confidence = "Template probe"
+                        self._append_scan_log(
+                            current_port,
+                            found,
+                            "matched",
+                            rx_detail or "Template probe",
+                            tx_hex=tx_hex,
+                            rx_hex=rx_hex,
+                            rx_detail=rx_detail,
+                        )
+                if not self.mock and status == "No response":
+                    self.scan_state["scanned"] = int(self.scan_state.get("scanned") or 0) + 1
+                    continue
+                self.scanned.append(
+                    {
+                        "id": scan_id,
+                        "serial_port": current_port,
+                        "slave_address": found,
+                        "template_id": default_template,
+                        "status": status,
+                        "confidence": confidence,
+                        "configured": already,
+                    }
+                )
+                found_count += 1
+                self.scan_state["found"] = found_count
+                self.scan_state["scanned"] = int(self.scan_state.get("scanned") or 0) + 1
+        finally:
+            self.scan_state["running"] = False
+            self.scan_state["stop_requested"] = False
+            self.scan_state["current_address"] = None
         mode = "mock scan" if self.mock else "scan"
+        if stopped:
+            self.status = f"RS-485: {mode} stopped after {self.scan_state.get('scanned', 0)} address(es), found {found_count} result(s) on {current_port}"
+            return self.snapshot(status=self.status)
         if found_count:
-            return self.snapshot(
-                status=f"RS-485: {mode} scanned {scanned_count} address(es), found {found_count} result(s) on {current_port}"
-            )
+            self.status = f"RS-485: {mode} scanned {scanned_count} address(es), found {found_count} result(s) on {current_port}"
+            return self.snapshot(status=self.status)
         suffix = f": {self.scan_errors[0]['error']}" if self.scan_errors else ""
-        return self.snapshot(
-            status=f"RS-485: {mode} scanned {scanned_count} address(es), found 0 result(s) on {current_port}{suffix}"
+        self.status = f"RS-485: {mode} scanned {scanned_count} address(es), found 0 result(s) on {current_port}{suffix}"
+        return self.snapshot(status=self.status)
+
+    def _append_scan_log(
+        self,
+        serial_port: str,
+        slave_address: int,
+        result: str,
+        message: str,
+        *,
+        tx_hex: str | None = None,
+        rx_hex: str | None = None,
+        rx_detail: str | None = None,
+    ) -> None:
+        self.scan_log.append(
+            {
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "serial_port": serial_port,
+                "slave_address": slave_address,
+                "result": result,
+                "tx_hex": tx_hex,
+                "rx_hex": rx_hex,
+                "rx_detail": rx_detail,
+                "message": message,
+            }
         )
+        if len(self.scan_log) > 300:
+            self.scan_log = self.scan_log[-300:]
 
     async def add_device(self, scan_id: str) -> dict[str, Any]:
         scan = next((item for item in self.scanned if item["id"] == scan_id), None)
@@ -810,7 +932,7 @@ class Rs485Manager:
             devices.append(device.snapshot())
         current_port_devices = [device for device in devices if device["serial_port"] == self.bus["serial_port"]]
         return {
-            "status": status or "RS-485: template-driven mock",
+            "status": status or self.status,
             "bus": dict(self.bus),
             "templates": templates["templates"],
             "template_details": [
@@ -820,6 +942,8 @@ class Rs485Manager:
             "template_errors": templates["errors"],
             "scanned": list(self.scanned),
             "scan_errors": list(self.scan_errors),
+            "scan_log": list(self.scan_log),
+            "scan_state": dict(self.scan_state),
             "devices": devices,
             "selected_id": selected_id or (current_port_devices[0]["id"] if current_port_devices else (devices[0]["id"] if devices else None)),
             "mock": self.mock,
@@ -1131,6 +1255,44 @@ def encode_register_value(point: dict[str, Any], value: Any) -> int:
 
 def _modbus_parity(parity: str) -> str:
     return {"none": "N", "even": "E", "odd": "O"}.get(parity.lower(), "N")
+
+
+def modbus_rtu_read_request_hex(slave_address: int, function: int, address: int, count: int) -> str:
+    frame = bytes(
+        [
+            slave_address & 0xFF,
+            function & 0xFF,
+            (address >> 8) & 0xFF,
+            address & 0xFF,
+            (count >> 8) & 0xFF,
+            count & 0xFF,
+        ]
+    )
+    return _hex_with_crc(frame)
+
+
+def modbus_rtu_read_register_response_hex(slave_address: int, function: int, registers: list[int]) -> str:
+    payload: list[int] = [slave_address & 0xFF, function & 0xFF, len(registers) * 2]
+    for register in registers:
+        payload.extend([(int(register) >> 8) & 0xFF, int(register) & 0xFF])
+    return _hex_with_crc(bytes(payload))
+
+
+def _hex_with_crc(frame: bytes) -> str:
+    crc = _modbus_crc16(frame)
+    return " ".join(f"{byte:02X}" for byte in frame + bytes([crc & 0xFF, (crc >> 8) & 0xFF]))
+
+
+def _modbus_crc16(frame: bytes) -> int:
+    crc = 0xFFFF
+    for byte in frame:
+        crc ^= byte
+        for _ in range(8):
+            if crc & 0x0001:
+                crc = (crc >> 1) ^ 0xA001
+            else:
+                crc >>= 1
+    return crc & 0xFFFF
 
 
 def _raise_on_error(result: Any) -> None:
