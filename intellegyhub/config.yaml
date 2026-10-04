@@ -1,7 +1,7 @@
 name: IntellegyHUB
 slug: intellegyhub
 description: IntellegyHUB hardware runtime for Home Assistant native entities
-version: 0.5.175
+version: 0.5.176
 stage: stable
 arch:
   - aarch64
@@ -40,6 +40,8 @@ options:
   onewire:
     bus1_poll_interval_seconds: 30
     bus2_poll_interval_seconds: 30
+  rs485:
+    enabled: false
   power_button:
     shutdown_enabled: true
     shutdown_hold_seconds: 1.0
@@ -56,6 +58,8 @@ schema:
   onewire:
     bus1_poll_interval_seconds: int(1,3600)
     bus2_poll_interval_seconds: int(1,3600)
+  rs485:
+    enabled: bool
   power_button:
     shutdown_enabled: bool
     shutdown_hold_seconds: float(0.1,1.5)

@@ -42,6 +42,7 @@ class AppConfig:
     onewire_bridge2_poll_interval_seconds: int = 30
     power_button_shutdown_enabled: bool = True
     power_button_shutdown_hold_seconds: float = 1.0
+    rs485_enabled: bool = True
     chip_path: str = "/dev/gpiochip0"
     mock: bool = False
 
@@ -96,6 +97,7 @@ def load_config(path: Path | None = None) -> AppConfig:
     onewire = _group(options, "onewire")
     power_button = _group(options, "power_button")
     buzzer = _group(options, "buzzer")
+    rs485 = _group(options, "rs485")
     config = AppConfig(
         led_gpio=FIXED_LED_GPIO,
         led_active_low=False,
@@ -140,6 +142,11 @@ def load_config(path: Path | None = None) -> AppConfig:
         ),
         power_button_shutdown_hold_seconds=float(
             _option(power_button, "shutdown_hold_seconds", options.get("power_button_shutdown_hold_seconds", 1.0))
+        ),
+        rs485_enabled=(
+            os.environ.get("INTELLEGY_RS485_ENABLED", "").lower() in {"1", "true", "yes", "on"}
+            if os.environ.get("INTELLEGY_RS485_ENABLED")
+            else _bool_option(rs485, "enabled", _bool_option(options, "rs485_enabled", True))
         ),
         mock=mock,
     )

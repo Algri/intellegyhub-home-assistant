@@ -36,15 +36,6 @@ discovery:
     expect:
       success: true
 
-polling:
-  groups:
-    state:
-      interval_ms: 250
-    modes:
-      interval_ms: 2000
-    settings:
-      mode: on_demand
-
 groups:
   outputs:
     name: Relay Outputs
@@ -88,7 +79,7 @@ points:
     access: read_write
     read_function: 0x03
     write_function: 0x06
-    poll_group: modes
+    poll_group: settings
     map: &mode_map
       0: normal
       1: linkage

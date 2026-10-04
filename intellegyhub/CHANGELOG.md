@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.176
+
+- Add a central RS-485 enable flag so production can hide the RS-485 card and prevent RS-485 scan, polling, and UART worker startup when disabled.
+- Default RS-485 to disabled in add-on options until real-hardware validation is complete.
+
 ## 0.5.175
 
 - Add RS-485 scan stop/progress handling and a console-style scan log that shows Modbus probe TX/RX frames.
