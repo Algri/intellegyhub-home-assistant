@@ -9,6 +9,13 @@ device:
   protocol: modbus_rtu
   protocol_revision: development_protocol_v2
 
+identity:
+  manufacturer: IntellegyHUB
+  model: MIO-8
+  hardware_version: v1.4 Rev.A
+  firmware_version: v1.2.3
+  serial_number: MIO8-001842
+
 communication:
   baudrate:
     factory_default: 9600
@@ -54,23 +61,23 @@ groups:
     order: 40
 
 points:
-  relay_1: { table: coil, address: 0x0000, data_type: bool, access: read_write, read_function: 0x01, write_function: 0x05, poll_group: state }
-  relay_2: { table: coil, address: 0x0001, data_type: bool, access: read_write, read_function: 0x01, write_function: 0x05, poll_group: state }
-  relay_3: { table: coil, address: 0x0002, data_type: bool, access: read_write, read_function: 0x01, write_function: 0x05, poll_group: state }
-  relay_4: { table: coil, address: 0x0003, data_type: bool, access: read_write, read_function: 0x01, write_function: 0x05, poll_group: state }
-  relay_5: { table: coil, address: 0x0004, data_type: bool, access: read_write, read_function: 0x01, write_function: 0x05, poll_group: state }
-  relay_6: { table: coil, address: 0x0005, data_type: bool, access: read_write, read_function: 0x01, write_function: 0x05, poll_group: state }
-  relay_7: { table: coil, address: 0x0006, data_type: bool, access: read_write, read_function: 0x01, write_function: 0x05, poll_group: state }
-  relay_8: { table: coil, address: 0x0007, data_type: bool, access: read_write, read_function: 0x01, write_function: 0x05, poll_group: state }
+  relay_1: { table: coil, address: 0x0000, data_type: bool, access: read_write, read_function: 0x01, write_function: 0x05, poll_group: outputs }
+  relay_2: { table: coil, address: 0x0001, data_type: bool, access: read_write, read_function: 0x01, write_function: 0x05, poll_group: outputs }
+  relay_3: { table: coil, address: 0x0002, data_type: bool, access: read_write, read_function: 0x01, write_function: 0x05, poll_group: outputs }
+  relay_4: { table: coil, address: 0x0003, data_type: bool, access: read_write, read_function: 0x01, write_function: 0x05, poll_group: outputs }
+  relay_5: { table: coil, address: 0x0004, data_type: bool, access: read_write, read_function: 0x01, write_function: 0x05, poll_group: outputs }
+  relay_6: { table: coil, address: 0x0005, data_type: bool, access: read_write, read_function: 0x01, write_function: 0x05, poll_group: outputs }
+  relay_7: { table: coil, address: 0x0006, data_type: bool, access: read_write, read_function: 0x01, write_function: 0x05, poll_group: outputs }
+  relay_8: { table: coil, address: 0x0007, data_type: bool, access: read_write, read_function: 0x01, write_function: 0x05, poll_group: outputs }
 
-  di_1: { table: discrete_input, address: 0x0000, data_type: bool, access: read, read_function: 0x02, poll_group: state }
-  di_2: { table: discrete_input, address: 0x0001, data_type: bool, access: read, read_function: 0x02, poll_group: state }
-  di_3: { table: discrete_input, address: 0x0002, data_type: bool, access: read, read_function: 0x02, poll_group: state }
-  di_4: { table: discrete_input, address: 0x0003, data_type: bool, access: read, read_function: 0x02, poll_group: state }
-  di_5: { table: discrete_input, address: 0x0004, data_type: bool, access: read, read_function: 0x02, poll_group: state }
-  di_6: { table: discrete_input, address: 0x0005, data_type: bool, access: read, read_function: 0x02, poll_group: state }
-  di_7: { table: discrete_input, address: 0x0006, data_type: bool, access: read, read_function: 0x02, poll_group: state }
-  di_8: { table: discrete_input, address: 0x0007, data_type: bool, access: read, read_function: 0x02, poll_group: state }
+  di_1: { table: discrete_input, address: 0x0000, data_type: bool, access: read, read_function: 0x02, poll_group: inputs }
+  di_2: { table: discrete_input, address: 0x0001, data_type: bool, access: read, read_function: 0x02, poll_group: inputs }
+  di_3: { table: discrete_input, address: 0x0002, data_type: bool, access: read, read_function: 0x02, poll_group: inputs }
+  di_4: { table: discrete_input, address: 0x0003, data_type: bool, access: read, read_function: 0x02, poll_group: inputs }
+  di_5: { table: discrete_input, address: 0x0004, data_type: bool, access: read, read_function: 0x02, poll_group: inputs }
+  di_6: { table: discrete_input, address: 0x0005, data_type: bool, access: read, read_function: 0x02, poll_group: inputs }
+  di_7: { table: discrete_input, address: 0x0006, data_type: bool, access: read, read_function: 0x02, poll_group: inputs }
+  di_8: { table: discrete_input, address: 0x0007, data_type: bool, access: read, read_function: 0x02, poll_group: inputs }
 
   relay_1_control_mode: &mode_point
     table: holding_register

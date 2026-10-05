@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.177
+
+- Refine RS-485 device, template, diagnostics, and polling configuration UI.
+- Keep Modbus traffic capture stopped by default and persist diagnostic logs safely across reloads.
+- Prevent automatic device reads from adding traffic after a page refresh.
+
 ## 0.5.176
 
 - Add a central RS-485 enable flag so production can hide the RS-485 card and prevent RS-485 scan, polling, and UART worker startup when disabled.

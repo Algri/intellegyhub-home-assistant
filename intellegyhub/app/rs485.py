@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
+import logging
 import os
 import sqlite3
 import sys
@@ -27,11 +29,103 @@ except ImportError:  # pragma: no cover - optional when pyserial is not installe
 VALID_TABLES = {"coil", "discrete_input", "holding_register", "input_register"}
 VALID_CAPABILITY_TYPES = {"switch", "binary_input", "sensor", "number", "select"}
 VALID_PROTOCOLS = {"modbus_rtu"}
+LOGGER = logging.getLogger("intellegyhub.rs485")
 MOCK_SERIAL_PORTS = {"/dev/ttyAMA3", "/dev/ttyAMA5"}
 RS485_DEFAULT_POLLING = {
-    "state": {"mode": "polling", "interval_ms": 250},
+    "inputs": {"mode": "polling", "interval_ms": 100},
+    "outputs": {"mode": "polling", "interval_ms": 250},
     "settings": {"mode": "on_demand"},
 }
+# Availability is time-based, rather than attempt-based. This keeps behavior
+# consistent when the configured poll interval changes: five seconds without a
+# valid complete poll means OFFLINE, and the next valid poll restores ONLINE.
+RS485_OFFLINE_AFTER_SECONDS = 5.0
+RS485_ONLINE_AFTER_SUCCESSES = 1
+# A USB-RS485 adapter/device may need more than one 50 ms polling tick to
+# turn the bus around and return a complete RTU frame. Keep retries disabled,
+# but allow the current transaction enough time to finish cleanly.
+RS485_RESPONSE_TIMEOUT_SECONDS = 0.5
+RS485_DIAGNOSTICS_MAX_ENTRIES = 100
+RS485_DIAGNOSTICS_MAX_ERRORS = 5
+MODBUS_EXCEPTION_CODES = {
+    1: "Illegal Function",
+    2: "Illegal Data Address",
+    3: "Illegal Data Value",
+    4: "Server Device Failure",
+    6: "Server Device Busy",
+    10: "Gateway Path Unavailable",
+    11: "Gateway Target Device Failed to Respond",
+}
+
+
+def decode_modbus_frame(frame_hex: str | None) -> dict[str, Any]:
+    """Decode the common RTU PDU fields without hiding malformed input."""
+    raw = " ".join(str(frame_hex or "").split()).upper()
+    try:
+        data = bytes.fromhex(raw)
+    except ValueError:
+        return {"valid": False, "error": "malformed frame", "raw": raw}
+    if len(data) < 4:
+        return {"valid": False, "error": "malformed frame", "raw": raw}
+    slave, function = data[0], data[1]
+    result: dict[str, Any] = {"valid": True, "raw": raw, "slave": slave, "function": function}
+    if function & 0x80:
+        code = data[2] if len(data) > 2 else None
+        result.update({"exception": code, "exception_name": MODBUS_EXCEPTION_CODES.get(code, "Unknown exception"), "valid": len(data) >= 5})
+        return result
+    if function in (1, 2, 3, 4) and len(data) >= 5:
+        if len(data) >= 8:
+            result.update({"address": int.from_bytes(data[2:4], "big"), "quantity": int.from_bytes(data[4:6], "big")})
+        else:
+            result["byte_count"] = data[2]
+            result["data"] = list(data[3:-2])
+    elif function in (5, 6) and len(data) >= 8:
+        result.update({"address": int.from_bytes(data[2:4], "big"), "value": int.from_bytes(data[4:6], "big")})
+    elif function in (15, 16) and len(data) >= 8:
+        result.update({"address": int.from_bytes(data[2:4], "big"), "quantity": int.from_bytes(data[4:6], "big")})
+    else:
+        result["valid"] = False
+        result["error"] = "malformed frame"
+    result["crc"] = data[-2:].hex(" ").upper()
+    return result
+
+
+def classify_modbus_error(message: str) -> str | None:
+    """Return the stable diagnostics bucket for a transport/protocol error."""
+    text = str(message or "").lower()
+    if "timeout" in text or "no response" in text:
+        return "timeout"
+    if "crc" in text:
+        return "crc"
+    if "exception" in text:
+        return "exception"
+    if "malformed" in text or "invalid frame" in text:
+        return "malformed"
+    if "wrong slave" in text:
+        return "wrong_slave"
+    if "wrong function" in text or "unexpected function" in text:
+        return "wrong_function"
+    return "protocol"
+
+
+def validate_modbus_frame(frame_hex: str | None, expected_slave: int | None = None, expected_function: int | None = None) -> dict[str, Any]:
+    decoded = decode_modbus_frame(frame_hex)
+    raw = bytes.fromhex(str(frame_hex or "").replace(" ", "")) if decoded.get("valid") else b""
+    if len(raw) >= 4:
+        crc = 0xFFFF
+        for byte in raw[:-2]:
+            crc ^= byte
+            for _ in range(8):
+                crc = (crc >> 1) ^ 0xA001 if crc & 1 else crc >> 1
+        expected_crc = bytes((crc & 0xFF, (crc >> 8) & 0xFF))
+        decoded["crc_valid"] = raw[-2:] == expected_crc
+        if not decoded["crc_valid"]:
+            decoded.update({"valid": False, "error": "crc error"})
+    if expected_slave is not None and decoded.get("slave") != expected_slave:
+        decoded.update({"valid": False, "error": "wrong slave"})
+    if expected_function is not None and decoded.get("function") not in {expected_function, expected_function | 0x80}:
+        decoded.update({"valid": False, "error": "unexpected function"})
+    return decoded
 
 
 class Rs485PollPreempted(Exception):
@@ -46,6 +140,7 @@ class Rs485Template:
     name: str
     description: str
     protocol: str
+    identity: dict[str, Any]
     communication: dict[str, Any]
     discovery: dict[str, Any]
     polling: dict[str, Any]
@@ -62,6 +157,7 @@ class Rs485Template:
             "name": self.name,
             "description": self.description,
             "protocol": self.protocol,
+            "identity": self.identity,
         }
 
     def snapshot(self) -> dict[str, Any]:
@@ -234,6 +330,7 @@ class Rs485TemplateRegistry:
             raise ValueError(f'unsupported protocol "{protocol}"')
 
         communication = _dict(raw.get("communication"), "communication")
+        identity = _dict(raw.get("identity") or {}, "identity")
         discovery = _dict(raw.get("discovery") or {}, "discovery")
         polling = _dict(raw.get("polling") or {}, "polling")
         groups = _dict(raw.get("groups"), "groups")
@@ -267,6 +364,7 @@ class Rs485TemplateRegistry:
             name=str(device.get("name") or model),
             description=str(device.get("description") or ""),
             protocol=protocol,
+            identity=identity,
             communication=communication,
             discovery=discovery,
             polling=polling,
@@ -283,6 +381,13 @@ class Rs485Store:
 
     async def initialize(self) -> None:
         await asyncio.to_thread(self._initialize_sync)
+
+    async def load_diagnostics(self) -> dict[str, dict[str, Any]]:
+        return await asyncio.to_thread(self._load_diagnostics_sync)
+
+    async def save_diagnostics(self, device_id: str, diagnostics: dict[str, Any]) -> None:
+        async with self._lock:
+            await asyncio.to_thread(self._save_diagnostics_sync, device_id, diagnostics)
 
     async def load_bus(self) -> dict[str, Any]:
         return await asyncio.to_thread(self._load_bus_sync)
@@ -337,6 +442,24 @@ class Rs485Store:
             columns = {row[1] for row in db.execute("PRAGMA table_info(rs485_devices)").fetchall()}
             if "polling_json" not in columns:
                 db.execute("ALTER TABLE rs485_devices ADD COLUMN polling_json TEXT NOT NULL DEFAULT '{}'")
+            db.execute("CREATE TABLE IF NOT EXISTS rs485_diagnostics (device_id TEXT PRIMARY KEY, data_json TEXT NOT NULL)")
+
+    def _load_diagnostics_sync(self) -> dict[str, dict[str, Any]]:
+        with self._connect() as db:
+            rows = db.execute("SELECT device_id,data_json FROM rs485_diagnostics").fetchall()
+        result: dict[str, dict[str, Any]] = {}
+        for device_id, data in rows:
+            try:
+                value = json.loads(data)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(value, dict):
+                result[str(device_id)] = value
+        return result
+
+    def _save_diagnostics_sync(self, device_id: str, diagnostics: dict[str, Any]) -> None:
+        with self._connect() as db:
+            db.execute("INSERT INTO rs485_diagnostics(device_id,data_json) VALUES(?,?) ON CONFLICT(device_id) DO UPDATE SET data_json=excluded.data_json", (device_id, json.dumps(diagnostics, separators=(",", ":"))))
 
     def _load_bus_sync(self) -> dict[str, Any]:
         settings = default_bus_settings()
@@ -528,7 +651,7 @@ class Rs485ModbusTransport:
             parity=_modbus_parity(str(bus["parity"])),
             stopbits=int(bus["stop_bits"]),
             bytesize=8,
-            timeout=0.15,
+            timeout=RS485_RESPONSE_TIMEOUT_SECONDS,
             retries=0,
         )
 
@@ -547,6 +670,11 @@ class Rs485ModbusTransport:
             client = self._client(bus)
             self._clients[key] = client
         if not getattr(client, "connected", False) and not client.connect():
+            self._clients.pop(key, None)
+            try:
+                client.close()
+            except Exception:
+                pass
             raise RuntimeError(f"unable to open {bus['serial_port']}")
         return client
 
@@ -570,6 +698,24 @@ class Rs485ModbusTransport:
     def _close_bus_sync(self, bus: dict[str, Any]) -> None:
         client = self._clients.pop(self._client_key(bus), None)
         if client is not None:
+            try:
+                client.close()
+            except Exception:
+                pass
+
+    async def close_port(self, serial_port: str) -> None:
+        async with self._lock:
+            await asyncio.to_thread(self._close_port_sync, serial_port)
+
+    def _close_port_sync(self, serial_port: str) -> None:
+        target = str(serial_port)
+        clients = [
+            (key, client)
+            for key, client in self._clients.items()
+            if key[0] == target
+        ]
+        for key, client in clients:
+            self._clients.pop(key, None)
             try:
                 client.close()
             except Exception:
@@ -722,9 +868,12 @@ class Rs485Manager:
         self.scanned: list[dict[str, Any]] = []
         self.scan_errors: list[dict[str, Any]] = []
         self.scan_log: list[dict[str, Any]] = []
+        self.diagnostics: dict[str, dict[str, Any]] = {}
+        self.diagnostics_paused: set[str] = set()
         self.scan_state: dict[str, Any] = {"running": False, "stop_requested": False}
         self.status = "RS-485: template-driven mock"
         self._scan_task: asyncio.Task | None = None
+        self._scan_stop_event: asyncio.Event | None = None
         self._poll_task: asyncio.Task | None = None
         self._bus_worker_task: asyncio.Task | None = None
         self._command_queue: asyncio.Queue[Rs485BusJob] = asyncio.Queue()
@@ -740,15 +889,27 @@ class Rs485Manager:
         await self.store.initialize()
         self.bus = await self.store.load_bus()
         self.devices = {device.id: device for device in await self.store.load_devices()}
+        # Older versions embedded the Modbus address in the display name (for
+        # example, ``MIO-8 #1``). Keep user-defined names intact, but migrate
+        # those generated names so the address has one explicit location in
+        # the identity block and device list.
+        for device in self.devices.values():
+            template = self.registry.get(device.template_id)
+            legacy_name = f"{template.model} #{device.slave_address}"
+            if device.name == legacy_name:
+                device.name = template.model
+                await self.store.save_device(device)
+        self.diagnostics = await self.store.load_diagnostics()
+        # Traffic capture is an explicit user action. Never resume it from a
+        # persisted session after the add-on restarts; keep the collected log
+        # and counters, but require Start for a new capture session.
+        for device_id, diagnostics in self.diagnostics.items():
+            diagnostics["paused"] = True
+            self.diagnostics_paused.add(device_id)
+            await self.store.save_diagnostics(device_id, diagnostics.copy())
         self._bus_worker_task = asyncio.create_task(self._bus_worker())
         await self.refresh()
         self._poll_task = asyncio.create_task(self._poll_loop())
-        self._append_scan_log(
-            str(self.bus.get("serial_port") or ""),
-            0,
-            "poll-start",
-            f"Polling task started in {'mock' if self._bus_is_mock(self.bus) else 'real'} mode",
-        )
 
     async def stop(self) -> None:
         await self.stop_scan()
@@ -773,7 +934,146 @@ class Rs485Manager:
 
     async def stop_scan(self) -> dict[str, Any]:
         self.scan_state["stop_requested"] = True
+        if self._scan_stop_event is not None:
+            self._scan_stop_event.set()
         return self.snapshot(status="RS-485: scan stop requested")
+
+    async def clear_scan_results(self) -> dict[str, Any]:
+        current_port = str(self.bus.get("serial_port") or "")
+        self.scanned = [item for item in self.scanned if item.get("serial_port") != current_port]
+        self.scan_errors = [item for item in self.scan_errors if item.get("serial_port") != current_port]
+        self.scan_log = [item for item in self.scan_log if item.get("serial_port") != current_port]
+        self.scan_state = {
+            "running": False,
+            "stop_requested": False,
+            "serial_port": current_port,
+            "template_id": self.scan_state.get("template_id"),
+            "current_address": None,
+            "scanned": 0,
+            "total": int(self.scan_state.get("total") or 255),
+            "found": 0,
+            "last_error": None,
+            "started_at": None,
+        }
+        return self.snapshot(status="RS-485: scan results cleared")
+
+    def _new_diagnostics(self) -> dict[str, Any]:
+        return {"entries": [], "errors": [], "sequence": 0, "total_requests": 0, "tx_count": 0, "rx_count": 0, "successful_responses": 0, "timeout_count": 0, "crc_errors": 0, "exception_count": 0, "malformed_count": 0, "wrong_slave_count": 0, "wrong_function_count": 0, "protocol_errors": 0, "consecutive_failures": 0, "latency_total_ms": 0, "latency_min_ms": None, "latency_max_ms": None, "last_success": None, "last_error": None, "last_valid_response_at": None, "possible_bus_conflict": False, "paused": True}
+
+    def _diagnostics_for(self, device_id: str) -> dict[str, Any]:
+        diagnostics = self.diagnostics.setdefault(device_id, self._new_diagnostics())
+        defaults = self._new_diagnostics()
+        for key, value in defaults.items():
+            diagnostics.setdefault(key, value)
+        if diagnostics.get("paused", True):
+            self.diagnostics_paused.add(device_id)
+        return diagnostics
+
+    def clear_device_diagnostics(self, device_id: str) -> dict[str, Any]:
+        self._device(device_id)
+        self.diagnostics[device_id] = self._new_diagnostics()
+        asyncio.create_task(self.store.save_diagnostics(device_id, self.diagnostics[device_id].copy()))
+        return self.snapshot(selected_id=device_id, status="RS-485: diagnostics log cleared")
+
+    def reset_device_diagnostic_counters(self, device_id: str) -> dict[str, Any]:
+        self._device(device_id)
+        diagnostics = self._diagnostics_for(device_id)
+        keep = {"entries": diagnostics.get("entries", []), "errors": diagnostics.get("errors", []), "sequence": diagnostics.get("sequence", 0), "paused": diagnostics.get("paused", True)}
+        fresh = self._new_diagnostics()
+        fresh.update(keep)
+        self.diagnostics[device_id] = fresh
+        asyncio.create_task(self.store.save_diagnostics(device_id, fresh.copy()))
+        return self.snapshot(selected_id=device_id, status="RS-485: diagnostic counters reset")
+
+    def set_device_diagnostics_paused(self, device_id: str, paused: bool) -> dict[str, Any]:
+        self._device(device_id)
+        diagnostics = self.diagnostics.setdefault(device_id, self._new_diagnostics())
+        diagnostics["paused"] = paused
+        if paused:
+            self.diagnostics_paused.add(device_id)
+        else:
+            self.diagnostics_paused.discard(device_id)
+        return self.snapshot(selected_id=device_id, status=f"RS-485: diagnostics {'paused' if paused else 'resumed'}")
+
+    def _record_diagnostic(
+        self,
+        device: Rs485Device,
+        result: str,
+        message: str,
+        started: float,
+        transaction_id: str | None = None,
+    ) -> None:
+        if device.id in self.diagnostics_paused:
+            return
+        diagnostics = self._diagnostics_for(device.id)
+        diagnostics["sequence"] += 1
+        transaction_id = transaction_id or f"{device.id}:{diagnostics['sequence']}"
+        if result == "scan":
+            diagnostics["total_requests"] += 1
+            diagnostics["tx_count"] += 1
+        response_ms = max(0, round((time.monotonic() - started) * 1000))
+        if result in {"response", "error"}:
+            diagnostics["latency_total_ms"] += response_ms
+            diagnostics["latency_min_ms"] = response_ms if diagnostics["latency_min_ms"] is None else min(diagnostics["latency_min_ms"], response_ms)
+            diagnostics["latency_max_ms"] = response_ms if diagnostics["latency_max_ms"] is None else max(diagnostics["latency_max_ms"], response_ms)
+        failed = result == "error"
+        lower_message = message.lower()
+        if failed:
+            category = classify_modbus_error(message)
+            diagnostics["timeout_count"] += int(category == "timeout")
+            diagnostics["protocol_errors"] += int(category == "protocol")
+            diagnostics["crc_errors"] += int(category == "crc")
+            diagnostics["exception_count"] += int(category == "exception")
+            diagnostics["malformed_count"] += int(category == "malformed")
+            diagnostics["wrong_slave_count"] += int(category == "wrong_slave")
+            diagnostics["wrong_function_count"] += int(category == "wrong_function")
+            diagnostics["possible_bus_conflict"] = diagnostics["possible_bus_conflict"] or any(token in lower_message for token in ("echo", "bus busy", "collision", "another master"))
+            diagnostics["consecutive_failures"] += 1
+            diagnostics["last_error"] = {"ts": datetime.now(timezone.utc).isoformat(), "message": message}
+        else:
+            if result == "response":
+                diagnostics["successful_responses"] += 1
+                diagnostics["rx_count"] += 1
+                diagnostics["last_valid_response_at"] = datetime.now(timezone.utc).isoformat()
+                diagnostics["last_success"] = {"ts": datetime.now(timezone.utc).isoformat(), "message": message}
+            diagnostics["consecutive_failures"] = 0
+        tx_hex = getattr(self.transport, "last_tx_hex", None)
+        rx_hex = getattr(self.transport, "last_rx_hex", None)
+        decoded = validate_modbus_frame(rx_hex or tx_hex, device.slave_address)
+        entry_ts = datetime.now(timezone.utc).isoformat()
+        diagnostics["entries"].append({
+            "seq": diagnostics["sequence"], "ts": datetime.now(timezone.utc).isoformat(), "result": result,
+            "slave_address": device.slave_address, "message": message,
+            "direction": "MASTER" if result == "scan" else "SLAVE", "function": message.split(" ", 1)[0],
+            "payload": rx_hex or tx_hex or "—", "bytes": len(bytes.fromhex((rx_hex or tx_hex or "").replace(" ", ""))) if (rx_hex or tx_hex) else 0,
+            "crc": "OK" if result != "error" else "—", "tx_hex": tx_hex, "rx_hex": rx_hex,
+            "response_ms": response_ms, "transaction_id": transaction_id,
+            "tx_ts": entry_ts if result == "scan" else None,
+            "rx_ts": entry_ts if result == "response" else None,
+            "decoded": decoded,
+        })
+        if result in {"response", "error"}:
+            for prior in reversed(diagnostics["entries"][:-1]):
+                if prior.get("transaction_id") == transaction_id and prior.get("result") == "scan":
+                    prior["rx_hex"] = rx_hex
+                    prior["rx_ts"] = entry_ts
+                    prior["response_ms"] = response_ms
+                    prior["pair_result"] = result
+                    prior["pair_message"] = message
+                    prior["rx_decoded"] = decoded
+                    break
+        if failed:
+            diagnostics["errors"].append({"ts": entry_ts, "message": message, "transaction_id": transaction_id})
+            diagnostics["errors"] = diagnostics["errors"][-RS485_DIAGNOSTICS_MAX_ERRORS:]
+        diagnostics["entries"] = diagnostics["entries"][-RS485_DIAGNOSTICS_MAX_ENTRIES:]
+        try:
+            # The entries/errors lists are mutated by subsequent bus events;
+            # persist an immutable-in-time snapshot so a quick page reload
+            # cannot observe a partially updated diagnostics record.
+            persisted = copy.deepcopy(diagnostics)
+            asyncio.create_task(self.store.save_diagnostics(device.id, persisted))
+        except RuntimeError:
+            pass
 
     async def _bus_worker(self) -> None:
         while True:
@@ -880,123 +1180,163 @@ class Rs485Manager:
         return self.snapshot(status=f"RS-485: deleted template {template_id}")
 
     async def save_bus(self, settings: dict[str, Any]) -> dict[str, Any]:
-        previous_bus = dict(self.bus)
-        self.bus = normalize_bus_settings(settings)
-        if hasattr(self.transport, "close_bus") and previous_bus != self.bus:
-            await self.transport.close_bus(previous_bus)
-        await self.store.save_bus(self.bus)
-        mode = "USB/Real" if self.bus.get("mode") == "usb_real" else ("mock" if self._bus_is_mock(self.bus) else "Modbus")
-        self.status = f"RS-485: {mode} on {self.bus['serial_port']}"
-        return self.snapshot(status=self.status)
+        self._command_pending += 1
+        try:
+            async with self._command_lock:
+                self._drop_pending_poll_jobs()
+                self._poll_due = {}
+                previous_bus = dict(self.bus)
+                self.bus = normalize_bus_settings(settings)
+                if previous_bus != self.bus:
+                    if hasattr(self.transport, "close_port"):
+                        await self.transport.close_port(str(previous_bus.get("serial_port") or ""))
+                        if previous_bus.get("serial_port") != self.bus.get("serial_port"):
+                            await self.transport.close_port(str(self.bus.get("serial_port") or ""))
+                    elif hasattr(self.transport, "close_bus"):
+                        await self.transport.close_bus(previous_bus)
+                await self.store.save_bus(self.bus)
+                mode = "USB/Real" if self.bus.get("mode") == "usb_real" else ("mock" if self._bus_is_mock(self.bus) else "Modbus")
+                self.status = f"RS-485: {mode} on {self.bus['serial_port']} {self.bus['baudrate']} {self.bus['parity']} {self.bus['stop_bits']} stop"
+                return self.snapshot(status=self.status)
+        finally:
+            self._command_pending = max(0, self._command_pending - 1)
 
     async def scan(self, settings: dict[str, Any]) -> dict[str, Any]:
-        bus = normalize_bus_settings(settings)
-        if not self._bus_is_mock(bus):
-            if self._scan_task and not self._scan_task.done():
-                return self.snapshot(status="RS-485: scan already running")
-            self._scan_task = asyncio.create_task(self._scan_impl(settings))
-            return self.snapshot(status="RS-485: scan started")
-        return await self._scan_impl(settings)
+        if self._scan_task and not self._scan_task.done():
+            return self.snapshot(status="RS-485: scan already running")
+        self._scan_stop_event = asyncio.Event()
+        # Mock discovery is deterministic and short; return its completed
+        # snapshot so API callers can immediately add a discovered device.
+        if self._bus_is_mock(normalize_bus_settings(settings)):
+            return await self._scan_impl(settings)
+        self._scan_task = asyncio.create_task(self._scan_impl(settings), name="rs485_scan")
+        return self.snapshot(status="RS-485: scan started")
 
     async def _scan_impl(self, settings: dict[str, Any]) -> dict[str, Any]:
-        self.bus = normalize_bus_settings(settings)
-        await self.store.save_bus(self.bus)
-        requested_template = str(settings.get("template_id") or "")
-        default_template = requested_template if requested_template in self.registry.templates else next(iter(self.registry.templates), "mio-8")
-        template = self.registry.get(default_template)
-        mock_bus = self._bus_is_mock(self.bus)
-        addresses = [1, 2] if mock_bus else template_slave_addresses(template)
-        scanned_count = len(addresses)
-        current_port = self.bus["serial_port"]
-        self.scanned = [item for item in self.scanned if item.get("serial_port") != current_port]
-        self.scan_errors = [item for item in self.scan_errors if item.get("serial_port") != current_port]
-        self.scan_log = [item for item in self.scan_log if item.get("serial_port") != current_port]
-        self.scan_state = {
-            "running": True,
-            "stop_requested": False,
-            "serial_port": current_port,
-            "template_id": default_template,
-            "current_address": None,
-            "scanned": 0,
-            "total": scanned_count,
-            "found": 0,
-            "last_error": None,
-        }
-        found_count = 0
-        stopped = False
+        self._command_pending += 1
+        stop_event = self._scan_stop_event
         try:
-            for found in addresses:
-                if self.scan_state.get("stop_requested"):
-                    stopped = True
-                    self._append_scan_log(current_port, found, "stopped", "Scan stopped by user")
-                    break
-                self.scan_state["current_address"] = found
-                scan_id = _device_id(current_port, found)
-                already = scan_id in self.devices
-                status = "Configured" if already else "Found"
-                confidence = "Mock match"
-                if not mock_bus:
-                    matched = await self.transport.probe(self.bus, template, found)
-                    tx_hex = getattr(self.transport, "last_tx_hex", None)
-                    rx_hex = getattr(self.transport, "last_rx_hex", None)
-                    rx_detail = getattr(self.transport, "last_rx_detail", None)
-                    if not matched:
-                        status = "No response"
-                        error = getattr(self.transport, "last_error", None) or "No supported response"
-                        confidence = error
-                        self.scan_state["last_error"] = error
-                        self._append_scan_log(
-                            current_port,
-                            found,
-                            "timeout",
-                            error,
-                            tx_hex=tx_hex,
-                            rx_hex=rx_hex,
-                            rx_detail=rx_detail,
-                        )
-                        if len(self.scan_errors) < 8:
-                            self.scan_errors.append(
-                                {
-                                    "serial_port": current_port,
-                                    "slave_address": found,
-                                    "template_id": default_template,
-                                    "error": error,
-                                }
+            self._drop_pending_poll_jobs()
+            self.bus = normalize_bus_settings(settings)
+            await self.store.save_bus(self.bus)
+            requested_template = str(settings.get("template_id") or "")
+            default_template = requested_template if requested_template in self.registry.templates else next(iter(self.registry.templates), "mio-8")
+            template = self.registry.get(default_template)
+            mock_bus = self._bus_is_mock(self.bus)
+            addresses = [1, 2] if mock_bus else template_slave_addresses(template)
+            scanned_count = len(addresses)
+            current_port = self.bus["serial_port"]
+            self.scanned = [item for item in self.scanned if item.get("serial_port") != current_port]
+            self.scan_errors = [item for item in self.scan_errors if item.get("serial_port") != current_port]
+            self.scan_log = [item for item in self.scan_log if item.get("serial_port") != current_port]
+            self.scan_state = {
+                "running": True,
+                "stop_requested": False,
+                "serial_port": current_port,
+                "template_id": default_template,
+                "current_address": None,
+                "scanned": 0,
+                "total": scanned_count,
+                "found": 0,
+                "last_error": None,
+                "started_at": datetime.now(timezone.utc).isoformat(),
+            }
+            self._append_scan_log(
+                current_port,
+                0,
+                "started",
+                f"Starting scan on {current_port} ({self.bus['baudrate']}, {self.bus['parity'].capitalize()}, {self.bus['stop_bits']}) - addresses 1 - {scanned_count}",
+            )
+            found_count = 0
+            stopped = False
+            try:
+                for found in addresses:
+                    if self.scan_state.get("stop_requested") or (stop_event is not None and stop_event.is_set()):
+                        stopped = True
+                        self._append_scan_log(current_port, found, "stopped", "Scan stopped by user")
+                        break
+                    self.scan_state["current_address"] = found
+                    scan_id = _device_id(current_port, found)
+                    already = scan_id in self.devices
+                    status = "Configured" if already else "Found"
+                    confidence = "Mock match"
+                    if not mock_bus:
+                        matched = await self.transport.probe(self.bus, template, found)
+                        tx_hex = getattr(self.transport, "last_tx_hex", None)
+                        rx_hex = getattr(self.transport, "last_rx_hex", None)
+                        rx_detail = getattr(self.transport, "last_rx_detail", None)
+                        if not matched:
+                            status = "No response"
+                            error = getattr(self.transport, "last_error", None) or "No supported response"
+                            confidence = error
+                            self.scan_state["last_error"] = error
+                            self._append_scan_log(
+                                current_port,
+                                found,
+                                "timeout",
+                                error,
+                                tx_hex=tx_hex,
+                                rx_hex=rx_hex,
+                                rx_detail=rx_detail,
                             )
-                        if is_fatal_scan_error(error):
-                            break
+                            if len(self.scan_errors) < 8:
+                                self.scan_errors.append(
+                                    {
+                                        "serial_port": current_port,
+                                        "slave_address": found,
+                                        "template_id": default_template,
+                                        "error": error,
+                                    }
+                                )
+                            if is_fatal_scan_error(error):
+                                break
+                        else:
+                            confidence = "Template probe"
+                            self._append_scan_log(
+                                current_port,
+                                found,
+                                "matched",
+                                rx_detail or "Template probe",
+                                tx_hex=tx_hex,
+                                rx_hex=rx_hex,
+                                rx_detail=rx_detail,
+                            )
                     else:
-                        confidence = "Template probe"
                         self._append_scan_log(
                             current_port,
                             found,
                             "matched",
-                            rx_detail or "Template probe",
-                            tx_hex=tx_hex,
-                            rx_hex=rx_hex,
-                            rx_detail=rx_detail,
+                            f"Found device at address {found}",
+                            rx_detail=f"{template.model} ({template.template_id})",
                         )
-                if not mock_bus and status == "No response":
+                    if not mock_bus and status == "No response":
+                        self.scan_state["scanned"] = int(self.scan_state.get("scanned") or 0) + 1
+                        continue
+                    self.scanned.append(
+                        {
+                            "id": scan_id,
+                            "serial_port": current_port,
+                            "slave_address": found,
+                            "template_id": default_template,
+                            "baudrate": int(self.bus.get("baudrate") or 9600),
+                            "parity": str(self.bus.get("parity") or "none"),
+                            "stop_bits": int(self.bus.get("stop_bits") or 1),
+                            "status": status,
+                            "confidence": confidence,
+                            "configured": already,
+                        }
+                    )
+                    found_count += 1
+                    self.scan_state["found"] = found_count
                     self.scan_state["scanned"] = int(self.scan_state.get("scanned") or 0) + 1
-                    continue
-                self.scanned.append(
-                    {
-                        "id": scan_id,
-                        "serial_port": current_port,
-                        "slave_address": found,
-                        "template_id": default_template,
-                        "status": status,
-                        "confidence": confidence,
-                        "configured": already,
-                    }
-                )
-                found_count += 1
-                self.scan_state["found"] = found_count
-                self.scan_state["scanned"] = int(self.scan_state.get("scanned") or 0) + 1
+            finally:
+                self.scan_state["running"] = False
+                self.scan_state["stop_requested"] = False
+                self.scan_state["current_address"] = None
+                if stop_event is self._scan_stop_event:
+                    self._scan_stop_event = None
         finally:
-            self.scan_state["running"] = False
-            self.scan_state["stop_requested"] = False
-            self.scan_state["current_address"] = None
+            self._command_pending = max(0, self._command_pending - 1)
         mode = "mock scan" if mock_bus else "scan"
         if stopped:
             self.status = f"RS-485: {mode} stopped after {self.scan_state.get('scanned', 0)} address(es), found {found_count} result(s) on {current_port}"
@@ -1004,6 +1344,7 @@ class Rs485Manager:
         if found_count:
             self.scan_errors = [item for item in self.scan_errors if item.get("serial_port") != current_port]
             self.status = f"RS-485: {mode} scanned {scanned_count} address(es), found {found_count} result(s) on {current_port}"
+            self._append_scan_log(current_port, int(self.scan_state.get("scanned") or scanned_count), "progress", f"Scanning... {self.scan_state.get('scanned', scanned_count)} / {scanned_count} addresses ({found_count} devices found)")
             return self.snapshot(status=self.status)
         suffix = f": {self.scan_errors[0]['error']}" if self.scan_errors else ""
         self.status = f"RS-485: {mode} scanned {scanned_count} address(es), found 0 result(s) on {current_port}{suffix}"
@@ -1032,44 +1373,68 @@ class Rs485Manager:
                 "message": message,
             }
         )
-        if len(self.scan_log) > 300:
-            self.scan_log = self.scan_log[-300:]
+        if len(self.scan_log) > 512:
+            self.scan_log = self.scan_log[-512:]
 
     async def add_device(self, scan_id: str) -> dict[str, Any]:
-        scan = next((item for item in self.scanned if item["id"] == scan_id), None)
-        if scan is None:
-            raise ValueError("scan result not found")
-        if scan_id in self.devices:
-            raise ValueError("device already configured")
-        if scan.get("status") == "No response":
-            raise ValueError("device did not respond")
-        template = self.registry.get(scan["template_id"])
-        values = default_values_for_template(template)
-        if "device_address" in values:
-            values["device_address"] = int(scan["slave_address"])
-        if "device_baudrate" in values:
-            values["device_baudrate"] = int(self.bus["baudrate"])
-        if "device_parity" in values:
-            values["device_parity"] = str(self.bus["parity"])
-        device = Rs485Device(
-            id=scan_id,
-            name=f"{template.model} #{scan['slave_address']}",
-            template_id=template.template_id,
-            serial_port=scan["serial_port"],
-            baudrate=int(self.bus["baudrate"]),
-            parity=str(self.bus["parity"]),
-            stop_bits=int(self.bus["stop_bits"]),
-            slave_address=int(scan["slave_address"]),
-            values=values,
-            runtime=runtime_state_for_template(template, online=True),
-        )
-        if not self._device_is_mock(device):
+        LOGGER.info("RS-485 add requested: scan_id=%s running=%s scanned=%s devices=%s", scan_id, bool(self._scan_task and not self._scan_task.done()), len(self.scanned), len(self.devices))
+        self._command_pending += 1
+        try:
+            self._drop_pending_poll_jobs()
+            scan = next((item for item in self.scanned if item["id"] == scan_id), None)
+            if scan is None:
+                LOGGER.warning("RS-485 add rejected: scan result not found: %s", scan_id)
+                raise ValueError("scan result not found")
+            if self._scan_task and not self._scan_task.done():
+                self.scan_state["stop_requested"] = True
+            async with self._command_lock:
+                if scan_id in self.devices:
+                    raise ValueError("device already configured")
+                if scan.get("status") == "No response":
+                    raise ValueError("device did not respond")
+                template = self.registry.get(scan["template_id"])
+                values = default_values_for_template(template)
+                if "device_address" in values:
+                    values["device_address"] = int(scan["slave_address"])
+                if "device_baudrate" in values:
+                    values["device_baudrate"] = int(self.bus["baudrate"])
+                if "device_parity" in values:
+                    values["device_parity"] = str(self.bus["parity"])
+                device = Rs485Device(
+                    id=scan_id,
+                    name=template.model,
+                    template_id=template.template_id,
+                    serial_port=scan["serial_port"],
+                    baudrate=int(self.bus["baudrate"]),
+                    parity=str(self.bus["parity"]),
+                    stop_bits=int(self.bus["stop_bits"]),
+                    slave_address=int(scan["slave_address"]),
+                    values=values,
+                    runtime=runtime_state_for_template(template, online=True),
+                )
+                self.devices[device.id] = device
+                await self.store.save_device(device)
+                self.scanned = [item for item in self.scanned if item["id"] != scan_id]
+                LOGGER.info("RS-485 add committed: device_id=%s remaining_scanned=%s devices=%s", device.id, len(self.scanned), len(self.devices))
+                if not self._device_is_mock(device):
+                    asyncio.create_task(
+                        self._hydrate_added_device(device, template),
+                        name=f"rs485_hydrate_{device.id}",
+                    )
+                return self.snapshot(selected_id=device.id, status=f"RS-485: configured {device.name}")
+        finally:
+            self._command_pending = max(0, self._command_pending - 1)
+
+    async def _hydrate_added_device(self, device: Rs485Device, template: Rs485Template) -> None:
+        try:
             await self._read_device_values(device, template, log_transport=True, log_result="add", priority="command")
             mark_device_runtime(device, template, None, success=True, group_id="settings")
-        self.devices[device.id] = device
-        await self.store.save_device(device)
-        self.scanned = [item for item in self.scanned if item["id"] != scan_id]
-        return self.snapshot(selected_id=device.id, status=f"RS-485: configured {device.name}")
+        except Exception as exc:
+            mark_device_runtime(device, template, str(exc), success=False, group_id="settings")
+        try:
+            await self.store.save_device(device)
+        except Exception:
+            pass
 
     async def remove_device(self, device_id: str) -> dict[str, Any]:
         if device_id not in self.devices:
@@ -1077,6 +1442,17 @@ class Rs485Manager:
         del self.devices[device_id]
         await self.store.delete_device(device_id)
         return self.snapshot(status="RS-485: configured device removed")
+
+    async def rename_device(self, device_id: str, name: str) -> dict[str, Any]:
+        device = self._device(device_id)
+        normalized = " ".join(str(name or "").split())
+        if not normalized:
+            raise ValueError("device name must not be empty")
+        if len(normalized) > 80:
+            raise ValueError("device name is too long")
+        device.name = normalized
+        await self.store.save_device(device)
+        return self.snapshot(selected_id=device.id, status=f"RS-485: renamed {device.name}")
 
     async def set_capability(self, device_id: str, capability_id: str, value: Any) -> dict[str, Any]:
         self._command_pending += 1
@@ -1097,40 +1473,67 @@ class Rs485Manager:
                     point = template.points.get(str(capability.get("source")))
                     if point is None:
                         raise ValueError("capability point not found")
+                    bus = self._effective_device_bus(device)
+                    write_started = time.monotonic()
+                    write_function = int(point.get("write_function") or (0x05 if point.get("table") == "coil" else 0x06))
+                    write_transaction_id = f"{device.id}:{int(write_started * 1000)}"
+                    self._record_diagnostic(device, "scan", f"Write FC{write_function:02d} {capability_id}", write_started, write_transaction_id)
                     try:
-                        await self._write_point(device_bus(device), point, device.slave_address, normalized, "command")
+                        await self._write_point(bus, point, device.slave_address, normalized, "command")
+                        self._record_diagnostic(device, "response", f"Write FC{write_function:02d} {capability_id}", write_started, write_transaction_id)
                         self._append_transport_log(device, "write", f"{capability_id}={normalized}")
                         if capability.get("type") != "switch" and not communication_setting:
-                            normalized = await self._read_point(device_bus(device), point, device.slave_address, "command")
+                            normalized = await self._read_point(bus, point, device.slave_address, "command")
                             self._append_transport_log(device, "readback", f"{capability_id}={normalized}")
                     except Exception as exc:
-                        self._append_transport_log(device, "error", f"{capability_id}: {exc}")
-                        raise
+                        error = str(exc)
+                        self._record_diagnostic(device, "error", f"Write FC{write_function:02d} {capability_id}: {error}", write_started, write_transaction_id)
+                        self._append_transport_log(device, "error", f"{capability_id}: {error}")
+                        if communication_setting:
+                            self._append_transport_log(device, "write-pending", f"{capability_id}={normalized}; device may have switched communication settings")
+                            if hasattr(self.transport, "close_port"):
+                                await self.transport.close_port(device.serial_port)
+                            elif hasattr(self.transport, "close_bus"):
+                                await self.transport.close_bus(bus)
+                        else:
+                            device.values[f"{capability_id}__error"] = error
+                            mark_device_runtime(device, template, capability, success=False, error=error)
+                            device.runtime["online"] = False
+                            device.runtime["communication_status"] = "OFFLINE"
+                            if hasattr(self.transport, "close_port"):
+                                await self.transport.close_port(device.serial_port)
+                            elif hasattr(self.transport, "close_bus"):
+                                await self.transport.close_bus(bus)
+                            await self.store.save_device(device)
+                            return self.snapshot(selected_id=device.id, status=f"RS-485: {capability.get('name', capability_id)} failed: {error}")
                 device.values[capability_id] = normalized
+                device.values.pop(f"{capability_id}__error", None)
                 mark_device_runtime(device, template, capability, success=True)
                 old_device_id = device.id
                 old_bus = device_bus(device)
                 if capability_id == "device_address":
+                    was_generated_name = device.name == f"{template.model} #{device.slave_address}"
                     next_address = int(normalized)
                     device.slave_address = next_address
                     device.id = _device_id(device.serial_port, next_address)
-                    device.name = f"{template.model} #{next_address}"
+                    if was_generated_name:
+                        device.name = template.model
                 elif capability_id == "device_baudrate":
                     device.baudrate = int(normalized)
                     normalized = device.baudrate
                     device.values[capability_id] = normalized
-                    if self.bus.get("serial_port") == device.serial_port:
-                        self.bus["baudrate"] = device.baudrate
-                        await self.store.save_bus(self.bus)
-                    if hasattr(self.transport, "close_bus"):
+                    if hasattr(self.transport, "close_port"):
+                        await self.transport.close_port(device.serial_port)
+                    elif hasattr(self.transport, "close_bus"):
                         await self.transport.close_bus(old_bus)
+                    await asyncio.sleep(0.2)
                 elif capability_id == "device_parity":
                     device.parity = str(normalized)
-                    if self.bus.get("serial_port") == device.serial_port:
-                        self.bus["parity"] = device.parity
-                        await self.store.save_bus(self.bus)
-                    if hasattr(self.transport, "close_bus"):
+                    if hasattr(self.transport, "close_port"):
+                        await self.transport.close_port(device.serial_port)
+                    elif hasattr(self.transport, "close_bus"):
                         await self.transport.close_bus(old_bus)
+                    await asyncio.sleep(0.2)
                 self.devices.pop(device_id, None)
                 if old_device_id != device_id:
                     self.devices.pop(old_device_id, None)
@@ -1138,7 +1541,11 @@ class Rs485Manager:
                 await self.store.save_device(device)
                 if device.id != device_id:
                     await self.store.delete_device(device_id)
-                return self.snapshot(selected_id=device.id, status=f"RS-485: updated {capability.get('name', capability_id)}")
+                name = capability.get("name", capability_id)
+                if capability.get("type") == "switch":
+                    state = "ON" if bool(normalized) else "OFF"
+                    return self.snapshot(selected_id=device.id, status=f"RS-485: {name} {state}")
+                return self.snapshot(selected_id=device.id, status=f"RS-485: updated {name}")
         finally:
             self._command_pending = max(0, self._command_pending - 1)
 
@@ -1203,8 +1610,11 @@ class Rs485Manager:
         now = time.monotonic()
         if self._command_lock.locked() or self._command_pending:
             return
+        active_serial_port = str(self.bus.get("serial_port") or "")
         for device in list(self.devices.values()):
             if not device.enabled:
+                continue
+            if str(device.serial_port) != active_serial_port:
                 continue
             template = self.registry.get(device.template_id)
             for group_id, interval_seconds in poll_intervals_seconds(template, device.polling).items():
@@ -1216,8 +1626,9 @@ class Rs485Manager:
                     if self._command_pending:
                         return
                     if not self._device_is_mock(device):
-                        self._append_scan_log(device.serial_port, device.slave_address, "poll-start", group_id)
-                        await self._read_device_values(device, template, poll_group=group_id, log_transport=True, log_result="poll", priority="poll")
+                        # Live state polling updates device values/runtime only. It must
+                        # not flood the user-facing scan log with successful heartbeats.
+                        await self._read_device_values(device, template, poll_group=group_id, log_transport=False, log_result="poll", priority="poll")
                     if not device.enabled:
                         continue
                     mark_device_runtime(device, template, None, success=True, group_id=group_id)
@@ -1241,15 +1652,24 @@ class Rs485Manager:
         template = self.registry.get(device.template_id)
         device.enabled = enabled
         if enabled:
-            device.runtime = runtime_state_for_template(template, online=True, polling=device.polling)
+            # Enabling polling does not prove reachability, but it must not
+            # erase the last known health/value state. Queue an immediate
+            # probe; the response will decide ONLINE/OFFLINE.
+            runtime = device.runtime or runtime_state_for_template(template, online=None, polling=device.polling)
+            runtime["polling"] = "live" if self._device_is_mock(device) else "starting"
+            runtime["last_error"] = None
+            device.runtime = runtime
+            self._poll_due = {key: value for key, value in self._poll_due.items() if key[0] != device.id}
+            self._poll_due.update({(device.id, group_id): 0.0 for group_id in poll_intervals_seconds(template, device.polling)})
         else:
-            runtime = device.runtime or runtime_state_for_template(template, online=True, polling=device.polling)
+            runtime = device.runtime or runtime_state_for_template(template, online=None, polling=device.polling)
             runtime["polling"] = "paused"
             runtime["last_error"] = None
             for group in runtime.get("groups", {}).values():
                 if group.get("mode") != "on_demand":
                     group["status"] = "paused"
             device.runtime = runtime
+            self._poll_due = {key: value for key, value in self._poll_due.items() if key[0] != device.id}
         await self.store.save_device(device)
         return self.snapshot(selected_id=device.id, status=f"RS-485: polling {'enabled' if enabled else 'disabled'} for {device.name}")
 
@@ -1257,25 +1677,40 @@ class Rs485Manager:
         device = self._device(device_id)
         template = self.registry.get(device.template_id)
         device.polling = normalize_polling_settings(settings)
-        device.runtime = runtime_state_for_template(template, online=device.enabled, polling=device.polling)
+        old_runtime = device.runtime or runtime_state_for_template(template, online=None, polling=device.polling)
+        fresh_groups = runtime_state_for_template(template, online=None, polling=device.polling)["groups"]
+        old_runtime["groups"] = fresh_groups
+        if device.enabled:
+            old_runtime["polling"] = old_runtime.get("polling") if old_runtime.get("polling") not in {"paused", "offline"} else "starting"
+        else:
+            old_runtime["polling"] = "paused"
+        device.runtime = old_runtime
         self._poll_due = {key: value for key, value in self._poll_due.items() if key[0] != device.id}
+        if device.enabled:
+            self._poll_due.update({(device.id, group_id): 0.0 for group_id in poll_intervals_seconds(template, device.polling)})
         await self.store.save_device(device)
         return self.snapshot(selected_id=device.id, status=f"RS-485: polling settings updated for {device.name}")
 
     def snapshot(self, selected_id: str | None = None, status: str | None = None) -> dict[str, Any]:
+        # Successful background polling is not scan activity and does not belong
+        # in the user-facing scan log. Filter legacy entries from older sessions too.
+        self.scan_log = [entry for entry in self.scan_log if entry.get("result") not in {"poll", "poll-start"}]
         templates = self.templates_snapshot()
         devices = []
         for device in sorted(self.devices.values(), key=lambda item: (item.serial_port, item.slave_address)):
             template = self.registry.templates.get(device.template_id)
             if template is not None and not device.runtime:
-                device.runtime = runtime_state_for_template(template, online=True, polling=device.polling)
-            devices.append({**device.snapshot(), "mock": self._device_is_mock(device)})
+                device.runtime = runtime_state_for_template(template, online=self._device_is_mock(device), polling=device.polling)
+            diagnostics = self._diagnostics_for(device.id)
+            device_snapshot = device.snapshot()
+            device_snapshot["identity"] = device_identity_snapshot(template, device)
+            devices.append({**device_snapshot, "mock": self._device_is_mock(device), "diagnostics": {**diagnostics, "paused": device.id in self.diagnostics_paused}})
         current_port_devices = [device for device in devices if device["serial_port"] == self.bus["serial_port"]]
         effective_mode = "mock" if self._bus_is_mock(self.bus) else "usb_real" if self.bus.get("mode") == "usb_real" else "modbus"
         default_status = (
             "RS-485: template-driven mock"
             if effective_mode == "mock"
-            else f"RS-485: {'USB/Real' if effective_mode == 'usb_real' else 'Modbus'} on {self.bus['serial_port']}"
+            else f"RS-485: {'USB/Real' if effective_mode == 'usb_real' else 'Modbus'} on {self.bus['serial_port']} {self.bus['baudrate']} {self.bus['parity']} {self.bus['stop_bits']} stop"
         )
         stale_mock_status = self.status == "RS-485: template-driven mock" and effective_mode != "mock"
         return {
@@ -1314,6 +1749,15 @@ class Rs485Manager:
             raise ValueError("device not found")
         return device
 
+    def _effective_device_bus(self, device: Rs485Device) -> dict[str, Any]:
+        bus = device_bus(device)
+        if str(self.bus.get("serial_port") or "") == str(device.serial_port):
+            bus["baudrate"] = int(self.bus.get("baudrate") or bus["baudrate"])
+            bus["parity"] = str(self.bus.get("parity") or bus["parity"])
+            bus["stop_bits"] = int(self.bus.get("stop_bits") or bus["stop_bits"])
+            bus["mode"] = str(self.bus.get("mode") or bus.get("mode") or "mock")
+        return bus
+
     async def _read_device_values(
         self,
         device: Rs485Device,
@@ -1323,7 +1767,7 @@ class Rs485Manager:
         log_result: str = "read",
         priority: str = "command",
     ) -> None:
-        bus = device_bus(device)
+        bus = self._effective_device_bus(device)
         items: list[tuple[str, dict[str, Any]]] = []
         for capability_id, capability in normalized_capabilities(template).items():
             source = capability.get("source")
@@ -1333,7 +1777,9 @@ class Rs485Manager:
             if point is None or point.get("access") not in {"read", "read_write"}:
                 continue
             resolved_poll_group = point_poll_group(point, capability)
-            if poll_group is not None and resolved_poll_group != poll_group:
+            # Keep the old manual/API `state` selector working while the
+            # template uses separate fast input and output groups.
+            if poll_group is not None and not (poll_group == "state" and resolved_poll_group in {"inputs", "outputs"}) and resolved_poll_group != poll_group:
                 continue
             if log_result == "poll" and self._command_pending:
                 self._append_scan_log(device.serial_port, device.slave_address, "poll-preempt", "command pending")
@@ -1341,20 +1787,42 @@ class Rs485Manager:
             items.append((capability_id, {**point, "poll_group": resolved_poll_group}))
         if not items:
             return
-        try:
-            values = await self._read_points(bus, items, device.slave_address, priority)
-            for capability_id, value in values.items():
-                device.values[capability_id] = value
-                device.values.pop(f"{capability_id}__error", None)
-            if log_transport:
-                self._append_transport_log(device, log_result, f"{len(values)}/{len(items)} point(s)")
-        except RuntimeError as exc:
-            error = str(exc)
-            if log_transport:
-                self._append_transport_log(device, "error", f"{poll_group or 'all'}: {error}")
-            for capability_id, _point in items:
-                device.values[f"{capability_id}__error"] = error
-            raise
+        # Keep independent Modbus tables independent. A failed relay read (FC01)
+        # must not prevent the digital-input read (FC02) from reaching the device.
+        batches: list[list[tuple[str, dict[str, Any]]]] = []
+        for table in ("discrete_input", "coil", "holding_register", "input_register"):
+            batch = [item for item in items if item[1].get("table") == table]
+            if batch:
+                batches.append(batch)
+        values: dict[str, Any] = {}
+        errors: list[tuple[list[tuple[str, dict[str, Any]]], RuntimeError]] = []
+        for batch in batches:
+            started = time.monotonic()
+            transaction_id = f"{device.id}:{int(started * 1000)}"
+            function = str(batch[0][1].get("function") or batch[0][1].get("table") or "read")
+            self._record_diagnostic(device, "scan", f"Read {function} ({len(batch)} point(s))", started, transaction_id)
+            try:
+                batch_values = await self._read_points(bus, batch, device.slave_address, priority)
+                self._record_diagnostic(device, "response", f"Read {function} ({len(batch_values)} point(s))", started, transaction_id)
+                values.update(batch_values)
+                for capability_id, value in batch_values.items():
+                    device.values[capability_id] = value
+                    device.values.pop(f"{capability_id}__error", None)
+            except RuntimeError as exc:
+                errors.append((batch, exc))
+                error = str(exc)
+                self._record_diagnostic(device, "error", error, started, transaction_id)
+                for capability_id, _point in batch:
+                    device.values[f"{capability_id}__error"] = error
+                if log_transport:
+                    self._append_transport_log(device, "error", f"{poll_group or 'all'}: {error}")
+        sync_device_settings_from_values(device)
+        if log_transport and values:
+            self._append_transport_log(device, log_result, f"{len(values)}/{len(items)} point(s)")
+        if errors:
+            # Partial values may remain visible, but a failed required table
+            # means this poll did not confirm that the device is reachable.
+            raise errors[0][1]
 
     def _append_transport_log(self, device: Rs485Device, result: str, message: str) -> None:
         self._append_scan_log(
@@ -1370,19 +1838,25 @@ class Rs485Manager:
 
 def runtime_state_for_template(
     template: Rs485Template | None = None,
-    online: bool = True,
+    online: bool | None = None,
     polling: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     now = _now_iso()
     groups: dict[str, dict[str, Any]] = {}
     for group_id, group in effective_polling_config(polling).items():
         groups[group_id] = _runtime_group(group, now)
+    communication_status = "ONLINE" if online is True else "OFFLINE" if online is False else "UNKNOWN"
     return {
         "online": online,
+        "communication_status": communication_status,
         "polling": "live" if online else "offline",
         "last_update": now if online else None,
         "last_seen": now if online else None,
         "last_error": None,
+        "availability_failures": 0,
+        "availability_successes": 0,
+        "availability_failure_started_at": None,
+        "availability_failure_seconds": 0.0,
         "groups": groups,
     }
 
@@ -1398,7 +1872,32 @@ def mark_device_runtime(
 ) -> None:
     runtime = device.runtime or runtime_state_for_template(template, online=success, polling=device.polling)
     now = _now_iso()
-    runtime["online"] = success
+    failures = int(runtime.get("availability_failures") or 0)
+    successes = int(runtime.get("availability_successes") or 0)
+    if success:
+        failures = 0
+        successes += 1
+        runtime["availability_failure_started_at"] = None
+        runtime["availability_failure_seconds"] = 0.0
+        if successes >= RS485_ONLINE_AFTER_SUCCESSES:
+            runtime["online"] = True
+            runtime["communication_status"] = "ONLINE"
+    else:
+        successes = 0
+        failures += 1
+        failure_started_at = runtime.get("availability_failure_started_at")
+        if not isinstance(failure_started_at, (int, float)):
+            failure_started_at = time.time()
+            runtime["availability_failure_started_at"] = failure_started_at
+        # Use elapsed wall time for the externally observable availability
+        # contract. Poll frequency only affects how quickly this is noticed.
+        failure_elapsed = max(0.0, time.time() - failure_started_at)
+        runtime["availability_failure_seconds"] = round(failure_elapsed, 3)
+        if failure_elapsed >= RS485_OFFLINE_AFTER_SECONDS:
+            runtime["online"] = False
+            runtime["communication_status"] = "OFFLINE"
+    runtime["availability_failures"] = failures
+    runtime["availability_successes"] = successes
     runtime["polling"] = "live" if success else "error"
     runtime["last_update"] = now
     if success:
@@ -1407,8 +1906,6 @@ def mark_device_runtime(
     else:
         runtime["last_error"] = error or "polling error"
     group_id = group_id or (str(capability.get("group")) if capability else "state")
-    if group_id in {"outputs", "inputs"}:
-        group_id = "state"
     if group_id == "control_modes":
         group_id = "settings"
     if group_id == "device_settings":
@@ -1456,7 +1953,14 @@ def poll_intervals_seconds(
 
 def effective_polling_config(polling: dict[str, Any] | None = None) -> dict[str, dict[str, Any]]:
     result = {group_id: dict(group) for group_id, group in RS485_DEFAULT_POLLING.items()}
-    for group_id, group in (polling or {}).items():
+    incoming_polling = dict(polling or {})
+    # Migrate the pre-separated `state` setting without changing the public
+    # API shape used by existing devices. Explicit new groups always win.
+    legacy_state = incoming_polling.get("state")
+    if isinstance(legacy_state, dict):
+        for group_id in ("inputs", "outputs"):
+            incoming_polling.setdefault(group_id, dict(legacy_state))
+    for group_id, group in incoming_polling.items():
         if group_id not in result or not isinstance(group, dict):
             continue
         merged = dict(result[group_id])
@@ -1487,14 +1991,14 @@ def point_poll_group(point: dict[str, Any], capability: dict[str, Any]) -> str:
         return "settings" if explicit_group == "modes" else explicit_group
     group = str(capability.get("group") or "")
     if group in {"outputs", "inputs"}:
-        return "state"
+        return group
     if group == "control_modes":
         return "settings"
     if group in {"device_settings", "diagnostics"}:
         return "settings"
     table = str(point.get("table") or "")
     if table in {"coil", "discrete_input"}:
-        return "state"
+        return "outputs" if table == "coil" else "inputs"
     if table in {"holding_register", "input_register"}:
         return "settings"
     return "state"
@@ -1548,10 +2052,7 @@ def default_bus_settings() -> dict[str, Any]:
 
 
 def serial_port_options() -> list[dict[str, str]]:
-    options: list[dict[str, str]] = [
-        {"value": "/dev/ttyAMA3", "label": "RS-485 CH1 (/dev/ttyAMA3)"},
-        {"value": "/dev/ttyAMA5", "label": "RS-485 CH2 (/dev/ttyAMA5)"},
-    ]
+    options: list[dict[str, str]] = []
     seen = {option["value"] for option in options}
     if list_ports is not None:
         try:
@@ -1609,6 +2110,25 @@ def device_bus(device: Rs485Device) -> dict[str, Any]:
         "stop_bits": device.stop_bits,
         "slave_address": device.slave_address,
     }
+
+
+def device_identity_snapshot(template: Rs485Template, device: Rs485Device) -> dict[str, Any]:
+    """Resolve template identity without inventing unavailable device data."""
+    configured = template.identity or {}
+    identity: dict[str, Any] = {}
+    for field_name in ("manufacturer", "model", "hardware_version", "serial_number"):
+        value = configured.get(field_name)
+        if isinstance(value, str) and value.strip():
+            identity[field_name] = value.strip()
+    firmware = configured.get("firmware_version")
+    if isinstance(firmware, dict):
+        ref = firmware.get("register_ref")
+        value = device.values.get(ref) if isinstance(ref, str) else None
+        if value is not None and value != "":
+            identity["firmware_version"] = value
+    elif isinstance(firmware, str) and firmware.strip():
+        identity["firmware_version"] = firmware.strip()
+    return identity
 
 
 def normalize_bus_settings(settings: dict[str, Any]) -> dict[str, Any]:
@@ -1669,6 +2189,25 @@ def default_values_for_template(template: Rs485Template) -> dict[str, Any]:
     if "device_address" in values:
         values["device_address"] = 1
     return values
+
+
+def sync_device_settings_from_values(device: Rs485Device) -> None:
+    if "device_baudrate" in device.values:
+        try:
+            device.baudrate = int(device.values["device_baudrate"])
+        except (TypeError, ValueError):
+            pass
+    if "device_parity" in device.values:
+        parity = str(device.values["device_parity"]).lower()
+        if parity in {"none", "even", "odd"}:
+            device.parity = parity
+    if "device_address" in device.values:
+        try:
+            address = int(device.values["device_address"])
+        except (TypeError, ValueError):
+            return
+        if 1 <= address <= 247:
+            device.slave_address = address
 
 
 def normalize_capability_value(capability: dict[str, Any], value: Any) -> Any:
