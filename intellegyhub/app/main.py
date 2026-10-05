@@ -233,7 +233,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.182 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.183 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -284,7 +284,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.182", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.183", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -697,10 +697,12 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       --rs485-label-height: 16px;
       --rs485-control-height: 42px;
       display: grid;
-      grid-template-columns: minmax(220px, 1.25fr) minmax(170px, 1.05fr) repeat(3, minmax(120px, .78fr)) minmax(150px, 1fr) auto;
+      grid-template-columns: minmax(160px, 1.35fr) minmax(140px, 1.1fr) minmax(108px, .72fr) minmax(96px, .62fr) minmax(88px, .56fr) minmax(130px, 1fr) auto;
       gap: 16px;
       align-items: end;
     }
+    .rs485-toolbar > * { min-width: 0; }
+    .rs485-toolbar .rs485-connection-intro { min-width: 0; }
     .rs485-toolbar + .rs485-layout { margin-top: 18px; }
     .rs485-field {
       min-width: 0;
@@ -813,6 +815,13 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .rs485-device-list-head, .rs485-table-row.configured { display: grid; grid-template-columns: 24px minmax(0, 1.35fr) 42px minmax(84px, 1.1fr) 78px; align-items: center; gap: 8px; }
     .rs485-table-row.configured > * { min-width: 0; }
     .rs485-table-row.configured.discovered { grid-template-columns: 24px minmax(0, 1.25fr) 42px minmax(84px, 1.1fr) 78px auto; }
+    .rs485-table-row.configured.discovered { grid-template-columns: 20px minmax(0, 1.1fr) 32px minmax(72px, 1fr) 68px 52px; gap: 6px; padding: 6px 8px; min-height: 40px; font-size: 11px; }
+    .rs485-table-row.configured.discovered .rs485-device-title,
+    .rs485-table-row.configured.discovered .rs485-list-address,
+    .rs485-table-row.configured.discovered .rs485-list-template,
+    .rs485-table-row.configured.discovered .rs485-device-status { font-size: 11px; }
+    .rs485-table-row.configured.discovered .rs485-device-status { gap: 5px; }
+    .rs485-table-row.configured.discovered .rs485-device-status::before { width: 8px; height: 8px; flex-basis: 8px; }
     .rs485-table-row.configured .rs485-device-title, .rs485-table-row.configured .rs485-list-template, .rs485-table-row.configured .rs485-device-status { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .rs485-device-list-head { min-height: 34px; padding: 0 10px; color: var(--ha-secondary); font-size: 12px; font-weight: 800; }
     .rs485-device-list-head span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -826,7 +835,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .rs485-device-status.discovered { color: #159bff; }
     .rs485-device-status.discovered::before { background: #159bff; box-shadow: none; }
     .rs485-row-menu { min-width: 28px !important; width: 28px; height: 32px !important; padding: 0 !important; border: 0 !important; font-size: 22px; }
-    .rs485-row-add { min-width: 58px !important; height: 32px !important; min-height: 32px !important; padding: 4px 8px !important; }
+    .rs485-row-add { min-width: 52px !important; height: 30px !important; min-height: 30px !important; padding: 4px 7px !important; font-size: 12px; }
     .rs485-device-summary { display: flex; align-items: baseline; gap: 14px; min-width: 0; }
     .rs485-device-index { color: var(--ha-secondary); font-size: 12px; font-weight: 800; text-align: center; }
     #rs485-device-list-panel .rs485-table { max-height: 620px; overflow-y: auto; overflow-x: hidden; padding-right: 2px; }
@@ -1255,7 +1264,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     pre { display: none; min-height: 180px; max-height: 360px; overflow: auto; border: 1px solid var(--ha-card-border); border-radius: 8px; padding: 14px; background: var(--ha-pre); color: #e5edf7; font-size: 13px; }
     pre.visible { display: block; }
-    @media (max-width: 1300px) { .relay-grid { grid-template-columns: repeat(4, minmax(140px, 1fr)); } .rs485-toolbar { grid-template-columns: repeat(3, minmax(180px, 1fr)); } .rs485-actions { justify-content: flex-start; } }
+    @media (max-width: 1300px) { .relay-grid { grid-template-columns: repeat(4, minmax(140px, 1fr)); } .rs485-toolbar { grid-template-columns: repeat(3, minmax(140px, 1fr)); } .rs485-actions { justify-content: flex-start; } }
     @media (max-width: 1300px) { .overview-panel { grid-template-columns: 1fr; } .overview-identity { border-right: 0; border-bottom: 1px solid var(--ha-card-border); min-height: 260px; } }
     @media (max-width: 1100px) { .ports, .carrier-io-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .xport-group-toolbar, .xport-group-toolbar.config-hidden { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .xport-group-toolbar .bus-note, .xport-group-toolbar.config-hidden .bus-note { grid-column: 1 / -1; } .relay-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); } .rs485-layout { grid-template-columns: 1fr; } .rs485-capability-grid, .rs485-device-settings { grid-template-columns: repeat(2, minmax(130px, 1fr)); } .rs485-polling-strip { grid-template-columns: 1fr auto; } .rs485-io-head, .rs485-io-row { grid-template-columns: 52px minmax(150px, 1fr) minmax(150px, 1fr) minmax(180px, .9fr); } }
     @media (max-width: 900px) { .diagnostic-led-grid, .diagnostic-rtc-grid, .buzzer-panel { grid-template-columns: 1fr; } .buzzer-actions { grid-template-columns: repeat(2, minmax(120px, 1fr)); grid-template-rows: auto; } .buzzer-actions .buzzer-group-title { grid-column: 1 / -1; } }
@@ -3611,6 +3620,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         rs485SelectedId = (selectedOnPort && selectedOnPort.id) || (devices[0] && devices[0].id) || null;
       }
       patchRs485LiveStatus(devices);
+      paintRs485ConfiguredDevices();
+      paintRs485ScanResults();
       paintRs485ScanLog();
       patchRs485DiagnosticsLog();
     }

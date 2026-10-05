@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.183
+
+- Refresh discovered RS-485 devices while scanning instead of waiting for scan completion.
+- Compact the RS-485 connection toolbar and discovered-device rows for narrow layouts.
+
 ## 0.5.182
 
 - Include and serve the MIO-8 device icon from the repository and App image.
