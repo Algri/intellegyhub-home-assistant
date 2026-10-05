@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.178
+
+- Include RS-485 image assets in all HAOS release bundles.
+- Refresh the release version after the corrected deployment packaging.
+
 ## 0.5.177
 
 - Refine RS-485 device, template, diagnostics, and polling configuration UI.
