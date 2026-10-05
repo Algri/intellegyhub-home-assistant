@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.179
+
+- Fix RS-485 device logo delivery in the Home Assistant App bundle.
+- Serve device assets through the same root application path as the main logo.
+
 ## 0.5.178
 
 - Include RS-485 image assets in all HAOS release bundles.

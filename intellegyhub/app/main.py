@@ -233,7 +233,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.178 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.179 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -284,7 +284,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.178", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.179", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -3954,7 +3954,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         ? pageItems.map((entry, index) => entry.type === 'configured' ? (() => { const device = entry.device; return `
             <div class="rs485-table-row configured ${device.id === rs485SelectedId ? 'selected' : ''}" role="button" tabindex="0" aria-selected="${device.id === rs485SelectedId ? 'true' : 'false'}" onclick="selectRs485MockDevice('${device.id}')" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectRs485MockDevice('${device.id}'); }">
               <div class="rs485-device-index">${(rs485DevicePage - 1) * rs485DevicePageSize + index + 1}</div>
-              <div class="rs485-device-title"><img class="rs485-list-icon" src="/rs485-icons/${device.template_id}.png" alt="">${device.name}</div>
+              <div class="rs485-device-title"><img class="rs485-list-icon" src="/rs485_assets/${device.template_id}.png" alt="">${device.name}</div>
               <div class="rs485-list-address">${device.slave_address}</div>
               <div class="rs485-list-template">${rs485TemplateLabel(device.template_id)}</div>
               <span class="rs485-device-status ${rs485CommunicationStatus(device).toLowerCase()}" data-rs485-live-status="${device.id}">${rs485CommunicationStatus(device)}</span>
@@ -4070,7 +4070,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       detail.innerHTML = `
         <div class="rs485-detail-head">
           <div class="rs485-device-identity">
-            <img class="rs485-device-icon" src="/rs485-icons/${selected.template_id}.png" alt="">
+            <img class="rs485-device-icon" src="/rs485_assets/${selected.template_id}.png" alt="">
             <div class="rs485-device-identity-copy">
             <div class="rs485-device-title-row"><div class="module-title">${selected.name}</div></div>
             <div class="rs485-device-subtitle"></div>
@@ -4827,6 +4827,13 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if not icon.is_file():
             raise HTTPException(status_code=404, detail="RS-485 device icon not found")
         return FileResponse(icon)
+
+    @app.get("/rs485_assets/{template_id}.png", include_in_schema=False)
+    async def rs485_asset(template_id: str) -> FileResponse:
+        asset = Path(__file__).resolve().parents[1] / "rs485_assets" / f"{template_id}.png"
+        if not asset.is_file():
+            raise HTTPException(status_code=404, detail="RS-485 device asset not found")
+        return FileResponse(asset)
 
     @app.get("/api/v1/state")
     async def get_state() -> dict:
