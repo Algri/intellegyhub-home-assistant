@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.182
+
+- Include and serve the MIO-8 device icon from the repository and App image.
+- Validate required device assets before repository deployment.
+
+## 0.5.181
+
+- Use the existing root `logo.png` for RS-485 device cards, matching the main card asset path.
+- Remove the unavailable `rs485_assets` Docker build dependency.
+
+## 0.5.180
+
+- Fix RS-485 device image URLs for Home Assistant ingress by using relative asset paths.
+
 ## 0.5.179
 
 - Fix RS-485 device logo delivery in the Home Assistant App bundle.
