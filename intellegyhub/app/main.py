@@ -241,7 +241,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.188 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.189 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -292,7 +292,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.188", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.189", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -300,6 +300,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     rs485_store_path = getattr(getattr(runtime, "ui_store", None), "path", None) if runtime is not None else None
     rs485_mock = is_mock_enabled() or (runtime is not None and isinstance(runtime.backend, MockGpioBackend))
     app.state.rs485 = Rs485Manager(store=Rs485Store(rs485_store_path), mock=rs485_mock)
+    if runtime is not None:
+        app.state.rs485.set_publisher(runtime.broadcast)
 
     def runtime_or_503() -> AppRuntime:
         current: AppRuntime = app.state.runtime
@@ -5145,7 +5147,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
 
     @app.put("/api/v1/rs485/bus")
     async def put_rs485_bus(payload: Rs485BusPayload) -> dict:
-        return await rs485_or_404().save_bus(payload.model_dump())
+        result = await rs485_or_404().save_bus(payload.model_dump())
+        await app.state.runtime.broadcast({"type": "rs485_changed", "rs485": result})
+        return result
 
     @app.post("/api/v1/rs485/scan")
     async def post_rs485_scan(payload: Rs485BusPayload) -> dict:
@@ -5190,6 +5194,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         LOGGER.info("RS485_ADD request scan_id=%s", scan_id)
         try:
             result = await rs485_or_404().add_device(scan_id)
+            await app.state.runtime.broadcast({"type": "rs485_changed", "rs485": result})
             LOGGER.info("RS485_ADD committed scan_id=%s selected_id=%s devices=%s scanned=%s", scan_id, result.get("selected_id"), len(result.get("devices", [])), len(result.get("scanned", [])))
             return result
         except ValueError as exc:
@@ -5199,7 +5204,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     @app.delete("/api/v1/rs485/devices/{device_id}")
     async def delete_rs485_device(device_id: str) -> dict:
         try:
-            return await rs485_or_404().remove_device(device_id)
+            result = await rs485_or_404().remove_device(device_id)
+            await app.state.runtime.broadcast({"type": "rs485_changed", "rs485": result})
+            return result
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -5224,14 +5231,18 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     @app.put("/api/v1/rs485/devices/{device_id}/name")
     async def put_rs485_device_name(device_id: str, payload: Rs485DeviceNamePayload) -> dict:
         try:
-            return await rs485_or_404().rename_device(device_id, payload.name)
+            result = await rs485_or_404().rename_device(device_id, payload.name)
+            await app.state.runtime.broadcast({"type": "rs485_changed", "rs485": result})
+            return result
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.put("/api/v1/rs485/devices/{device_id}/capabilities/{capability_id}")
     async def put_rs485_capability(device_id: str, capability_id: str, payload: Rs485CapabilityPayload) -> dict:
         try:
-            return await rs485_or_404().set_capability(device_id, capability_id, payload.value)
+            result = await rs485_or_404().set_capability(device_id, capability_id, payload.value)
+            await app.state.runtime.broadcast({"type": "rs485_changed", "rs485": result})
+            return result
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -5245,14 +5256,18 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     @app.put("/api/v1/rs485/devices/{device_id}/enabled")
     async def put_rs485_device_enabled(device_id: str, payload: Rs485DeviceEnabledPayload) -> dict:
         try:
-            return await rs485_or_404().set_device_enabled(device_id, payload.enabled)
+            result = await rs485_or_404().set_device_enabled(device_id, payload.enabled)
+            await app.state.runtime.broadcast({"type": "rs485_changed", "rs485": result})
+            return result
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     @app.put("/api/v1/rs485/devices/{device_id}/polling")
     async def put_rs485_device_polling(device_id: str, payload: Rs485PollingPayload) -> dict:
         try:
-            return await rs485_or_404().set_device_polling(device_id, payload.model_dump(exclude_none=True))
+            result = await rs485_or_404().set_device_polling(device_id, payload.model_dump(exclude_none=True))
+            await app.state.runtime.broadcast({"type": "rs485_changed", "rs485": result})
+            return result
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 

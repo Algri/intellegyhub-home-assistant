@@ -53,6 +53,7 @@ class IntellegyHubGpioManager:
         self._listeners: list[Callable[[], None]] = []
         self._task: asyncio.Task | None = None
         self._resync_task: asyncio.Task | None = None
+        self._rs485_state_task: asyncio.Task | None = None
         self._stopped = asyncio.Event()
         self._remove_stop_listener: Callable[[], None] | None = None
 
@@ -116,7 +117,10 @@ class IntellegyHubGpioManager:
 
     async def async_set_rs485_capability(self, device_id: str, capability_id: str, value) -> dict:
         result = await self.client.set_rs485_capability(device_id, capability_id, value)
-        self._apply_rs485_device(result.get("device"))
+        if isinstance(result.get("devices"), list):
+            self.rs485 = result
+        else:
+            self._apply_rs485_device(result.get("device"))
         self.connected = True
         self._notify()
         return result
@@ -436,6 +440,13 @@ class IntellegyHubGpioManager:
             self._remove_onewire_registry_entries(event["sensor_id"])
         elif event_type == "onewire_power_changed" and isinstance(event.get("on"), bool):
             self.onewire.setdefault("power", {})["on"] = event["on"]
+        elif event_type == "rs485_changed" and isinstance(event.get("rs485"), dict):
+            self.rs485 = event["rs485"]
+            self._remove_stale_rs485_registry_entries()
+        elif event_type == "rs485_device_changed" and isinstance(event.get("device"), dict):
+            self._apply_rs485_device(event["device"])
+        elif event_type == "rs485_device_removed" and isinstance(event.get("device_id"), str):
+            self._remove_rs485_device(event["device_id"])
         else:
             LOGGER.debug("Ignoring unknown backend event: %s", event)
             return
@@ -513,6 +524,14 @@ class IntellegyHubGpioManager:
         else:
             devices.append(device)
         self.rs485["devices"] = devices
+
+    @callback
+    def _remove_rs485_device(self, device_id: str) -> None:
+        self.rs485["devices"] = [
+            item for item in self.rs485.get("devices", [])
+            if item.get("id") != device_id
+        ]
+        self._remove_stale_rs485_registry_entries()
 
     def _remove_stale_rs485_registry_entries(self) -> None:
         current_ids = {item.get("id") for item in self.rs485.get("devices", []) if isinstance(item.get("id"), str)}

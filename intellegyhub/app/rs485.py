@@ -11,6 +11,7 @@ import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 import yaml
@@ -913,15 +914,30 @@ class Rs485Manager:
         self.status = "RS-485: template-driven mock"
         self._scan_task: asyncio.Task | None = None
         self._scan_stop_event: asyncio.Event | None = None
-        self._poll_task: asyncio.Task | None = None
-        self._bus_worker_task: asyncio.Task | None = None
-        self._command_queue: asyncio.Queue[Rs485BusJob] = asyncio.Queue()
-        self._poll_queue: asyncio.Queue[Rs485BusJob] = asyncio.Queue()
-        self._bus_queue_event = asyncio.Event()
+        self._poll_tasks: dict[str, asyncio.Task] = {}
+        self._bus_worker_tasks: dict[str, asyncio.Task] = {}
+        self._command_queues: dict[str, asyncio.Queue[Rs485BusJob]] = {}
+        self._poll_queues: dict[str, asyncio.Queue[Rs485BusJob]] = {}
+        self._bus_queue_events: dict[str, asyncio.Event] = {}
         self._poll_tick_seconds = 0.05
         self._poll_due: dict[tuple[str, str], float] = {}
         self._command_lock = asyncio.Lock()
         self._command_pending = 0
+        self._publisher: Callable[[dict[str, Any]], Awaitable[None]] | None = None
+
+    def set_publisher(self, publisher: Callable[[dict[str, Any]], Awaitable[None]]) -> None:
+        self._publisher = publisher
+
+    async def _publish(self, event: dict[str, Any]) -> None:
+        if self._publisher is not None:
+            await self._publisher(event)
+
+    async def _publish_device(self, device: Rs485Device) -> None:
+        template = self.registry.get(device.template_id)
+        snapshot = device.snapshot()
+        snapshot["identity"] = device_identity_snapshot(template, device)
+        snapshot["mock"] = self._device_is_mock(device)
+        await self._publish({"type": "rs485_device_changed", "device": snapshot})
 
     async def start(self) -> None:
         self.registry.reload()
@@ -938,6 +954,7 @@ class Rs485Manager:
             if device.name == legacy_name:
                 device.name = template.model
                 await self.store.save_device(device)
+                await self._publish_device(device)
         self.diagnostics = await self.store.load_diagnostics()
         # Traffic capture is an explicit user action. Never resume it from a
         # persisted session after the add-on restarts; keep the collected log
@@ -946,32 +963,36 @@ class Rs485Manager:
             diagnostics["paused"] = True
             self.diagnostics_paused.add(device_id)
             await self.store.save_diagnostics(device_id, diagnostics.copy())
-        self._bus_worker_task = asyncio.create_task(self._bus_worker())
+        for serial_port in {str(device.serial_port) for device in self.devices.values()}:
+            self._ensure_bus_worker(serial_port)
         await self.refresh()
         for device in self.devices.values():
             if device.enabled:
                 self._schedule_device_polling(device)
-        self._poll_task = asyncio.create_task(self._poll_loop())
+        for serial_port in {str(device.serial_port) for device in self.devices.values() if device.enabled}:
+            self._ensure_poll_task(serial_port)
 
     async def stop(self) -> None:
         await self.stop_scan()
         await self.flush_diagnostics()
-        if self._poll_task is None:
-            pass
-        else:
-            self._poll_task.cancel()
+        poll_tasks = list(self._poll_tasks.values())
+        self._poll_tasks.clear()
+        for task in poll_tasks:
+            task.cancel()
+        for task in poll_tasks:
             try:
-                await self._poll_task
+                await task
             except asyncio.CancelledError:
                 pass
-            self._poll_task = None
-        if self._bus_worker_task is not None:
-            self._bus_worker_task.cancel()
+        workers = list(self._bus_worker_tasks.values())
+        self._bus_worker_tasks.clear()
+        for task in workers:
+            task.cancel()
+        for task in workers:
             try:
-                await self._bus_worker_task
+                await task
             except asyncio.CancelledError:
                 pass
-            self._bus_worker_task = None
         if hasattr(self.transport, "close_all"):
             await self.transport.close_all()
 
@@ -1120,59 +1141,63 @@ class Rs485Manager:
             diagnostics["errors"].append({"ts": entry_ts, "message": message, "transaction_id": transaction_id})
             diagnostics["errors"] = diagnostics["errors"][-RS485_DIAGNOSTICS_MAX_ERRORS:]
         diagnostics["entries"] = diagnostics["entries"][-1000:]
-    async def _bus_worker(self) -> None:
+    async def _bus_worker(self, serial_port: str) -> None:
         while True:
-            job = self._next_bus_job()
+            job = self._next_bus_job(serial_port)
             if job is None:
-                self._bus_queue_event.clear()
-                await self._bus_queue_event.wait()
+                event = self._bus_queue_events[serial_port]
+                event.clear()
+                await event.wait()
                 continue
-            if job.future.cancelled():
-                continue
-            try:
-                result = await job.operation()
-            except Exception as exc:
-                if not job.future.cancelled():
-                    job.future.set_exception(exc)
-            else:
-                if not job.future.cancelled():
-                    job.future.set_result(result)
+            await self._execute_bus_job(job)
 
-    def _next_bus_job(self) -> Rs485BusJob | None:
+    async def _execute_bus_job(self, job: Rs485BusJob) -> None:
+        if job.future.cancelled():
+            return
         try:
-            return self._command_queue.get_nowait()
+            result = await job.operation()
+        except Exception as exc:
+            if not job.future.cancelled():
+                job.future.set_exception(exc)
+        else:
+            if not job.future.cancelled():
+                job.future.set_result(result)
+
+    def _next_bus_job(self, serial_port: str) -> Rs485BusJob | None:
+        try:
+            return self._command_queues[serial_port].get_nowait()
         except asyncio.QueueEmpty:
             pass
         try:
-            return self._poll_queue.get_nowait()
+            return self._poll_queues[serial_port].get_nowait()
         except asyncio.QueueEmpty:
             return None
 
-    async def _run_bus_job(self, priority: str, operation) -> Any:
-        if self._bus_worker_task is None:
-            return await operation()
+    async def _run_bus_job(self, priority: str, operation, serial_port: str) -> Any:
+        self._ensure_bus_worker(serial_port)
         loop = asyncio.get_running_loop()
         future = loop.create_future()
         job = Rs485BusJob(operation=operation, future=future)
         if priority == "command":
-            self._drop_pending_poll_jobs()
-            await self._command_queue.put(job)
+            self._drop_pending_poll_jobs(serial_port)
+            await self._command_queues[serial_port].put(job)
         else:
-            await self._poll_queue.put(job)
-        self._bus_queue_event.set()
+            await self._poll_queues[serial_port].put(job)
+        self._bus_queue_events[serial_port].set()
         return await future
 
-    def _drop_pending_poll_jobs(self) -> None:
+    def _drop_pending_poll_jobs(self, serial_port: str | None = None) -> None:
+        queues = [self._poll_queues[serial_port]] if serial_port and serial_port in self._poll_queues else list(self._poll_queues.values())
         while True:
             try:
-                job = self._poll_queue.get_nowait()
-            except asyncio.QueueEmpty:
+                job = next(queue for queue in queues if not queue.empty()).get_nowait()
+            except (asyncio.QueueEmpty, StopIteration):
                 return
             if not job.future.done():
                 job.future.cancel()
 
     async def _read_point(self, bus: dict[str, Any], point: dict[str, Any], slave_address: int, priority: str) -> Any:
-        return await self._run_bus_job(priority, lambda: self.transport.read_point(bus, point, slave_address))
+        return await self._run_bus_job(priority, lambda: self.transport.read_point(bus, point, slave_address), str(bus["serial_port"]))
 
     async def _read_points(
         self,
@@ -1182,7 +1207,7 @@ class Rs485Manager:
         priority: str,
     ) -> dict[str, Any]:
         if hasattr(self.transport, "read_points"):
-            return await self._run_bus_job(priority, lambda: self.transport.read_points(bus, items, slave_address))
+            return await self._run_bus_job(priority, lambda: self.transport.read_points(bus, items, slave_address), str(bus["serial_port"]))
 
         async def read_each() -> dict[str, Any]:
             values = {}
@@ -1190,10 +1215,10 @@ class Rs485Manager:
                 values[capability_id] = await self.transport.read_point(bus, point, slave_address)
             return values
 
-        return await self._run_bus_job(priority, read_each)
+        return await self._run_bus_job(priority, read_each, str(bus["serial_port"]))
 
     async def _write_point(self, bus: dict[str, Any], point: dict[str, Any], slave_address: int, value: Any, priority: str) -> None:
-        await self._run_bus_job(priority, lambda: self.transport.write_point(bus, point, slave_address, value))
+        await self._run_bus_job(priority, lambda: self.transport.write_point(bus, point, slave_address, value), str(bus["serial_port"]))
 
     def templates_snapshot(self) -> dict[str, Any]:
         return self.registry.snapshot()
@@ -1306,7 +1331,11 @@ class Rs485Manager:
                     status = "Configured" if already else "Found"
                     confidence = "Mock match"
                     if not mock_bus:
-                        matched = await self.transport.probe(self.bus, template, found)
+                        matched = await self._run_bus_job(
+                            "command",
+                            lambda: self.transport.probe(self.bus, template, found),
+                            current_port,
+                        )
                         tx_hex = getattr(self.transport, "last_tx_hex", None)
                         rx_hex = getattr(self.transport, "last_rx_hex", None)
                         rx_detail = getattr(self.transport, "last_rx_detail", None)
@@ -1460,6 +1489,8 @@ class Rs485Manager:
                 self.devices[device.id] = device
                 await self.store.save_device(device)
                 self._schedule_device_polling(device)
+                self._ensure_bus_worker(device.serial_port)
+                self._ensure_poll_task(device.serial_port)
                 self.scanned = [item for item in self.scanned if item["id"] != scan_id]
                 LOGGER.info("RS-485 add committed: device_id=%s remaining_scanned=%s devices=%s", device.id, len(self.scanned), len(self.devices))
                 if not self._device_is_mock(device):
@@ -1467,6 +1498,7 @@ class Rs485Manager:
                         self._hydrate_added_device(device, template),
                         name=f"rs485_hydrate_{device.id}",
                     )
+                await self._publish_device(device)
                 return self.snapshot(selected_id=device.id, status=f"RS-485: configured {device.name}")
         finally:
             self._command_pending = max(0, self._command_pending - 1)
@@ -1487,6 +1519,7 @@ class Rs485Manager:
             raise ValueError("device not found")
         del self.devices[device_id]
         await self.store.delete_device(device_id)
+        await self._publish({"type": "rs485_device_removed", "device_id": device_id})
         return self.snapshot(status="RS-485: configured device removed")
 
     async def rename_device(self, device_id: str, name: str) -> dict[str, Any]:
@@ -1631,7 +1664,12 @@ class Rs485Manager:
                 target_slave = int(slave_address if slave_address is not None else device.slave_address)
                 if not 1 <= target_slave <= 247:
                     raise ValueError("slave ID must be between 1 and 247")
-                result = await self.transport.manual_command(self.bus, target_slave, function, address, count, value)
+                bus = self._effective_device_bus(device)
+                result = await self._run_bus_job(
+                    "command",
+                    lambda: self.transport.manual_command(bus, target_slave, function, address, count, value),
+                    str(device.serial_port),
+                )
                 elapsed = max(0, round((time.monotonic() - started) * 1000))
                 self._record_diagnostic(device, "scan", f"Manual FC{function:02d}", started, transaction_id)
                 self._record_diagnostic(device, "response", f"Manual FC{function:02d}", started, transaction_id)
@@ -1660,11 +1698,29 @@ class Rs485Manager:
             await self.store.save_device(device)
         return self.snapshot(status="RS-485: refreshed")
 
-    async def _poll_loop(self) -> None:
+    def _ensure_bus_worker(self, serial_port: str) -> None:
+        if not serial_port or serial_port in self._bus_worker_tasks:
+            return
+        self._command_queues[serial_port] = asyncio.Queue()
+        self._poll_queues[serial_port] = asyncio.Queue()
+        self._bus_queue_events[serial_port] = asyncio.Event()
+        self._bus_worker_tasks[serial_port] = asyncio.create_task(
+            self._bus_worker(serial_port),
+            name=f"intellegyhub_rs485_bus_{serial_port.rsplit('/', 1)[-1]}",
+        )
+
+    def _ensure_poll_task(self, serial_port: str) -> None:
+        if serial_port and serial_port not in self._poll_tasks:
+            self._poll_tasks[serial_port] = asyncio.create_task(
+                self._poll_loop(serial_port),
+                name=f"intellegyhub_rs485_poll_{serial_port.rsplit('/', 1)[-1]}",
+            )
+
+    async def _poll_loop(self, serial_port: str) -> None:
         while True:
             await asyncio.sleep(self._poll_tick_seconds)
             try:
-                await self._poll_due_groups()
+                await self._poll_due_groups(serial_port)
             except Exception as exc:
                 self.status = f"RS-485: polling loop error: {exc}"
                 self._append_scan_log(
@@ -1675,15 +1731,15 @@ class Rs485Manager:
                 )
                 continue
 
-    async def _poll_due_groups(self) -> None:
+    async def _poll_due_groups(self, serial_port: str | None = None) -> None:
         now = time.monotonic()
         if self._command_lock.locked() or self._command_pending:
             return
-        active_serial_port = str(self.bus.get("serial_port") or "")
+        target_serial_port = serial_port or str(self.bus.get("serial_port") or "")
         for device in list(self.devices.values()):
             if not device.enabled:
                 continue
-            if str(device.serial_port) != active_serial_port:
+            if str(device.serial_port) != target_serial_port:
                 continue
             template = self.registry.get(device.template_id)
             for group_id, interval_seconds in poll_intervals_seconds(template, device.polling).items():
@@ -1691,6 +1747,8 @@ class Rs485Manager:
                 if now < self._poll_due.get(key, 0):
                     continue
                 self._poll_due[key] = now + interval_seconds
+                previous_values = dict(device.values)
+                previous_polling = device.runtime.get("polling")
                 try:
                     if self._command_pending:
                         return
@@ -1709,6 +1767,8 @@ class Rs485Manager:
                     self._append_transport_log(device, "poll-error", f"{group_id}: {exc}")
                     mark_device_runtime(device, template, None, success=False, error=str(exc), group_id=group_id)
                 await self.store.save_device(device)
+                if device.values != previous_values or device.runtime.get("polling") != previous_polling:
+                    await self._publish_device(device)
 
     async def toggle_collapsed(self, device_id: str) -> dict[str, Any]:
         device = self._device(device_id)

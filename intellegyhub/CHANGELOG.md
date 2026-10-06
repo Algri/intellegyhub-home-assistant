@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.189
+
+- Separate RS-485 polling, command, scan, and manual transactions per serial interface.
+- Route RS-485 live state and configuration lifecycle updates through WebSocket events.
+- Remove the shared transaction fallback so every Modbus operation requires its serial port.
+- Fix DI live updates and relay command confirmation in Home Assistant.
+
 ## 0.5.188
 
 - Add isolated dynamic Home Assistant entities for RS-485 devices.
