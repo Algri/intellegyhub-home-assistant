@@ -16,7 +16,6 @@ BRIDGE_DEVICE_CLASS_CONNECTIVITY = getattr(BinarySensorDeviceClass, "CONNECTIVIT
 FAULT_DEVICE_CLASS_PROBLEM = getattr(BinarySensorDeviceClass, "PROBLEM", "problem")
 XDI16_INPUT_OPEN_ICON = "mdi:electric-switch"
 XDI16_INPUT_CLOSED_ICON = "mdi:electric-switch-closed"
-RS485_INPUT_ICON = "mdi:connection"
 BUTTON_INPUT_ICON = "mdi:gesture-tap-button"
 POWER_INPUT_ICON = "mdi:power"
 
@@ -223,7 +222,7 @@ class IntellegyHubRs485BinarySensor(IntellegyHubRs485Entity, BinarySensorEntity)
 
     @property
     def icon(self) -> str:
-        return RS485_INPUT_ICON
+        return XDI16_INPUT_CLOSED_ICON if self.is_on else XDI16_INPUT_OPEN_ICON
 
 
 class IntellegyHubOneWireBridgeConnectivitySensor(IntellegyHubOneWireBridgeEntity, BinarySensorEntity):

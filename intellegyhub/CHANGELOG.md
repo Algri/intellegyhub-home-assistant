@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.190
+
+- Publish MIO-8 DI changes immediately over WebSocket after Modbus detection.
+- Keep DI/DO runtime state in memory without SQLite writes during polling.
+- Preserve XDI-16 input icon behavior for RS-485 binary sensors.
+
 ## 0.5.189
 
 - Separate RS-485 polling, command, scan, and manual transactions per serial interface.

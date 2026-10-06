@@ -1147,6 +1147,11 @@ class Rs485Manager:
             if job is None:
                 event = self._bus_queue_events[serial_port]
                 event.clear()
+                # Close the check/clear race: a producer may enqueue a job
+                # between the first queue check and event.clear(). Re-check
+                # before sleeping so a polling worker cannot stall forever.
+                if not self._port_queues_empty(serial_port):
+                    continue
                 await event.wait()
                 continue
             await self._execute_bus_job(job)
@@ -1172,6 +1177,9 @@ class Rs485Manager:
             return self._poll_queues[serial_port].get_nowait()
         except asyncio.QueueEmpty:
             return None
+
+    def _port_queues_empty(self, serial_port: str) -> bool:
+        return self._command_queues[serial_port].empty() and self._poll_queues[serial_port].empty()
 
     async def _run_bus_job(self, priority: str, operation, serial_port: str) -> Any:
         self._ensure_bus_worker(serial_port)
@@ -1766,7 +1774,6 @@ class Rs485Manager:
                         continue
                     self._append_transport_log(device, "poll-error", f"{group_id}: {exc}")
                     mark_device_runtime(device, template, None, success=False, error=str(exc), group_id=group_id)
-                await self.store.save_device(device)
                 if device.values != previous_values or device.runtime.get("polling") != previous_polling:
                     await self._publish_device(device)
 
