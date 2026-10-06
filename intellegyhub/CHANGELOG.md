@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.186
+
+- Align the HA add-on navigation with the host header and refine spacing.
+- Improve RS-485 toolbar layout at medium widths.
+- Hide the RS-485 navigation tab when RS-485 is disabled.
+
+
 ## 0.5.185
 
 - Add configurable RS-485 traffic log buffer with a default of 1000 entries.

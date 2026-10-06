@@ -241,7 +241,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.185 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.186 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -292,7 +292,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.185", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.186", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -417,7 +417,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     main { width: min(100%, 1520px); margin: 0 auto; padding-bottom: 35vh; }
     .app-toolbar { display: flex; justify-content: flex-end; margin-bottom: 10px; }
-    .global-nav { position: sticky; top: 10px; z-index: 80; display: flex; gap: 2px; overflow-x: auto; margin-bottom: 18px; padding: 3px; border: 1px solid var(--ha-row-border); border-radius: 9px; background: color-mix(in srgb, var(--ha-surface) 94%, transparent); box-shadow: 0 6px 18px rgba(0, 0, 0, .18); scrollbar-width: thin; }
+    .global-nav { position: sticky; top: 5px; z-index: 80; display: flex; gap: 2px; overflow-x: auto; margin-top: -19px; margin-bottom: 0; padding: 3px; border: 1px solid var(--ha-row-border); border-radius: 9px; background: color-mix(in srgb, var(--ha-surface) 94%, transparent); box-shadow: 0 6px 18px rgba(0, 0, 0, .18); scrollbar-width: thin; }
     .global-nav button { flex: 0 0 auto; min-height: 38px; padding: 7px 14px; border: 0 !important; border-radius: 6px; background: transparent !important; color: var(--ha-secondary) !important; font-size: 12px; font-weight: 800; white-space: nowrap; box-shadow: none !important; }
     .global-nav > button[data-ui-nav-target] { min-width: 86px; text-align: center; }
     .global-nav button:hover, .global-nav button:focus-visible { background: var(--ha-field) !important; color: var(--ha-text) !important; outline: none; box-shadow: none !important; }
@@ -716,8 +716,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       --rs485-label-height: 16px;
       --rs485-control-height: 42px;
       display: grid;
-      grid-template-columns: minmax(160px, 1.35fr) minmax(140px, 1.1fr) minmax(108px, .72fr) minmax(96px, .62fr) minmax(88px, .56fr) minmax(130px, 1fr) auto;
-      gap: 16px;
+      grid-template-columns: minmax(190px, 1.45fr) minmax(140px, 1.15fr) minmax(104px, .78fr) minmax(88px, .56fr) minmax(80px, .46fr) minmax(130px, 1fr) auto;
+      gap: 12px;
       align-items: end;
     }
     .rs485-toolbar > * { min-width: 0; }
@@ -1460,7 +1460,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       <div class="extension-actions bus-toolbar rs485-toolbar">
         <div class="rs485-connection-intro">
           <div class="rs485-bus-icon">RS&#8209;485</div>
-          <div><strong>Connection</strong><span>Select port and parameters to scan or work with devices.</span></div>
+          <div><strong>Connection</strong><span>Select port and parameters<br>to scan or work with devices.</span></div>
         </div>
         <div class="rs485-field rs485-serial-field">
           <label>Serial port</label>
