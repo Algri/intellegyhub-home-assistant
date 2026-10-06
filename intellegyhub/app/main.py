@@ -241,7 +241,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.184 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.185 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -292,7 +292,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.184", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.185", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -415,8 +415,19 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       background: var(--ha-page);
       color: var(--ha-text);
     }
-    main { width: min(100%, 1520px); margin: 0 auto; }
+    main { width: min(100%, 1520px); margin: 0 auto; padding-bottom: 35vh; }
     .app-toolbar { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+    .global-nav { position: sticky; top: 10px; z-index: 80; display: flex; gap: 2px; overflow-x: auto; margin-bottom: 18px; padding: 3px; border: 1px solid var(--ha-row-border); border-radius: 9px; background: color-mix(in srgb, var(--ha-surface) 94%, transparent); box-shadow: 0 6px 18px rgba(0, 0, 0, .18); scrollbar-width: thin; }
+    .global-nav button { flex: 0 0 auto; min-height: 38px; padding: 7px 14px; border: 0 !important; border-radius: 6px; background: transparent !important; color: var(--ha-secondary) !important; font-size: 12px; font-weight: 800; white-space: nowrap; box-shadow: none !important; }
+    .global-nav > button[data-ui-nav-target] { min-width: 86px; text-align: center; }
+    .global-nav button:hover, .global-nav button:focus-visible { background: var(--ha-field) !important; color: var(--ha-text) !important; outline: none; box-shadow: none !important; }
+    .global-nav button.active { border: 1px solid var(--ha-primary) !important; border-radius: 10px !important; background: var(--ha-field) !important; color: var(--ha-primary) !important; }
+    .global-nav .theme-switcher { flex: 0 0 auto; margin-left: auto; }
+    .global-nav .theme-switcher { border: 0; background: transparent; box-shadow: none; padding: 0; }
+    .global-nav .theme-switcher .theme-choice { min-height: 38px !important; }
+    .global-nav .theme-switcher .theme-choice.active { border-color: var(--ha-primary) !important; color: var(--ha-primary) !important; background: var(--ha-field) !important; }
+    .global-nav .theme-switcher { flex: 0 0 auto; margin-left: auto; }
+    .ui-nav-section { scroll-margin-top: 74px; }
     .theme-switcher { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--ha-card-border); border-radius: 999px; background: var(--ha-card); padding: 4px; }
     .theme-switcher span { color: var(--ha-secondary); font-size: 12px; font-weight: 800; padding: 0 8px; text-transform: uppercase; letter-spacing: .08em; }
     .theme-choice { min-height: 30px !important; border-radius: 999px !important; padding: 4px 12px !important; border-color: transparent !important; color: var(--ha-secondary) !important; }
@@ -1098,7 +1109,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .rs485-diagnostics-grid > div { display: grid; gap: 4px; min-width: 0; }
     .rs485-diagnostics-grid span { color: var(--ha-secondary); font-size: 12px; font-weight: 800; text-transform: uppercase; }
     .rs485-diagnostics-grid strong { overflow-wrap: anywhere; }
-    .rs485-io-table { position: relative; z-index: 1; max-height: 620px; overflow: auto; border: 1px solid var(--ha-row-border); border-radius: 10px; background: var(--ha-row); }
+    .rs485-io-table { position: relative; z-index: 1; border: 1px solid var(--ha-row-border); border-radius: 10px; background: var(--ha-row); }
     .rs485-io-head, .rs485-io-row { display: grid; grid-template-columns: 52px minmax(180px, 1fr) minmax(180px, 1fr) minmax(220px, 1fr); align-items: center; }
     .rs485-io-head { position: sticky; top: 0; z-index: 4; min-height: 44px; background: var(--ha-card); color: var(--ha-secondary); font-size: 12px; font-weight: 800; text-transform: uppercase; }
     .rs485-io-head span, .rs485-io-row > div { min-width: 0; padding: 8px 12px; }
@@ -1299,19 +1310,28 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     @media (max-width: 1100px) { .ports, .carrier-io-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .xport-group-toolbar, .xport-group-toolbar.config-hidden { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .xport-group-toolbar .bus-note, .xport-group-toolbar.config-hidden .bus-note { grid-column: 1 / -1; } .relay-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); } .rs485-layout { grid-template-columns: 1fr; } .rs485-capability-grid, .rs485-device-settings { grid-template-columns: repeat(2, minmax(130px, 1fr)); } .rs485-polling-strip { grid-template-columns: 1fr auto; } .rs485-io-head, .rs485-io-row { grid-template-columns: 52px minmax(150px, 1fr) minmax(150px, 1fr) minmax(180px, .9fr); } }
     @media (max-width: 900px) { .diagnostic-led-grid, .diagnostic-rtc-grid, .buzzer-panel { grid-template-columns: 1fr; } .buzzer-actions { grid-template-columns: repeat(2, minmax(120px, 1fr)); grid-template-rows: auto; } .buzzer-actions .buzzer-group-title { grid-column: 1 / -1; } }
     @media (max-width: 620px) { body { padding: 10px; } .app-toolbar { justify-content: stretch; } .theme-switcher { width: 100%; justify-content: space-between; } .theme-choice { flex: 1; } .overview-identity { min-height: 260px; padding: 22px 18px; } .overview-wordmark { font-size: 22px; letter-spacing: .12em; } .overview-title-row { align-items: flex-start; flex-direction: column; gap: 14px; } .overview-title h1 { font-size: 34px; } .overview-title .subtitle { font-size: 16px; } .overview-facts { grid-template-columns: 88px minmax(0, 1fr); } .overview-facts dt, .overview-facts dd { font-size: 14px; } .overview-health { grid-template-columns: 1fr; gap: 18px; } .overview-health-item + .overview-health-item { border-left: 0; padding-left: 0; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+3) { border-right: 0; border-bottom: 1px solid var(--ha-card-border); } .overview-metric:nth-of-type(4) { border-bottom: 0; } .xport-panel { padding: 18px 14px; border-radius: 12px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .xport-group-toolbar, .xport-group-toolbar.config-hidden { grid-template-columns: 1fr; } .xport-group-toolbar .bus-note, .xport-group-toolbar.config-hidden .bus-note { grid-column: 1; } .ports, .carrier-io-grid, .relay-grid, .rs485-toolbar { grid-template-columns: 1fr; } .rs485-table-row, .rs485-table-row.scan, .rs485-table-row.configured { grid-template-columns: 1fr; align-items: stretch; } .rs485-device-summary { align-items: flex-start; flex-wrap: wrap; gap: 4px 10px; } .rs485-device-meta { flex-wrap: wrap; } .rs485-device-filters, .rs485-device-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } .rs485-row-actions { justify-content: flex-start; } .rs485-detail-head { flex-direction: column; } .rs485-device-identity { align-items: flex-start; } .rs485-detail-meta { position: static; flex-wrap: wrap; } .rs485-detail-last-seen { position: static; } .rs485-detail-actions { justify-content: flex-start; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-row { grid-template-columns: 1fr; gap: 6px; } }
+    @media (max-width: 620px) { .global-nav .theme-switcher { width: auto; justify-content: initial; } .global-nav .theme-switcher span { display: none; } .global-nav .theme-choice { flex: 0 0 auto; } }
   </style>
 </head>
 <body>
   <main>
-    <div class="app-toolbar">
+    <nav class="global-nav" id="global-nav" aria-label="Application sections">
+      <button type="button" data-ui-nav-target="overview-section">Overview</button>
+      <button type="button" data-ui-nav-target="xport-section">X-Port</button>
+      <button type="button" data-ui-nav-target="xbus-section">X-Bus</button>
+      <button type="button" data-ui-nav-target="rs485-section">RS-485</button>
+      <button type="button" data-ui-nav-target="onewire-section">1-Wire</button>
+      <button type="button" data-ui-nav-target="diagnostics-section">Functions</button>
+      <button type="button" data-ui-nav-target="controls-section">Controls</button>
+      <button type="button" data-ui-nav-target="tools-section">Tools</button>
       <div class="theme-switcher" role="group" aria-label="Theme">
         <span>Theme</span>
         <button class="theme-choice" type="button" data-theme-choice="auto" onclick="setTheme('auto')">Auto</button>
         <button class="theme-choice" type="button" data-theme-choice="light" onclick="setTheme('light')">Light</button>
         <button class="theme-choice" type="button" data-theme-choice="dark" onclick="setTheme('dark')">Dark</button>
       </div>
-    </div>
-    <section class="extension-panel overview-panel">
+    </nav>
+    <section id="overview-section" class="extension-panel overview-panel ui-nav-section">
       <div class="overview-identity">
         <div class="overview-badge-row">
           <div class="overview-wordmark" aria-label="IntellegyHUB">INTELLEGY<span>HUB</span></div>
@@ -1373,7 +1393,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         <div id="overview-updated" class="overview-updated">Updated --</div>
       </div>
     </section>
-    <section class="extension-panel xport-panel">
+    <section id="xport-section" class="extension-panel xport-panel ui-nav-section">
       <div class="module-row">
         <div>
           <div class="eyebrow">Optional Module</div>
@@ -1398,7 +1418,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       <div id="xport-unavailable" class="xport-unavailable hidden"></div>
       <div id="ports" class="ports"></div>
     </section>
-    <section class="extension-panel">
+    <section id="xbus-section" class="extension-panel ui-nav-section">
       <div class="module-row">
         <div>
           <div class="eyebrow">Hardware Bus</div>
@@ -1420,7 +1440,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       <div id="modules" class="modules"></div>
     </section>
     <!-- RS485_START -->
-    <section id="rs485-section" class="extension-panel">
+    <section id="rs485-section" class="extension-panel ui-nav-section">
       <div class="module-row">
         <div>
           <div class="eyebrow">Interface</div>
@@ -1545,7 +1565,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       </div>
     </section>
     <!-- RS485_END -->
-    <section class="extension-panel">
+    <section id="onewire-section" class="extension-panel ui-nav-section">
       <div class="module-row">
         <div>
           <div class="eyebrow">Interface</div>
@@ -1567,11 +1587,11 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       </div>
       <div id="onewire-modules" class="modules"></div>
     </section>
-    <section class="extension-panel">
+    <section id="diagnostics-section" class="extension-panel ui-nav-section">
       <div class="module-row">
         <div>
-          <div class="eyebrow">Diagnostic</div>
-          <h1>BOARD DIAGNOSTICS</h1>
+          <div class="eyebrow">Board Services</div>
+          <h1>FUNCTIONS</h1>
           <div class="subtitle">Onboard status indicators and GPIO18 hardware PWM test</div>
           <div id="buzzer-status" class="status">BUZZER: loading...</div>
         </div>
@@ -1675,7 +1695,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         <div class="diagnostic-led-note">RTC is handled by the host kernel driver. The add-on does not access the RTC I2C address directly.</div>
       </div>
     </section>
-    <section class="extension-panel">
+    <section id="controls-section" class="extension-panel ui-nav-section">
       <div class="module-row">
         <div>
           <div class="eyebrow">Carrier Board I/O</div>
@@ -1687,7 +1707,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       </div>
       <div id="carrier-io" class="carrier-io-grid"></div>
     </section>
-    <section class="extension-panel">
+    <section id="tools-section" class="extension-panel ui-nav-section">
       <div class="module-row">
         <div>
           <div class="eyebrow">Service Tools</div>
@@ -3077,9 +3097,11 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       trigger.type = 'button';
       trigger.className = 'mode-trigger';
       trigger.textContent = selected.label;
-      trigger.onclick = () => {
+      trigger.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
         closeModeSelects(wrap);
-        wrap.classList.toggle('open');
+        wrap.classList.add('open');
       };
       const menu = document.createElement('div');
       menu.className = 'mode-menu';
@@ -3088,7 +3110,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         button.type = 'button';
         button.className = `mode-option ${String(option.value) === String(selected.value) ? 'active' : ''}`;
         button.textContent = option.label;
-        button.onclick = () => {
+        button.onclick = (event) => {
+          event.preventDefault();
+          event.stopPropagation();
           wrap.dataset.value = option.value;
           wrap.classList.remove('open');
           renderRs485Select(id, options, option.value, onChange);
@@ -3131,6 +3155,17 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       catch (_error) { /* Browser storage may be disabled. */ }
     }
     let rs485DiagnosticsFilter = 'all';
+    const RS485_DIAGNOSTICS_BUFFER_KEY = 'intellegyhub.rs485.diagnostics-buffer';
+    function rs485DiagnosticsBufferSize() {
+      const stored = Number(localStorage.getItem(RS485_DIAGNOSTICS_BUFFER_KEY) || 1000);
+      return Math.min(1000, Math.max(100, Number.isFinite(stored) ? Math.round(stored) : 1000));
+    }
+    function saveRs485DiagnosticsBuffer(value) {
+      const size = Math.min(1000, Math.max(100, Math.round(Number(value) || 1000)));
+      localStorage.setItem(RS485_DIAGNOSTICS_BUFFER_KEY, String(size));
+      const input = document.getElementById('rs485-diagnostics-buffer');
+      if (input) input.value = String(size);
+    }
     let rs485DiagnosticsSlaveFilter = 'all';
     let rs485DiagnosticsFunctionFilter = 'all';
     const rs485DiagnosticsTraffic = {};
@@ -3703,16 +3738,17 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         const value = values[capabilityId];
         const error = values[`${capabilityId}__error`];
         const active = Boolean(value);
-        const text = row.querySelector(row.dataset.rs485LiveType === 'binary_input' ? '.rs485-input-toggle span' : '.state-text');
+        const text = row.querySelector('.state-text');
         if (text) {
-          text.textContent = row.dataset.rs485LiveType === 'binary_input' ? (active ? 'ACTIVE' : 'INACTIVE') : (active ? 'ON' : 'OFF');
+          text.textContent = active ? 'ON' : 'OFF';
           text.classList.toggle('on', active);
         }
         const toggle = row.querySelector('.toggle');
         if (toggle) {
           toggle.classList.toggle('on', active);
           const label = toggle.querySelector('span');
-          if (label) label.textContent = row.dataset.rs485LiveType === 'binary_input' ? (active ? 'ACTIVE' : 'INACTIVE') : (active ? 'ON' : 'OFF');
+          if (label) label.textContent = active ? 'ON' : 'OFF';
+          if (row.dataset.rs485LiveType === 'binary_input') toggle.setAttribute('aria-label', `${toggle.closest('.relay-row')?.querySelector('span')?.textContent || 'Input'} ${active ? 'ON' : 'OFF'}`);
         }
         row.classList.toggle('rs485-stale', Boolean(error));
         row.title = error || '';
@@ -3737,7 +3773,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       return bytes.map((byte, index) => `<span class="hex-token ${classes[index]}">${byte.toUpperCase()}</span>`).join('');
     }
     function rs485DiagnosticsTrafficRows(device) {
-      const traffic = (device.diagnostics && device.diagnostics.entries) || [];
+      const traffic = ((device.diagnostics && device.diagnostics.entries) || []).slice(-rs485DiagnosticsBufferSize());
       const filteredTraffic = traffic.filter((entry) => {
         if (rs485DiagnosticsFilter === 'errors' && entry.result !== 'error') return false;
         if (rs485DiagnosticsFilter === 'master' && entry.direction !== 'MASTER') return false;
@@ -4166,6 +4202,10 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
               </div>
               <div class="rs485-polling-settings-block">
                 ${renderRs485PollingControls(selected)}
+                <label class="rs485-polling-field">
+                  <span>Traffic log buffer</span>
+                  <input id="rs485-diagnostics-buffer" type="number" min="100" max="1000" step="100" value="${rs485DiagnosticsBufferSize()}" onchange="saveRs485DiagnosticsBuffer(this.value)">
+                </label>
               </div>
               <div class="rs485-panel-head rs485-device-settings-head">
                 <div class="rs485-panel-title">Device Settings</div>
@@ -4268,8 +4308,10 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       wrap.dataset.value = selected.value;
       wrap.innerHTML = `<button type="button" class="mode-trigger">${selected.label}</button><div class="mode-menu">${options.map((option) => `<button type="button" class="mode-option ${option.value === selected.value ? 'active' : ''}" data-value="${option.value}">${option.label}</button>`).join('')}</div>`;
       const trigger = wrap.querySelector('.mode-trigger');
-      trigger.onclick = () => { closeModeSelects(wrap); wrap.classList.toggle('open'); };
-      wrap.querySelectorAll('.mode-option').forEach((option) => option.onclick = () => {
+      trigger.onclick = (event) => { event.preventDefault(); event.stopPropagation(); closeModeSelects(wrap); wrap.classList.add('open'); };
+      wrap.querySelectorAll('.mode-option').forEach((option) => option.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
         wrap.dataset.value = option.dataset.value;
         setupRs485ManualFunctionSelect(panel);
         updateRs485ManualFields(panel);
@@ -4527,7 +4569,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         </div>
         <section class="rs485-traffic-panel">
           <div class="rs485-traffic-filters"><div id="rs485-diagnostics-filter" class="mode-select"></div><div id="rs485-diagnostics-slave-filter" class="mode-select"></div><div id="rs485-diagnostics-function-filter" class="mode-select"></div><button type="button" onclick="toggleRs485DiagnosticsView()">${rs485DiagnosticsView === 'decoded' ? 'Show raw' : 'Show decoded'}</button><button type="button" onclick="exportRs485Diagnostics('csv')">Export CSV</button><button type="button" onclick="exportRs485Diagnostics('json')">Export JSON</button></div>
-          <div class="rs485-traffic-head"><div class="rs485-traffic-title">Modbus Traffic Log <span>(Last 100 entries)</span></div><div class="rs485-traffic-actions"><button type="button" data-rs485-manual-open="${device.id}">Send packet</button><button type="button" data-rs485-diagnostics-reset="${device.id}">Reset counters</button><button type="button" class="danger-button" data-rs485-diagnostics-clear="${device.id}">Clear log</button><button type="button" data-rs485-diagnostics-toggle="${device.id}">${diagnostics.paused ? 'Start' : 'Stop'}</button></div></div>
+          <div class="rs485-traffic-head"><div class="rs485-traffic-title">Modbus Traffic Log</div><div class="rs485-traffic-actions"><button type="button" data-rs485-manual-open="${device.id}">Send packet</button><button type="button" data-rs485-diagnostics-reset="${device.id}">Reset counters</button><button type="button" class="danger-button" data-rs485-diagnostics-clear="${device.id}">Clear log</button><button type="button" data-rs485-diagnostics-toggle="${device.id}">${diagnostics.paused ? 'Start' : 'Stop'}</button></div></div>
           <div class="rs485-manual-command ${rs485ManualCommandOpen ? 'open' : ''}" data-rs485-manual-panel="${device.id}">
             <div class="rs485-manual-command-head"><span>Send packet</span><button type="button" data-rs485-manual-close="${device.id}" aria-label="Close">&times;</button></div>
             <div class="rs485-manual-command-body">
@@ -4552,12 +4594,12 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     function renderRs485DiagnosticsFooter(device) {
       const runtime = rs485Runtime(device);
       const diagnostics = device.diagnostics || {};
-      const entries = diagnostics.entries || [];
+      const entries = (diagnostics.entries || []).slice(-rs485DiagnosticsBufferSize());
       const last = entries[entries.length - 1];
       const failures = Number(diagnostics.timeout_count || 0) + Number(diagnostics.protocol_errors || 0);
       const success = Number(diagnostics.successful_responses || 0);
       const total = Number(diagnostics.total_requests || 0);
-      const rate = total ? `${Math.round((success / total) * 100)}%` : '—';
+      const rate = total ? `${Math.min(100, Math.round((success / total) * 100))}%` : '—';
       return `<div><span class="rs485-diagnostics-online ${runtime.online === false ? 'offline' : ''}"></span><strong>${diagnostics.paused ? 'Traffic capture off' : 'Traffic capture active'}</strong></div><div><strong>Requests: ${total || '—'}</strong></div><div><strong>Success: ${rate}</strong><span>${failures ? ` / Errors: ${failures}` : ''}</span></div><div><strong>Last response: ${last && last.response_ms != null ? `${last.response_ms} ms` : '—'}</strong></div>`;
     }
     function renderRs485PollingControls(device) {
@@ -4621,7 +4663,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         return `
           <div class="relay-row${error ? ' rs485-stale' : ''}" data-rs485-live-value="${capability.id}" data-rs485-live-type="binary_input" title="${error || ''}">
             <span>${displayName}</span>
-            <button class="toggle rs485-input-toggle ${on ? 'on' : ''}" type="button" disabled aria-label="${displayName} ${on ? 'ACTIVE' : 'INACTIVE'}"><span>${on ? 'ACTIVE' : 'INACTIVE'}</span></button>
+            <span class="state-text ${on ? 'on' : ''}">${on ? 'ON' : 'OFF'}</span>
+            <button class="toggle rs485-input-toggle ${on ? 'on' : ''}" type="button" disabled aria-label="${displayName} ${on ? 'ON' : 'OFF'}"><span>${on ? 'ON' : 'OFF'}</span></button>
           </div>`;
       }
       return `
@@ -4917,6 +4960,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       }
     }
     window.RS485_ENABLED = __RS485_ENABLED__;
+    const rs485NavButton = document.querySelector('[data-ui-nav-target="rs485-section"]');
+    if (rs485NavButton && !window.RS485_ENABLED) rs485NavButton.hidden = true;
     document.getElementById('buzzer-frequency').addEventListener('change', saveBuzzerSettings);
     document.getElementById('buzzer-duration').addEventListener('change', saveBuzzerSettings);
     document.getElementById('buzzer-volume').addEventListener('change', saveBuzzerSettings);
@@ -4942,8 +4987,37 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         document.querySelectorAll('.mode-select.open').forEach((item) => item.classList.remove('open'));
       }
     }, true);
+    function initGlobalNavigation() {
+      const nav = document.getElementById('global-nav');
+      if (!nav) return;
+      let navigationLockUntil = 0;
+      const buttons = [...nav.querySelectorAll('[data-ui-nav-target]')];
+      const sections = buttons.map((button) => document.getElementById(button.dataset.uiNavTarget)).filter(Boolean);
+      buttons.forEach((button) => {
+        const target = document.getElementById(button.dataset.uiNavTarget);
+        if (!target) { button.hidden = true; return; }
+        button.onclick = () => {
+          setActive(target.id);
+          navigationLockUntil = Date.now() + 1200;
+          localStorage.setItem('intellegyhub.ui.section', target.id);
+          window.scrollTo({ top: Math.max(0, target.getBoundingClientRect().top + window.scrollY - 74), behavior: 'smooth' });
+        };
+      });
+      const setActive = (id) => buttons.forEach((button) => button.classList.toggle('active', button.dataset.uiNavTarget === id));
+      if ('IntersectionObserver' in window) {
+        const observer = new IntersectionObserver((entries) => {
+          if (Date.now() < navigationLockUntil) return;
+          const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+          if (visible) { setActive(visible.target.id); localStorage.setItem('intellegyhub.ui.section', visible.target.id); }
+        }, { rootMargin: '-74px 0px -55% 0px', threshold: [0.1, 0.35, 0.6] });
+        sections.forEach((section) => observer.observe(section));
+      }
+      const saved = localStorage.getItem('intellegyhub.ui.section');
+      setActive(sections.some((section) => section.id === saved) ? saved : 'overview-section');
+    }
     applyTheme('auto');
     loadTheme();
+    initGlobalNavigation();
     renderCarrier();
     renderXPort();
     renderCarrierIO();

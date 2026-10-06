@@ -1,7 +1,7 @@
 name: IntellegyHUB
 slug: intellegyhub
 description: IntellegyHUB hardware runtime for Home Assistant native entities
-version: 0.5.184
+version: 0.5.185
 stage: stable
 arch:
   - aarch64
@@ -32,10 +32,6 @@ map:
     read_only: false
     path: /ha_config
 options:
-  led_gpio: 22
-  button_gpio: 26
-  button_bias: pull_up
-  button_debounce_ms: 50
   diagnostics:
     carrier_monitoring_poll_interval_seconds: 30
     ste_heartbeat_on_seconds: 0.2
@@ -54,10 +50,6 @@ options:
     frequency: 2000
     duration_ms: 200
 schema:
-  led_gpio: int(0,64)
-  button_gpio: int(0,64)
-  button_bias: list(pull_up|pull_down|disabled)
-  button_debounce_ms: int(0,5000)
   diagnostics:
     carrier_monitoring_poll_interval_seconds: int(1,3600)
     ste_heartbeat_on_seconds: float(0.05,10)

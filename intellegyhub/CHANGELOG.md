@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.185
+
+- Add configurable RS-485 traffic log buffer with a default of 1000 entries.
+- Keep Clear log independent from traffic capture Stop/Start state.
+- Improve RS-485 navigation, settings UI, and digital input ON/OFF status display.
+
 ## 0.5.183
 
 - Refresh discovered RS-485 devices while scanning instead of waiting for scan completion.

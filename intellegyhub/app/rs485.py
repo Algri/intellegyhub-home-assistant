@@ -45,7 +45,6 @@ RS485_ONLINE_AFTER_SUCCESSES = 1
 # turn the bus around and return a complete RTU frame. Keep retries disabled,
 # but allow the current transaction enough time to finish cleanly.
 RS485_RESPONSE_TIMEOUT_SECONDS = 0.5
-RS485_DIAGNOSTICS_MAX_ENTRIES = 100
 RS485_DIAGNOSTICS_MAX_ERRORS = 5
 MODBUS_EXCEPTION_CODES = {
     1: "Illegal Function",
@@ -1015,8 +1014,10 @@ class Rs485Manager:
 
     def clear_device_diagnostics(self, device_id: str) -> dict[str, Any]:
         self._device(device_id)
-        self.diagnostics[device_id] = self._new_diagnostics()
-        asyncio.create_task(self.store.save_diagnostics(device_id, self.diagnostics[device_id].copy()))
+        diagnostics = self._diagnostics_for(device_id)
+        diagnostics["entries"] = []
+        diagnostics["errors"] = []
+        asyncio.create_task(self.store.save_diagnostics(device_id, copy.deepcopy(diagnostics)))
         return self.snapshot(selected_id=device_id, status="RS-485: diagnostics log cleared")
 
     def reset_device_diagnostic_counters(self, device_id: str) -> dict[str, Any]:
@@ -1118,7 +1119,7 @@ class Rs485Manager:
         if failed:
             diagnostics["errors"].append({"ts": entry_ts, "message": message, "transaction_id": transaction_id})
             diagnostics["errors"] = diagnostics["errors"][-RS485_DIAGNOSTICS_MAX_ERRORS:]
-        diagnostics["entries"] = diagnostics["entries"][-RS485_DIAGNOSTICS_MAX_ENTRIES:]
+        diagnostics["entries"] = diagnostics["entries"][-1000:]
     async def _bus_worker(self) -> None:
         while True:
             job = self._next_bus_job()
