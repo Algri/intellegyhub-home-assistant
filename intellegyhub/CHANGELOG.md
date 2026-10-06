@@ -883,3 +883,9 @@
 - Add Expansion section for xDO-8 modules on I2C-1.
 - Add expansion bus power control through MCP23017 0x20 on I2C-10 GPB7.
 - Add Home Assistant entities for expansion bus power and detected xDO-8 relays.
+## 0.5.184
+
+- Add manual Modbus command sending with calculated RTU CRC preview.
+- Preserve manual command settings between dialog refreshes and browser reloads.
+- Keep diagnostics capture in memory and persist it on Stop or shutdown.
+- Align RS-485 device list states and diagnostics controls with the addon UI style.

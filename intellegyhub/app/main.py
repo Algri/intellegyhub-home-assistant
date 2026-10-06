@@ -121,6 +121,14 @@ class Rs485DeviceNamePayload(BaseModel):
     name: str
 
 
+class Rs485ManualCommandPayload(BaseModel):
+    slave_id: int = 1
+    function: Literal[1, 2, 3, 4, 5, 6]
+    address: int = 0
+    count: int = 1
+    value: int | None = None
+
+
 def collect_device_diagnostics() -> dict[str, list[str]]:
     if is_mock_enabled():
         return {
@@ -233,7 +241,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.183 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.184 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -284,7 +292,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.183", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.184", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -812,15 +820,16 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .rs485-row-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; min-width: 0; align-items: center; }
     .rs485-row-actions button { min-width: 78px; height: 42px; min-height: 42px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; }
     .rs485-table-row.configured { grid-template-columns: 28px minmax(0, 1fr) auto; }
-    .rs485-device-list-head, .rs485-table-row.configured { display: grid; grid-template-columns: 24px minmax(0, 1.35fr) 42px minmax(84px, 1.1fr) 78px; align-items: center; gap: 8px; }
+    .rs485-device-list-head { display: grid; grid-template-columns: 20px minmax(120px, 1.4fr) 60px 92px 50px; align-items: center; gap: 8px; }
+    .rs485-table-row.configured { display: grid; grid-template-columns: 20px minmax(120px, 1.4fr) 60px 92px 50px; align-items: center; gap: 8px; }
     .rs485-table-row.configured > * { min-width: 0; }
     .rs485-table-row.configured.discovered { grid-template-columns: 24px minmax(0, 1.25fr) 42px minmax(84px, 1.1fr) 78px auto; }
-    .rs485-table-row.configured.discovered { grid-template-columns: 20px minmax(0, 1.1fr) 32px minmax(72px, 1fr) 68px 52px; gap: 6px; padding: 6px 8px; min-height: 40px; font-size: 11px; }
+    .rs485-table-row.configured.discovered { grid-template-columns: 20px minmax(120px, 1.4fr) 60px 92px 50px; gap: 8px; padding: 6px 8px; min-height: 40px; font-size: 11px; }
     .rs485-table-row.configured.discovered .rs485-device-title,
     .rs485-table-row.configured.discovered .rs485-list-address,
     .rs485-table-row.configured.discovered .rs485-list-template,
     .rs485-table-row.configured.discovered .rs485-device-status { font-size: 11px; }
-    .rs485-table-row.configured.discovered .rs485-device-status { gap: 5px; }
+    .rs485-table-row.configured.discovered .rs485-device-status { gap: 4px; overflow: hidden; text-overflow: ellipsis; }
     .rs485-table-row.configured.discovered .rs485-device-status::before { width: 8px; height: 8px; flex-basis: 8px; }
     .rs485-table-row.configured .rs485-device-title, .rs485-table-row.configured .rs485-list-template, .rs485-table-row.configured .rs485-device-status { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .rs485-device-list-head { min-height: 34px; padding: 0 10px; color: var(--ha-secondary); font-size: 12px; font-weight: 800; }
@@ -894,8 +903,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .rs485-device-identity-copy { min-width: 0; }
     .rs485-device-subtitle { margin-top: 4px; color: var(--ha-secondary); font-size: 14px; }
     .rs485-device-identity-facts { display: grid; gap: 2px; margin-top: 12px; color: var(--ha-secondary); font-size: 13px; line-height: 1.35; }
-    .rs485-device-identity-facts span { display: flex; gap: 8px; }
-    .rs485-device-identity-facts strong { color: var(--ha-text); font-weight: 700; }
+    .rs485-device-identity-facts > span { display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 8px; align-items: baseline; }
+    .rs485-device-identity-facts > span > span { display: block; color: var(--ha-secondary); white-space: nowrap; }
+    .rs485-device-identity-facts strong { color: var(--ha-text); font-weight: 400; }
     .rs485-device-connection { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; color: var(--ha-secondary); font-size: 13px; }
     .rs485-device-connection span + span::before { content: '·'; margin-right: 12px; color: var(--ha-border); }
     .rs485-edit-device { width: 42px; height: 42px; min-width: 42px; padding: 0; font-size: 22px; }
@@ -1014,7 +1024,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .rs485-diagnostics-card:first-child .rs485-diagnostics-list > div:nth-child(4) { display: none; }
     .rs485-diagnostics-card:nth-child(2) .rs485-diagnostics-list > div:nth-child(3),
     .rs485-diagnostics-card:nth-child(2) .rs485-diagnostics-list > div:nth-child(5) { display: none; }
-    .rs485-traffic-panel { order: 1; min-width: 0; overflow: hidden; border: 1px solid var(--ha-row-border); border-radius: 10px; background: var(--ha-row); }
+    .rs485-traffic-panel { order: 1; min-width: 0; overflow: visible; border: 1px solid var(--ha-row-border); border-radius: 10px; background: var(--ha-row); }
     .rs485-traffic-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 9px 14px; border-bottom: 1px solid var(--ha-row-border); background: var(--ha-row); }
     .rs485-traffic-filters .mode-select { width: 150px; flex: 0 0 150px; }
     .rs485-traffic-filters .mode-select:nth-child(2) { width: 140px; flex-basis: 140px; }
@@ -1028,6 +1038,26 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .rs485-traffic-actions { display: flex; gap: 8px; }
     .rs485-traffic-actions button { min-height: 34px; padding: 6px 12px; }
     .rs485-traffic-actions button { min-width: 76px; cursor: pointer; }
+    .rs485-manual-command { display: none; margin: 16px 14px 14px; border: 1px solid var(--ha-row-border); border-radius: 8px; background: var(--ha-card); overflow: visible; }
+    .rs485-manual-command.open { display: block; }
+    .rs485-manual-command .hidden { display: none !important; }
+    .rs485-manual-command-head { display: flex; align-items: center; justify-content: space-between; padding: 11px 14px; border-bottom: 1px solid var(--ha-row-border); color: var(--ha-text); font-weight: 800; }
+    .rs485-manual-command-head button { min-width: 32px; min-height: 30px; padding: 4px 8px; border: 0; background: transparent; color: var(--ha-secondary); box-shadow: none; }
+    .rs485-manual-command-body { display: grid; gap: 14px; padding: 14px; }
+    .rs485-manual-command-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px; padding: 2px; border: 1px solid var(--ha-row-border); border-radius: 7px; background: var(--ha-row); }
+    .rs485-manual-command-tabs button { min-height: 34px; border: 0; background: transparent; color: var(--ha-secondary); box-shadow: none; }
+    .rs485-manual-command-tabs button.active { background: var(--ha-primary); color: #fff; }
+    .rs485-manual-command-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .rs485-manual-command-fields label { margin: 0; color: var(--ha-secondary); font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+    .rs485-manual-command-fields input, .rs485-manual-command-fields select { width: 100%; box-sizing: border-box; height: 42px; min-height: 42px; margin-top: 4px; border: 1px solid var(--ha-row-border); border-radius: 7px; background: var(--ha-field); color: var(--ha-text); padding: 0 10px; }
+    .rs485-manual-command-fields input:focus, .rs485-manual-command-fields input:focus-visible,
+    .rs485-manual-command-fields select:focus, .rs485-manual-command-fields select:focus-visible { outline: none; box-shadow: none; border-color: var(--ha-primary); }
+    .rs485-manual-function-select .mode-trigger { height: 42px; min-height: 42px; margin-top: 4px; padding: 0 36px 0 10px; font-size: 13px; }
+    .rs485-manual-function-select .mode-trigger::after { top: 16px; right: 14px; }
+    .rs485-manual-function-select .mode-menu { max-height: 260px; overflow-y: auto; }
+    .rs485-manual-preview { padding: 9px 10px; border: 1px solid var(--ha-row-border); border-radius: 7px; background: var(--ha-pre); color: var(--ha-secondary); font: 12px ui-monospace, Consolas, monospace; }
+    .rs485-manual-result { min-height: 16px; color: var(--ha-success); font-size: 11px; }
+    .rs485-manual-command-submit { width: 100%; }
     .rs485-traffic-empty { height: 220px; max-height: 220px; overflow: auto; display: block; color: var(--ha-secondary); font-size: 13px; scrollbar-gutter: stable; }
     .rs485-traffic-empty.no-entries { display: grid; place-items: center; }
     .rs485-traffic-table-head, .rs485-traffic-entry { width: 100%; box-sizing: border-box; display: grid; grid-template-columns: 34px 76px 46px 68px 40px 68px 34px minmax(180px, 1fr) 34px 32px; gap: 5px; align-items: center; justify-content: start; padding: 6px 8px; text-align: left; color: var(--ha-secondary); font-size: 11px; }
@@ -1063,7 +1093,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .rs485-diagnostics-footer .rs485-diagnostics-online::before { display: block; width: 10px; height: 10px; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 18%, transparent); }
     .toggle { cursor: pointer; }
     .toggle > span { pointer-events: none; }
-    @media (max-width: 800px) { .rs485-diagnostics-cards { grid-template-columns: 1fr; } .rs485-diagnostics-footer { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 800px) { .rs485-diagnostics-cards { grid-template-columns: 1fr; } .rs485-diagnostics-footer { grid-template-columns: repeat(2, minmax(0, 1fr)); } .rs485-manual-command-fields { grid-template-columns: 1fr; } }
     .rs485-diagnostics-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
     .rs485-diagnostics-grid > div { display: grid; gap: 4px; min-width: 0; }
     .rs485-diagnostics-grid span { color: var(--ha-secondary); font-size: 12px; font-weight: 800; text-transform: uppercase; }
@@ -1484,7 +1514,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 <button type="button" data-filter="offline" onclick="setRs485DeviceFilter('offline')">Offline <span>0</span></button>
               </div>
             </div>
-            <div class="rs485-device-list-head"><span>#</span><span>Device name</span><span>Addr</span><span>Template / Model</span><span>Status</span><span></span></div>
+            <div class="rs485-device-list-head"><span>#</span><span>Device name</span><span>Slave ID</span><span>Status</span><span></span></div>
             <div id="rs485-configured-devices" class="rs485-table">
               <div class="rs485-table-row">
                 <span>MIO-8 #1</span>
@@ -3091,6 +3121,15 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     let rs485DetailTab = 'io';
     let rs485DiagnosticsPaused = false;
     let rs485DiagnosticsCommandInFlight = false;
+    let rs485ManualCommandOpen = false;
+    const rs485ManualCommandState = (() => {
+      try { return JSON.parse(localStorage.getItem('intellegyhub.rs485.manual-command') || '{}') || {}; }
+      catch (_error) { return {}; }
+    })();
+    function persistRs485ManualCommandState() {
+      try { localStorage.setItem('intellegyhub.rs485.manual-command', JSON.stringify(rs485ManualCommandState)); }
+      catch (_error) { /* Browser storage may be disabled. */ }
+    }
     let rs485DiagnosticsFilter = 'all';
     let rs485DiagnosticsSlaveFilter = 'all';
     let rs485DiagnosticsFunctionFilter = 'all';
@@ -3452,7 +3491,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       paintRs485ConfiguredDevices();
     }
     function setRs485DeviceFilter(value) {
-      rs485DeviceFilter = ['all', 'configured', 'online', 'offline'].includes(value) ? value : 'all';
+      rs485DeviceFilter = ['all', 'configured', 'discovered', 'online', 'offline'].includes(value) ? value : 'all';
       rs485DevicePage = 1;
       paintRs485ConfiguredDevices();
     }
@@ -3967,15 +4006,14 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
               <div class="rs485-device-index">${(rs485DevicePage - 1) * rs485DevicePageSize + index + 1}</div>
               <div class="rs485-device-title"><img class="rs485-list-icon" src="rs485_assets/${device.template_id}.png" alt="">${device.name}</div>
               <div class="rs485-list-address">${device.slave_address}</div>
-              <div class="rs485-list-template">${rs485TemplateLabel(device.template_id)}</div>
               <span class="rs485-device-status ${rs485CommunicationStatus(device).toLowerCase()}" data-rs485-live-status="${device.id}">${rs485CommunicationStatus(device)}</span>
+              <span aria-hidden="true"></span>
             </div>`; })() : (() => { const item = entry.item; return `
         <div class="rs485-table-row configured discovered">
           <div class="rs485-device-index">${(rs485DevicePage - 1) * rs485DevicePageSize + index + 1}</div>
-          <div class="rs485-device-title"><span class="rs485-discovered-icon" aria-hidden="true"></span>(discovered)</div>
+          <div class="rs485-device-title" title="${rs485TemplateLabel(item.template_id) || item.model || 'Discovered device'}"><span class="rs485-discovered-icon" aria-hidden="true"></span>${rs485TemplateLabel(item.template_id) || item.model || 'Discovered device'}</div>
           <div class="rs485-list-address">${item.slave_address}</div>
-          <div class="rs485-list-template">Unknown device</div>
-          <span class="rs485-device-status discovered">Discovered</span>
+              <span class="rs485-device-status discovered" title="Discovered">Discovered</span>
           <button type="button" class="rs485-row-add" aria-label="Add discovered device" data-rs485-add-id="${item.id}">Add</button>
         </div>`; })()).join('')
         : '<div class="rs485-empty">No devices match the current filter.</div>';
@@ -4076,7 +4114,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         ['Serial', identity.serial_number],
         ['Slave ID', selected.slave_address]
       ].filter((item) => item[1] !== null && item[1] !== undefined && String(item[1]).trim() !== '')
-        .map((item) => `<span>${item[0]} <strong>${item[1]}</strong></span>`).join('');
+        .map((item) => `<span><span>${item[0]}:</span><strong>${item[1]}</strong></span>`).join('');
       const parityCode = String(selected.parity || 'none').toLowerCase() === 'even' ? 'E' : String(selected.parity || 'none').toLowerCase() === 'odd' ? 'O' : 'N';
       detail.innerHTML = `
         <div class="rs485-detail-head">
@@ -4194,12 +4232,109 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         event.stopPropagation();
         rs485DiagnosticsTogglePause(diagnosticsToggle.dataset.rs485DiagnosticsToggle);
       };
+      const manualPanel = detail.querySelector('[data-rs485-manual-panel]');
+      const manualOpen = detail.querySelector('[data-rs485-manual-open]');
+      const manualClose = detail.querySelector('[data-rs485-manual-close]');
+      if (manualOpen && manualPanel) manualOpen.onclick = () => { rs485ManualCommandOpen = true; manualPanel.classList.add('open'); updateRs485ManualPreview(manualPanel); };
+      if (manualClose && manualPanel) manualClose.onclick = () => { rs485ManualCommandOpen = false; manualPanel.classList.remove('open'); };
+      if (manualPanel) {
+        setupRs485ManualFunctionSelect(manualPanel);
+        updateRs485ManualFields(manualPanel);
+        manualPanel.querySelectorAll('input').forEach((field) => field.addEventListener('input', () => updateRs485ManualPreview(manualPanel)));
+        updateRs485ManualPreview(manualPanel);
+        const send = manualPanel.querySelector('[data-rs485-manual-send]');
+        if (send) send.onclick = () => sendRs485ManualCommand(manualPanel, send.dataset.rs485ManualSend);
+      }
       detail.querySelectorAll('[data-rs485-entry]').forEach((row) => {
         row.onclick = () => {
           const detailRow = detail.querySelector(`[data-rs485-detail="${row.dataset.rs485Entry}"]`);
           if (detailRow) detailRow.classList.toggle('hidden');
         };
       });
+    }
+    function setupRs485ManualFunctionSelect(panel) {
+      const wrap = panel.querySelector('[data-rs485-manual-function]');
+      if (!wrap) return;
+      const options = [
+        { value: 3, label: 'FC03 - Read Holding Registers' },
+        { value: 1, label: 'FC01 - Read Coils' },
+        { value: 2, label: 'FC02 - Read Discrete Inputs' },
+        { value: 4, label: 'FC04 - Read Input Registers' },
+        { value: 5, label: 'FC05 - Write Single Coil' },
+        { value: 6, label: 'FC06 - Write Single Register' }
+      ];
+      const selected = options.find((option) => String(option.value) === String(wrap.dataset.value)) || options[0];
+      wrap.className = 'mode-select rs485-manual-function-select';
+      wrap.dataset.value = selected.value;
+      wrap.innerHTML = `<button type="button" class="mode-trigger">${selected.label}</button><div class="mode-menu">${options.map((option) => `<button type="button" class="mode-option ${option.value === selected.value ? 'active' : ''}" data-value="${option.value}">${option.label}</button>`).join('')}</div>`;
+      const trigger = wrap.querySelector('.mode-trigger');
+      trigger.onclick = () => { closeModeSelects(wrap); wrap.classList.toggle('open'); };
+      wrap.querySelectorAll('.mode-option').forEach((option) => option.onclick = () => {
+        wrap.dataset.value = option.dataset.value;
+        setupRs485ManualFunctionSelect(panel);
+        updateRs485ManualFields(panel);
+        updateRs485ManualPreview(panel);
+      });
+    }
+    function updateRs485ManualFields(panel) {
+      const fn = rs485ManualFunctionValue(panel);
+      const write = fn >= 5;
+      panel.querySelector('[data-rs485-manual-count-field]')?.classList.toggle('hidden', write);
+      panel.querySelector('[data-rs485-manual-value-field]')?.classList.toggle('hidden', !write);
+      const valueLabel = panel.querySelector('[data-rs485-manual-value-label]');
+      if (valueLabel) valueLabel.textContent = fn === 5 ? 'Coil state' : 'Value';
+    }
+    function rs485ManualFunctionValue(panel) {
+      return Number(panel.querySelector('[data-rs485-manual-function]')?.dataset.value || 3);
+    }
+    function rs485ManualCrc(bytes) {
+      let crc = 0xFFFF;
+      bytes.forEach((byte) => {
+        crc ^= byte;
+        for (let bit = 0; bit < 8; bit += 1) crc = (crc & 1) ? ((crc >> 1) ^ 0xA001) : (crc >> 1);
+      });
+      return [crc & 0xFF, (crc >> 8) & 0xFF];
+    }
+    function updateRs485ManualPreview(panel) {
+      const fn = rs485ManualFunctionValue(panel);
+      const address = Number(panel.querySelector('[data-rs485-manual-address]').value || 0);
+      const count = Number(panel.querySelector('[data-rs485-manual-count]').value || 1);
+      const value = Number(panel.querySelector('[data-rs485-manual-value]').value || 0);
+      const slave = Number(panel.querySelector('[data-rs485-manual-slave]').value || 1);
+      const data = fn === 5 ? (value ? 0xFF00 : 0x0000) : fn === 6 ? value : count;
+      const frame = [slave, fn, (address >> 8) & 0xFF, address & 0xFF, (data >> 8) & 0xFF, data & 0xFF];
+      const crc = rs485ManualCrc(frame);
+      panel.querySelector('[data-rs485-manual-preview]').textContent = `Preview: ${[...frame, ...crc].map((byte) => byte.toString(16).padStart(2, '0').toUpperCase()).join(' ')}`;
+      const deviceId = panel.dataset.rs485ManualPanel;
+      if (deviceId) {
+        rs485ManualCommandState[deviceId] = { slave_id: slave, function: fn, address, count, value };
+        persistRs485ManualCommandState();
+      }
+    }
+    async function sendRs485ManualCommand(panel, deviceId) {
+      const fn = rs485ManualFunctionValue(panel);
+      const body = { slave_id: Number(panel.querySelector('[data-rs485-manual-slave]').value || 1), function: fn, address: Number(panel.querySelector('[data-rs485-manual-address]').value || 0), count: Number(panel.querySelector('[data-rs485-manual-count]').value || 1), value: Number(panel.querySelector('[data-rs485-manual-value]').value || 0) };
+      const error = body.slave_id < 1 || body.slave_id > 247 ? 'Slave ID must be 1-247' : body.address < 0 || body.address > 65535 ? 'Address must be 0-65535' : fn < 5 && (body.count < 1 || body.count > 125) ? 'Count must be 1-125' : fn === 5 && ![0, 1].includes(body.value) ? 'Coil state must be 0 or 1' : fn === 6 && (body.value < 0 || body.value > 65535) ? 'Value must be 0-65535' : '';
+      const result = panel.querySelector('[data-rs485-manual-result]');
+      if (error) { if (result) result.textContent = error; return; }
+      const send = panel.querySelector('[data-rs485-manual-send]');
+      if (send) { send.disabled = true; send.textContent = 'Sending...'; }
+      rs485ManualCommandState[deviceId] = body;
+      try {
+        const payload = await rs485Command(() => requestJson(`api/v1/rs485/devices/${encodeURIComponent(deviceId)}/manual-command`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }));
+        rs485ManualCommandOpen = true;
+        paintRs485(payload);
+        const refreshedPanel = document.querySelector(`[data-rs485-manual-panel="${deviceId}"]`);
+        if (refreshedPanel) {
+          refreshedPanel.classList.add('open');
+          updateRs485ManualPreview(refreshedPanel);
+        }
+      } catch (error) {
+        document.getElementById('rs485-status').textContent = `RS-485 manual command failed: ${errorDetail(error)}`;
+      } finally {
+        const refreshedSend = document.querySelector(`[data-rs485-manual-send="${deviceId}"]`);
+        if (refreshedSend) { refreshedSend.disabled = false; refreshedSend.textContent = 'Send packet'; }
+      }
     }
     function rs485DeviceSettingLabel(device) {
       const pending = rs485PendingSettings[device.id] || {};
@@ -4318,6 +4453,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       }
     }
     function renderRs485Diagnostics(device) {
+      const manual = rs485ManualCommandState[device.id] || { slave_id: device.slave_address, function: 3, address: 0, count: 1, value: 0 };
       const runtime = rs485Runtime(device);
       const state = rs485RuntimeGroup(device, 'state');
       const diagnostics = device.diagnostics || {};
@@ -4391,7 +4527,22 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         </div>
         <section class="rs485-traffic-panel">
           <div class="rs485-traffic-filters"><div id="rs485-diagnostics-filter" class="mode-select"></div><div id="rs485-diagnostics-slave-filter" class="mode-select"></div><div id="rs485-diagnostics-function-filter" class="mode-select"></div><button type="button" onclick="toggleRs485DiagnosticsView()">${rs485DiagnosticsView === 'decoded' ? 'Show raw' : 'Show decoded'}</button><button type="button" onclick="exportRs485Diagnostics('csv')">Export CSV</button><button type="button" onclick="exportRs485Diagnostics('json')">Export JSON</button></div>
-          <div class="rs485-traffic-head"><div class="rs485-traffic-title">Raw Modbus traffic log <span>(Last 100 entries)</span></div><div class="rs485-traffic-actions"><button type="button" data-rs485-diagnostics-reset="${device.id}">Reset counters</button><button type="button" class="danger-button" data-rs485-diagnostics-clear="${device.id}">Clear log</button><button type="button" data-rs485-diagnostics-toggle="${device.id}">${diagnostics.paused ? 'Start' : 'Stop'}</button></div></div>
+          <div class="rs485-traffic-head"><div class="rs485-traffic-title">Modbus Traffic Log <span>(Last 100 entries)</span></div><div class="rs485-traffic-actions"><button type="button" data-rs485-manual-open="${device.id}">Send packet</button><button type="button" data-rs485-diagnostics-reset="${device.id}">Reset counters</button><button type="button" class="danger-button" data-rs485-diagnostics-clear="${device.id}">Clear log</button><button type="button" data-rs485-diagnostics-toggle="${device.id}">${diagnostics.paused ? 'Start' : 'Stop'}</button></div></div>
+          <div class="rs485-manual-command ${rs485ManualCommandOpen ? 'open' : ''}" data-rs485-manual-panel="${device.id}">
+            <div class="rs485-manual-command-head"><span>Send packet</span><button type="button" data-rs485-manual-close="${device.id}" aria-label="Close">&times;</button></div>
+            <div class="rs485-manual-command-body">
+              <div class="rs485-manual-command-fields">
+                <label>Slave ID<input type="number" min="1" max="247" value="${manual.slave_id}" data-rs485-manual-slave></label>
+                <label>Function code<div class="mode-select rs485-manual-function-select" data-rs485-manual-function data-value="${manual.function}"></div></label>
+                <label>Start address<input type="number" min="0" max="65535" value="${manual.address}" data-rs485-manual-address></label>
+                <label data-rs485-manual-count-field>Count<input type="number" min="1" max="125" value="${manual.count}" data-rs485-manual-count></label>
+                <label class="hidden" data-rs485-manual-value-field><span data-rs485-manual-value-label>Value</span><input type="number" min="0" max="65535" value="${manual.value}" data-rs485-manual-value></label>
+              </div>
+              <div class="rs485-manual-preview" data-rs485-manual-preview>Preview: enter command values</div>
+              <div class="rs485-manual-result" data-rs485-manual-result role="status"></div>
+              <button type="button" class="rs485-manual-command-submit" data-rs485-manual-send="${device.id}">Send packet</button>
+            </div>
+          </div>
           <div class="rs485-traffic-table-head"><span>#</span><span>Time</span><span>Delta</span><span>Direction</span><span>Slave</span><span>Function</span><span>FC</span><span>Payload</span><span>Byte</span><span>CRC</span></div>
           <div class="rs485-traffic-empty ${traffic.length ? '' : 'no-entries'}">${traffic.length ? trafficRows : 'No Modbus traffic recorded yet.'}</div>
           <div class="rs485-diagnostics-footer">${renderRs485DiagnosticsFooter(device)}</div>
@@ -4977,6 +5128,17 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
             return await rs485_or_404().read_device(device_id, group)
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.post("/api/v1/rs485/devices/{device_id}/manual-command")
+    async def post_rs485_manual_command(device_id: str, payload: Rs485ManualCommandPayload) -> dict:
+        if not 0 <= payload.address <= 0xFFFF or not 1 <= payload.count <= 125:
+            raise HTTPException(status_code=400, detail="address/count out of range")
+        if payload.function in {5, 6} and payload.count != 1:
+            raise HTTPException(status_code=400, detail="write commands use count 1")
+        try:
+            return await rs485_or_404().manual_command(device_id, payload.function, payload.address, payload.count, payload.value, payload.slave_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.put("/api/v1/rs485/devices/{device_id}/name")
     async def put_rs485_device_name(device_id: str, payload: Rs485DeviceNamePayload) -> dict:

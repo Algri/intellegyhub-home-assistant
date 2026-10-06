@@ -642,6 +642,46 @@ class Rs485ModbusTransport:
         async with self._lock:
             await asyncio.to_thread(self._write_point_sync, bus, point, slave_address, value)
 
+    async def manual_command(self, bus: dict[str, Any], slave_address: int, function: int, address: int, count: int = 1, value: int | None = None) -> dict[str, Any]:
+        async with self._lock:
+            return await asyncio.to_thread(self._manual_command_sync, bus, slave_address, function, address, count, value)
+
+    def _manual_command_sync(self, bus: dict[str, Any], slave_address: int, function: int, address: int, count: int, value: int | None) -> dict[str, Any]:
+        client = self._connected_client(bus)
+        if function == 1:
+            self.last_tx_hex = modbus_rtu_read_request_hex(slave_address, function, address, count)
+            result = self._call_modbus(client.read_coils, slave_address, address=address, count=count)
+            data = [int(bool(item)) for item in _result_bits(result)[:count]]
+        elif function == 2:
+            self.last_tx_hex = modbus_rtu_read_request_hex(slave_address, function, address, count)
+            result = self._call_modbus(client.read_discrete_inputs, slave_address, address=address, count=count)
+            data = [int(bool(item)) for item in _result_bits(result)[:count]]
+        elif function in {3, 4}:
+            self.last_tx_hex = modbus_rtu_read_request_hex(slave_address, function, address, count)
+            method = client.read_holding_registers if function == 3 else client.read_input_registers
+            result = self._call_modbus(method, slave_address, address=address, count=count)
+            data = [int(item) for item in _result_registers(result)[:count]]
+        elif function == 5:
+            if value not in {0, 1}:
+                raise ValueError("FC05 value must be 0 or 1")
+            wire_value = 0xFF00 if value else 0x0000
+            self.last_tx_hex = modbus_rtu_write_single_request_hex(slave_address, function, address, wire_value)
+            result = self._call_modbus(client.write_coil, slave_address, address=address, value=bool(value))
+            _raise_on_error(result)
+            data = [int(value)]
+        elif function == 6:
+            if value is None or not 0 <= value <= 0xFFFF:
+                raise ValueError("FC06 value must be an unsigned 16-bit integer")
+            self.last_tx_hex = modbus_rtu_write_single_request_hex(slave_address, function, address, value)
+            result = self._call_modbus(client.write_register, slave_address, address=address, value=value)
+            _raise_on_error(result)
+            data = [value]
+        else:
+            raise ValueError("Supported function codes: 01, 02, 03, 04, 05, 06")
+        self.last_rx_hex = None
+        self.last_rx_detail = f"manual FC{function:02d} data={data}"
+        return {"function": function, "address": address, "count": count, "value": value, "data": data, "tx_hex": self.last_tx_hex, "rx_hex": self.last_rx_hex}
+
     def _client(self, bus: dict[str, Any]):
         if ModbusSerialClient is None:
             raise RuntimeError("pymodbus is not installed")
@@ -909,10 +949,14 @@ class Rs485Manager:
             await self.store.save_diagnostics(device_id, diagnostics.copy())
         self._bus_worker_task = asyncio.create_task(self._bus_worker())
         await self.refresh()
+        for device in self.devices.values():
+            if device.enabled:
+                self._schedule_device_polling(device)
         self._poll_task = asyncio.create_task(self._poll_loop())
 
     async def stop(self) -> None:
         await self.stop_scan()
+        await self.flush_diagnostics()
         if self._poll_task is None:
             pass
         else:
@@ -991,9 +1035,18 @@ class Rs485Manager:
         diagnostics["paused"] = paused
         if paused:
             self.diagnostics_paused.add(device_id)
+            try:
+                asyncio.create_task(self.store.save_diagnostics(device_id, copy.deepcopy(diagnostics)))
+            except RuntimeError:
+                pass
         else:
             self.diagnostics_paused.discard(device_id)
         return self.snapshot(selected_id=device_id, status=f"RS-485: diagnostics {'paused' if paused else 'resumed'}")
+
+    async def flush_diagnostics(self) -> None:
+        """Persist the in-memory capture at an explicit lifecycle boundary."""
+        for device_id, diagnostics in self.diagnostics.items():
+            await self.store.save_diagnostics(device_id, copy.deepcopy(diagnostics))
 
     def _record_diagnostic(
         self,
@@ -1066,15 +1119,6 @@ class Rs485Manager:
             diagnostics["errors"].append({"ts": entry_ts, "message": message, "transaction_id": transaction_id})
             diagnostics["errors"] = diagnostics["errors"][-RS485_DIAGNOSTICS_MAX_ERRORS:]
         diagnostics["entries"] = diagnostics["entries"][-RS485_DIAGNOSTICS_MAX_ENTRIES:]
-        try:
-            # The entries/errors lists are mutated by subsequent bus events;
-            # persist an immutable-in-time snapshot so a quick page reload
-            # cannot observe a partially updated diagnostics record.
-            persisted = copy.deepcopy(diagnostics)
-            asyncio.create_task(self.store.save_diagnostics(device.id, persisted))
-        except RuntimeError:
-            pass
-
     async def _bus_worker(self) -> None:
         while True:
             job = self._next_bus_job()
@@ -1414,6 +1458,7 @@ class Rs485Manager:
                 )
                 self.devices[device.id] = device
                 await self.store.save_device(device)
+                self._schedule_device_polling(device)
                 self.scanned = [item for item in self.scanned if item["id"] != scan_id]
                 LOGGER.info("RS-485 add committed: device_id=%s remaining_scanned=%s devices=%s", device.id, len(self.scanned), len(self.devices))
                 if not self._device_is_mock(device):
@@ -1571,6 +1616,29 @@ class Rs485Manager:
                 if failed_error:
                     return self.snapshot(selected_id=device.id, status=f"RS-485: read failed for {device.name}: {failed_error}")
                 return self.snapshot(selected_id=device.id, status=f"RS-485: read {device.name}")
+            finally:
+                self._command_pending = max(0, self._command_pending)
+
+    async def manual_command(self, device_id: str, function: int, address: int, count: int = 1, value: int | None = None, slave_address: int | None = None) -> dict[str, Any]:
+        self._command_pending += 1
+        async with self._command_lock:
+            self._command_pending -= 1
+            device = self._device(device_id)
+            started = time.monotonic()
+            transaction_id = f"{device.id}:manual:{int(started * 1000)}"
+            try:
+                target_slave = int(slave_address if slave_address is not None else device.slave_address)
+                if not 1 <= target_slave <= 247:
+                    raise ValueError("slave ID must be between 1 and 247")
+                result = await self.transport.manual_command(self.bus, target_slave, function, address, count, value)
+                elapsed = max(0, round((time.monotonic() - started) * 1000))
+                self._record_diagnostic(device, "scan", f"Manual FC{function:02d}", started, transaction_id)
+                self._record_diagnostic(device, "response", f"Manual FC{function:02d}", started, transaction_id)
+                return self.snapshot(selected_id=device.id, status=f"RS-485: manual FC{function:02d} sent ({elapsed} ms)")
+            except Exception as exc:
+                self._record_diagnostic(device, "scan", f"Manual FC{function:02d}", started, transaction_id)
+                self._record_diagnostic(device, "error", f"Manual FC{function:02d}: {exc}", started, transaction_id)
+                return self.snapshot(selected_id=device.id, status=f"RS-485: manual command failed: {exc}")
             finally:
                 self._command_pending = max(0, self._command_pending)
 
@@ -1748,6 +1816,13 @@ class Rs485Manager:
         if device is None:
             raise ValueError("device not found")
         return device
+
+    def _schedule_device_polling(self, device: Rs485Device) -> None:
+        """Make enabled device groups immediately eligible for a poll."""
+        template = self.registry.get(device.template_id)
+        self._poll_due = {key: value for key, value in self._poll_due.items() if key[0] != device.id}
+        if device.enabled:
+            self._poll_due.update({(device.id, group_id): 0.0 for group_id in poll_intervals_seconds(template, device.polling)})
 
     def _effective_device_bus(self, device: Rs485Device) -> dict[str, Any]:
         bus = device_bus(device)
