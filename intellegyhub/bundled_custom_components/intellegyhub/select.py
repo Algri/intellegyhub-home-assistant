@@ -23,7 +23,8 @@ from .const import (
     XPORT_MODE_VALUES_BY_LABEL,
     normalize_xport_profile,
 )
-from .entity import IntellegyHubGpioEntity, IntellegyHubXPortEntity
+from .entity import IntellegyHubGpioEntity, IntellegyHubXPortEntity, IntellegyHubRs485Entity
+from .rs485_entities import setup_rs485_dynamic_platform
 
 XPORT_CONFIGURATION_LABELS = {
     XPORT_GROUP_MODE_RGBW: "RGBW",
@@ -40,6 +41,7 @@ XPORT_CONFIGURATION_VALUES_BY_LABEL = {label: value for value, label in XPORT_CO
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     manager = hass.data[DOMAIN][entry.entry_id]
     async_add_entities([IntellegyHubXPortProfileSelect(manager), IntellegyHubXPortConfigurationSelect(manager)])
+    setup_rs485_dynamic_platform(entry, manager, async_add_entities, "select", lambda device_id, capability_id: IntellegyHubRs485Select(manager, device_id, capability_id))
     known: dict[int, IntellegyHubXPortModeSelect] = {}
 
     @callback
@@ -138,3 +140,23 @@ class IntellegyHubXPortConfigurationSelect(IntellegyHubGpioEntity, SelectEntity)
         if option not in XPORT_CONFIGURATION_VALUES_BY_LABEL:
             raise ValueError(f"Unsupported X-Port configuration: {option}")
         await self.manager.async_set_xport_profile(XPORT_CONFIGURATION_VALUES_BY_LABEL[option])
+
+
+class IntellegyHubRs485Select(IntellegyHubRs485Entity, SelectEntity):
+    def __init__(self, manager, device_id: str, capability_id: str) -> None:
+        super().__init__(manager, device_id, capability_id)
+        self._attr_unique_id = f"intellegyhub_rs485_{device_id}_{capability_id}"
+        self._attr_name = self.capability.get("name") or capability_id
+        self._attr_options = [str(option.get("name", option.get("id"))) for option in self.capability.get("options", [])]
+
+    @property
+    def current_option(self) -> str | None:
+        value = self.capability_state.get(self.capability_id)
+        for option in self.capability.get("options", []):
+            if option.get("id") == value:
+                return str(option.get("name", option.get("id")))
+        return None
+
+    async def async_select_option(self, option: str) -> None:
+        value = next(item.get("id") for item in self.capability.get("options", []) if str(item.get("name", item.get("id"))) == option)
+        await self.manager.async_set_rs485_capability(self.rs485_device_id, self.capability_id, value)

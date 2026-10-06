@@ -8,8 +8,9 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import BUTTONS, DOMAIN, XPORT_MODE_DI
-from .entity import IntellegyHubGpioEntity, IntellegyHubOneWireBridgeEntity, IntellegyHubXDi16Entity, IntellegyHubXPortEntity
+from .entity import IntellegyHubGpioEntity, IntellegyHubOneWireBridgeEntity, IntellegyHubXDi16Entity, IntellegyHubXPortEntity, IntellegyHubRs485Entity
 from .xport_entities import setup_xport_dynamic_platform
+from .rs485_entities import setup_rs485_dynamic_platform
 
 BRIDGE_DEVICE_CLASS_CONNECTIVITY = getattr(BinarySensorDeviceClass, "CONNECTIVITY", "connectivity")
 FAULT_DEVICE_CLASS_PROBLEM = getattr(BinarySensorDeviceClass, "PROBLEM", "problem")
@@ -36,6 +37,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         "di",
         lambda channel: IntellegyHubXPortDiSensor(manager, channel),
     )
+    setup_rs485_dynamic_platform(entry, manager, async_add_entities, "binary_input", lambda device_id, capability_id: IntellegyHubRs485BinarySensor(manager, device_id, capability_id))
 
     def onewire_bridge_ids() -> set[str]:
         return {
@@ -206,6 +208,17 @@ class IntellegyHubXDi16InputSensor(IntellegyHubXDi16Entity, BinarySensorEntity):
         if len(inputs) < self.channel:
             return False
         return bool(inputs[self.channel - 1])
+
+
+class IntellegyHubRs485BinarySensor(IntellegyHubRs485Entity, BinarySensorEntity):
+    def __init__(self, manager, device_id: str, capability_id: str) -> None:
+        super().__init__(manager, device_id, capability_id)
+        self._attr_unique_id = f"intellegyhub_rs485_{device_id}_{capability_id}"
+        self._attr_name = self.capability.get("name") or capability_id
+
+    @property
+    def is_on(self) -> bool:
+        return bool(self.capability_state.get(self.capability_id))
 
 
 class IntellegyHubOneWireBridgeConnectivitySensor(IntellegyHubOneWireBridgeEntity, BinarySensorEntity):

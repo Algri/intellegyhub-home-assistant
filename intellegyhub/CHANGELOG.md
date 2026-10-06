@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.188
+
+- Add isolated dynamic Home Assistant entities for RS-485 devices.
+- Support RS485-1/RS485-2 device naming with Slave ID in DeviceInfo.
+- Add dynamic relay switches, digital input sensors, and mode selects.
+- Preserve X-BUS isolation and remove stale RS-485 registry devices.
+
+
+## 0.5.187
+
+- Fix rounded corners and clipping for RS-485 I/O and traffic panels.
+- Keep traffic panel scrolling and controls inside the corrected frame.
+
+
 ## 0.5.186
 
 - Align the HA add-on navigation with the host header and refine spacing.

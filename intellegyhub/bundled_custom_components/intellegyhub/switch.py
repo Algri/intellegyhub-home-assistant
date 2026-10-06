@@ -15,8 +15,10 @@ from .entity import (
     IntellegyHubOneWirePowerEntity,
     IntellegyHubXDo8Entity,
     IntellegyHubXPortEntity,
+    IntellegyHubRs485Entity,
 )
 from .xport_entities import setup_xport_dynamic_platform
+from .rs485_entities import setup_rs485_dynamic_platform
 
 LOGGER = logging.getLogger(__name__)
 PARALLEL_UPDATES = 0
@@ -62,6 +64,7 @@ async def async_setup_entry(
         "do",
         lambda channel: IntellegyHubXPortDoSwitch(manager, channel),
     )
+    setup_rs485_dynamic_platform(entry, manager, async_add_entities, "switch", lambda device_id, capability_id: IntellegyHubRs485Switch(manager, device_id, capability_id))
 
     def check_extension_entities() -> None:
         current_module_ids = xdo8_module_ids()
@@ -201,3 +204,20 @@ class IntellegyHubXDo8RelaySwitch(IntellegyHubXDo8Entity, SwitchEntity):
 
     async def async_turn_off(self, **kwargs) -> None:
         await self.manager.async_set_extension_relay(self.module_id, self.channel, False)
+
+
+class IntellegyHubRs485Switch(IntellegyHubRs485Entity, SwitchEntity):
+    def __init__(self, manager, device_id: str, capability_id: str) -> None:
+        super().__init__(manager, device_id, capability_id)
+        self._attr_unique_id = f"intellegyhub_rs485_{device_id}_{capability_id}"
+        self._attr_name = self.capability.get("name") or capability_id
+
+    @property
+    def is_on(self) -> bool:
+        return bool(self.capability_state.get(self.capability_id))
+
+    async def async_turn_on(self, **kwargs) -> None:
+        await self.manager.async_set_rs485_capability(self.rs485_device_id, self.capability_id, True)
+
+    async def async_turn_off(self, **kwargs) -> None:
+        await self.manager.async_set_rs485_capability(self.rs485_device_id, self.capability_id, False)

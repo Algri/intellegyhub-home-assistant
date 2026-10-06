@@ -49,6 +49,7 @@ class IntellegyHubGpioManager:
         self._last_xport_group_mode: str | None = None
         self.extensions: dict = {}
         self.onewire: dict = {}
+        self.rs485: dict = {"devices": []}
         self._listeners: list[Callable[[], None]] = []
         self._task: asyncio.Task | None = None
         self._resync_task: asyncio.Task | None = None
@@ -112,6 +113,13 @@ class IntellegyHubGpioManager:
         self._remove_stale_xport_registry_entries()
         self.connected = True
         self._notify()
+
+    async def async_set_rs485_capability(self, device_id: str, capability_id: str, value) -> dict:
+        result = await self.client.set_rs485_capability(device_id, capability_id, value)
+        self._apply_rs485_device(result.get("device"))
+        self.connected = True
+        self._notify()
+        return result
 
     async def async_set_xport_profile(self, profile: str) -> None:
         result = await self.client.set_xport_profile(profile)
@@ -303,6 +311,11 @@ class IntellegyHubGpioManager:
         self._normalize_xport_profile()
         self.extensions = payload.get("extensions", {})
         self.onewire = payload.get("onewire", {})
+        try:
+            self.rs485 = await self.client.rs485_state()
+        except Exception:
+            self.rs485 = {"devices": []}
+        self._remove_stale_rs485_registry_entries()
         self._remove_stale_extension_registry_entries()
         self._remove_stale_onewire_registry_entries()
         self._remove_stale_xport_registry_entries()
@@ -487,6 +500,33 @@ class IntellegyHubGpioManager:
         else:
             channels.append(channel)
         self.xport["channels"] = sorted(channels, key=lambda item: item.get("channel", 0))
+
+    @callback
+    def _apply_rs485_device(self, device: dict | None) -> None:
+        if not isinstance(device, dict) or not isinstance(device.get("id"), str):
+            return
+        devices = list(self.rs485.get("devices", []))
+        for index, item in enumerate(devices):
+            if item.get("id") == device["id"]:
+                devices[index] = device
+                break
+        else:
+            devices.append(device)
+        self.rs485["devices"] = devices
+
+    def _remove_stale_rs485_registry_entries(self) -> None:
+        current_ids = {item.get("id") for item in self.rs485.get("devices", []) if isinstance(item.get("id"), str)}
+        device_registry = dr.async_get(self.hass)
+        for device in list(getattr(device_registry, "devices", {}).values()):
+            identifiers = set(device.identifiers)
+            stale = {
+                identifier
+                for identifier in identifiers
+                if identifier[0] == DOMAIN and identifier[1].startswith("rs485_")
+                and not any(identifier[1].endswith(f"_{device_id}") for device_id in current_ids)
+            }
+            if stale:
+                device_registry.async_remove_device(device.id)
 
     @callback
     def _normalize_xport_profile(self) -> None:

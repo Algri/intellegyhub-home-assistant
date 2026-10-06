@@ -32,6 +32,25 @@ class IntellegyHubApiClient:
         self._validate_state(payload)
         return payload
 
+    async def rs485_state(self) -> dict[str, Any]:
+        async with self.session.get(urljoin(self.base_url, "api/v1/rs485"), timeout=10) as response:
+            if response.status != 200:
+                raise IntellegyHubApiError(f"RS-485 state request failed with HTTP {response.status}")
+            payload = await response.json()
+        if not isinstance(payload, dict) or not isinstance(payload.get("devices", []), list):
+            raise IntellegyHubApiError("Invalid RS-485 state payload")
+        return payload
+
+    async def set_rs485_capability(self, device_id: str, capability_id: str, value: Any) -> dict[str, Any]:
+        async with self.session.put(
+            urljoin(self.base_url, f"api/v1/rs485/devices/{device_id}/capabilities/{capability_id}"),
+            json={"value": value},
+            timeout=10,
+        ) as response:
+            if response.status != 200:
+                raise IntellegyHubApiError(f"RS-485 capability command failed with HTTP {response.status}")
+            return await response.json()
+
     async def set_led(self, on: bool) -> bool:
         async with self.session.put(urljoin(self.base_url, "api/v1/led"), json={"on": on}, timeout=10) as response:
             if response.status != 200:

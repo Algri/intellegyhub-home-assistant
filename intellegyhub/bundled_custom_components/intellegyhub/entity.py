@@ -107,6 +107,60 @@ class IntellegyHubOneWirePowerEntity(IntellegyHubGpioEntity):
         return self.manager.connected and bool(self.manager.onewire.get("power", {}).get("available", False))
 
 
+class IntellegyHubRs485Entity(IntellegyHubGpioEntity):
+    _attr_has_entity_name = True
+
+    def __init__(self, manager: IntellegyHubGpioManager, device_id: str, capability_id: str) -> None:
+        super().__init__(manager)
+        self.rs485_device_id = device_id
+        self.capability_id = capability_id
+
+    @property
+    def rs485_device(self) -> dict:
+        return next((item for item in self.manager.rs485.get("devices", []) if item.get("id") == self.rs485_device_id), {})
+
+    @property
+    def capability_state(self) -> dict:
+        device = self.rs485_device
+        return device.get("values", {})
+
+    @property
+    def capability(self) -> dict:
+        device = self.rs485_device
+        for template in self.manager.rs485.get("template_details", []):
+            if template.get("template_id") == device.get("template_id"):
+                return (template.get("capabilities") or {}).get(self.capability_id, {})
+        return {}
+
+    @property
+    def available(self) -> bool:
+        return self.manager.connected and bool(self.rs485_device) and bool(self.rs485_device.get("enabled", True))
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        device = self.rs485_device
+        template = next((item for item in self.manager.rs485.get("template_details", []) if item.get("template_id") == device.get("template_id")), {})
+        channel = _rs485_channel_label(device.get("serial_port"))
+        slave = device.get("slave_address", "?")
+        return DeviceInfo(
+            identifiers={(DOMAIN, f"rs485_{channel.lower().replace('-', '')}_{slave}_{self.rs485_device_id}")},
+            name=f"{channel} {device.get('name') or template.get('model') or 'RS485 device'} · Slave {slave}",
+            manufacturer=template.get("manufacturer") or "IntellegyHub",
+            model=template.get("model") or device.get("template_id") or "Modbus device",
+            serial_number=str(device.get("identity", {}).get("serial_number") or f"{channel}-slave-{slave}"),
+            via_device_id=_parent_device_id(self, self.manager),
+        )
+
+
+def _rs485_channel_label(serial_port: object) -> str:
+    port = str(serial_port or "")
+    if port.endswith("ttyAMA3"):
+        return "RS485-1"
+    if port.endswith("ttyAMA5"):
+        return "RS485-2"
+    return f"RS485-{port.rsplit('/', 1)[-1] or '?'}"
+
+
 def _parent_device_id(entity: Entity, manager: IntellegyHubGpioManager) -> str | None:
     hass = getattr(entity, "hass", None)
     if hass is None:

@@ -241,7 +241,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.186 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.188 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -292,7 +292,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.186", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.188", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -716,8 +716,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       --rs485-label-height: 16px;
       --rs485-control-height: 42px;
       display: grid;
-      grid-template-columns: minmax(190px, 1.45fr) minmax(140px, 1.15fr) minmax(104px, .78fr) minmax(88px, .56fr) minmax(80px, .46fr) minmax(130px, 1fr) auto;
-      gap: 12px;
+      grid-template-columns: minmax(190px, 280px) 250px 140px 120px 100px 220px auto;
+      column-gap: 14px;
+      row-gap: 12px;
       align-items: end;
     }
     .rs485-toolbar > * { min-width: 0; }
@@ -1035,7 +1036,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .rs485-diagnostics-card:first-child .rs485-diagnostics-list > div:nth-child(4) { display: none; }
     .rs485-diagnostics-card:nth-child(2) .rs485-diagnostics-list > div:nth-child(3),
     .rs485-diagnostics-card:nth-child(2) .rs485-diagnostics-list > div:nth-child(5) { display: none; }
-    .rs485-traffic-panel { order: 1; min-width: 0; overflow: visible; border: 1px solid var(--ha-row-border); border-radius: 10px; background: var(--ha-row); }
+    .rs485-traffic-panel { position: relative; order: 1; min-width: 0; overflow: hidden; border: 1px solid var(--ha-row-border); border-radius: 10px; background: var(--ha-row); }
     .rs485-traffic-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 9px 14px; border-bottom: 1px solid var(--ha-row-border); background: var(--ha-row); }
     .rs485-traffic-filters .mode-select { width: 150px; flex: 0 0 150px; }
     .rs485-traffic-filters .mode-select:nth-child(2) { width: 140px; flex-basis: 140px; }
@@ -1110,8 +1111,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .rs485-diagnostics-grid span { color: var(--ha-secondary); font-size: 12px; font-weight: 800; text-transform: uppercase; }
     .rs485-diagnostics-grid strong { overflow-wrap: anywhere; }
     .rs485-io-table { position: relative; z-index: 1; border: 1px solid var(--ha-row-border); border-radius: 10px; background: var(--ha-row); }
+    .rs485-io-table::after { content: ''; position: absolute; inset: 0; z-index: 60; border: 1px solid var(--ha-row-border); border-radius: 10px; pointer-events: none; }
     .rs485-io-head, .rs485-io-row { display: grid; grid-template-columns: 52px minmax(180px, 1fr) minmax(180px, 1fr) minmax(220px, 1fr); align-items: center; }
-    .rs485-io-head { position: sticky; top: 0; z-index: 4; min-height: 44px; background: var(--ha-card); color: var(--ha-secondary); font-size: 12px; font-weight: 800; text-transform: uppercase; }
+    .rs485-io-head { position: sticky; top: 0; z-index: 4; min-height: 44px; border-radius: 9px 9px 0 0; clip-path: inset(0 round 9px 9px 0 0); background: var(--ha-card); color: var(--ha-secondary); font-size: 12px; font-weight: 800; text-transform: uppercase; }
     .rs485-io-head span, .rs485-io-row > div { min-width: 0; padding: 8px 12px; }
     .rs485-io-row { position: relative; min-height: 58px; border-top: 1px solid var(--ha-row-border); background: var(--ha-row); }
     .rs485-io-row:has(.mode-select.open) { z-index: 50; }
@@ -1120,6 +1122,11 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .rs485-io-head span + span { border-left: 1px solid var(--ha-row-border); }
     .rs485-io-row > div + div { border-left: 1px solid var(--ha-row-border); }
     .rs485-io-head span { height: 100%; display: flex; align-items: center; }
+    .rs485-io-head span:first-child { border-top-left-radius: 9px; }
+    .rs485-io-head span:last-child { border-top-right-radius: 9px; }
+    .rs485-io-row:last-child > div:first-child { border-bottom-left-radius: 9px; }
+    .rs485-io-row:last-child > div:last-child { border-bottom-right-radius: 9px; }
+    .rs485-io-row:last-child { border-bottom-left-radius: 9px; border-bottom-right-radius: 9px; }
     .rs485-io-head span:first-child { justify-content: center; }
     .rs485-io-row > div:last-child { display: flex; align-items: center; justify-content: stretch; }
     .rs485-io-row > div:last-child .rs485-mode-row { width: 100%; }
