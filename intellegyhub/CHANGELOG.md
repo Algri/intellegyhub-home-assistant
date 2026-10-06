@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.191
+
+- Bind RS-485 WebSocket publishing to the lazily-created production runtime.
+- Deliver detected MIO-8 DI changes to Home Assistant immediately after polling.
+
 ## 0.5.190
 
 - Publish MIO-8 DI changes immediately over WebSocket after Modbus detection.
