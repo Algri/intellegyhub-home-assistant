@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.201
+
+- Stop RS-485 live UI refresh when the selected bus is disabled, even if devices remain saved.
+- Prevent the disabled RS-485 bus from competing with other add-on controls for browser time.
+
 ## 0.5.200
 
 - Replace the heavy RS-485 live snapshot polling with a compact live-state endpoint.
