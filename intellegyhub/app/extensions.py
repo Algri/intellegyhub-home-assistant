@@ -365,7 +365,7 @@ class ExtensionHardware:
                         modules.append(self._xdo8_module(address, True, None))
                 except Exception as exc:
                     modules.append(self._unknown_module(address, False, str(exc)))
-            return modules
+        return modules
 
     async def set_xdo8_relay(self, address_text: str, channel: int, on: bool) -> XDo8Module:
         started = time.perf_counter()

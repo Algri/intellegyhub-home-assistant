@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.207
+
+- Fix X-BUS scanning stopping after the first address, which hid modules such as xDO-8 at 0x21.
+
 ## 0.5.206
 
 - Serialize X-BUS I2C operations through one priority-aware owner, with relay commands ahead of waiting input reads.
