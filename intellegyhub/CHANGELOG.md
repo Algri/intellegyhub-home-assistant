@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.206
+
+- Serialize X-BUS I2C operations through one priority-aware owner, with relay commands ahead of waiting input reads.
+- Move X-BUS state persistence to a separate coalescing SQLite queue and dedicated worker thread.
+- Avoid repeated XDI-16 initialization during input reads and trace XDO-8 command latency across UI and hardware stages.
+
 ## 0.5.205
 
 - Keep WebSocket UI updates flowing while a control retains keyboard focus.

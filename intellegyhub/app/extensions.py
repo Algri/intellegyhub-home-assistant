@@ -3,15 +3,21 @@ from __future__ import annotations
 import asyncio
 import copy
 import errno
+import heapq
+import itertools
 import json
+import logging
 import os
 import sqlite3
 import sys
 import threading
 import time
+from concurrent.futures import Future as ThreadFuture, ThreadPoolExecutor
 from dataclasses import asdict, dataclass
+from contextlib import asynccontextmanager
+from functools import partial
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Coroutine
 
 from .carrier import CarrierManager
 
@@ -19,6 +25,51 @@ I2C_SLAVE = 0x0703
 POWER_SETTLE_SECONDS = 0.15
 XDI16_INTERRUPT_DRAIN_LIMIT = 64
 XDI16_INTERRUPT_RETRY_SECONDS = 0.25
+LOGGER = logging.getLogger("intellegyhub.extensions")
+I2C1_EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="intellegyhub-i2c1")
+EXTENSION_DB_EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="intellegyhub-xbus-db")
+
+
+class PriorityI2CQueue:
+    def __init__(self) -> None:
+        self._owner_loop: asyncio.AbstractEventLoop | None = None
+        self._busy = False
+        self._sequence = itertools.count()
+        self._waiting: list[tuple[int, int, asyncio.Future[None]]] = []
+
+    def _grant_next(self) -> None:
+        if self._busy:
+            return
+        while self._waiting:
+            _, _, future = heapq.heappop(self._waiting)
+            if not future.cancelled():
+                self._busy = True
+                future.set_result(None)
+                return
+
+    @asynccontextmanager
+    async def acquire(self, priority: int = 1):
+        loop = asyncio.get_running_loop()
+        if self._owner_loop is None:
+            self._owner_loop = loop
+        elif self._owner_loop is not loop:
+            raise RuntimeError("I2C queue belongs to another event loop; use submit_threadsafe")
+        future = loop.create_future()
+        heapq.heappush(self._waiting, (priority, next(self._sequence), future))
+        self._grant_next()
+        try:
+            await future
+            yield
+        finally:
+            if future.done() and not future.cancelled():
+                self._busy = False
+                self._grant_next()
+
+    def submit_threadsafe(self, operation: Coroutine[Any, Any, Any]) -> ThreadFuture:
+        if self._owner_loop is None or not self._owner_loop.is_running():
+            operation.close()
+            raise RuntimeError("I2C queue owner loop is not running")
+        return asyncio.run_coroutine_threadsafe(operation, self._owner_loop)
 
 
 @dataclass
@@ -45,26 +96,31 @@ class ExtensionStore:
         self.path = path or _default_store_path()
         self._lock = asyncio.Lock()
 
+    async def _run_db(self, operation, *args):
+        return await asyncio.get_running_loop().run_in_executor(
+            EXTENSION_DB_EXECUTOR, partial(operation, *args)
+        )
+
     async def initialize(self) -> None:
-        await asyncio.to_thread(self._initialize_sync)
+        await self._run_db(self._initialize_sync)
 
     async def load_power(self) -> bool:
-        return await asyncio.to_thread(self._load_power_sync)
+        return await self._run_db(self._load_power_sync)
 
     async def save_power(self, on: bool) -> None:
         async with self._lock:
-            await asyncio.to_thread(self._save_power_sync, on)
+            await self._run_db(self._save_power_sync, on)
 
     async def load_modules(self) -> list[ExtensionModule]:
-        return await asyncio.to_thread(self._load_modules_sync)
+        return await self._run_db(self._load_modules_sync)
 
     async def save_modules(self, modules: list[ExtensionModule]) -> None:
         async with self._lock:
-            await asyncio.to_thread(self._save_modules_sync, modules)
+            await self._run_db(self._save_modules_sync, modules)
 
     async def delete_module(self, module_id: str) -> None:
         async with self._lock:
-            await asyncio.to_thread(self._delete_module_sync, module_id)
+            await self._run_db(self._delete_module_sync, module_id)
 
     def _connect(self) -> sqlite3.Connection:
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -204,23 +260,35 @@ class ExtensionHardware:
     _mcp_iocon = 0x0B
 
     def __init__(self, carrier: CarrierManager | None = None) -> None:
-        self._lock = asyncio.Lock()
+        self._lock = PriorityI2CQueue()
         self.carrier = carrier or CarrierManager()
         self._power_gpio_a = 0
         self._power_gpio_b = 0
         self._relay_shadows: dict[int, int] = {}
         self._input_shadows: dict[int, int] = {}
+        self._xdi_initialized: set[int] = set()
+        self.last_relay_timing: dict[str, float] = {}
         self._xdi_chip: Any = None
         self._xdi_interrupt_request: Any = None
         self._xdi_interrupt_thread: threading.Thread | None = None
         self._xdi_interrupt_stop = threading.Event()
         self._xdi_interrupt_callback: Callable[[], None] | None = None
 
+    async def _run_i2c(self, operation, *args):
+        future = asyncio.get_running_loop().run_in_executor(
+            I2C1_EXECUTOR, partial(operation, *args)
+        )
+        try:
+            return await asyncio.shield(future)
+        except asyncio.CancelledError:
+            await asyncio.shield(future)
+            raise
+
     async def initialize(self) -> bool:
         if _is_mock_platform():
             return True
-        async with self._lock:
-            if not self._probe(self.power_bus, self.power_address, self._mcp23017_iodirb, 1):
+        async with self._lock.acquire():
+            if not await self._run_i2c(self._probe, self.power_bus, self.power_address, self._mcp23017_iodirb, 1):
                 return False
             return await self.carrier.xbus_power_on()
 
@@ -258,10 +326,11 @@ class ExtensionHardware:
     async def set_power(self, on: bool) -> bool:
         if _is_mock_platform():
             return on
-        async with self._lock:
+        async with self._lock.acquire():
             await self.carrier.set_xbus_power(on)
             if not on:
                 self._relay_shadows.clear()
+                self._xdi_initialized.clear()
             return on
 
     async def scan_xdo8(self, power_on: bool) -> list[ExtensionModule]:
@@ -280,24 +349,26 @@ class ExtensionHardware:
             ]
         if not power_on:
             return []
-        async with self._lock:
-            modules = []
-            for address in self.xdo_addresses:
-                if not self._probe(self.xdo_bus, address, self._mcp_iocon, 1):
+        modules = []
+        for address in self.xdo_addresses:
+            async with self._lock.acquire(priority=2):
+                if not await self._run_i2c(self._probe, self.xdo_bus, address, self._mcp_iocon, 1):
                     continue
                 try:
-                    detected = await asyncio.to_thread(self._detect_module_type, address)
+                    detected = await self._run_i2c(self._detect_module_type, address)
                     if detected == "xdi16":
-                        await asyncio.to_thread(self._initialize_xdi16, address)
+                        await self._run_i2c(self._initialize_xdi16, address)
+                        self._xdi_initialized.add(address)
                         modules.append(self._xdi16_module(address, True, None))
                     else:
-                        await asyncio.to_thread(self._initialize_xdo8, address)
+                        await self._run_i2c(self._initialize_xdo8, address)
                         modules.append(self._xdo8_module(address, True, None))
                 except Exception as exc:
                     modules.append(self._unknown_module(address, False, str(exc)))
             return modules
 
     async def set_xdo8_relay(self, address_text: str, channel: int, on: bool) -> XDo8Module:
+        started = time.perf_counter()
         if channel < 1 or channel > 8:
             raise ValueError("xDO-8 relay channel must be in range 1-8")
         address = int(address_text, 16)
@@ -307,12 +378,28 @@ class ExtensionHardware:
             shadow = self._relay_shadows.get(address, 0)
             bit = 1 << (channel - 1)
             self._relay_shadows[address] = (shadow | bit) if on else (shadow & ~bit)
+            self.last_relay_timing = {"i2c_lock_wait": 0.0, "executor_wait": 0.0, "i2c_io": 0.0}
             return self._xdo8_module(address, True, None)
-        async with self._lock:
+        async with self._lock.acquire(priority=0):
+            lock_acquired = time.perf_counter()
             shadow = self._relay_shadows.get(address, 0)
             bit = 1 << (channel - 1)
             shadow = (shadow | bit) if on else (shadow & ~bit)
-            confirmed = await asyncio.to_thread(self._write_xdo8_outputs, address, shadow)
+            submitted = time.perf_counter()
+
+            def write_relay() -> tuple[int, float]:
+                thread_started = time.perf_counter()
+                confirmed = self._write_xdo8_outputs(address, shadow)
+                self._relay_shadows[address] = confirmed
+                return confirmed, thread_started
+
+            confirmed, thread_started = await self._run_i2c(write_relay)
+            completed = time.perf_counter()
+            self.last_relay_timing = {
+                "i2c_lock_wait": round((lock_acquired - started) * 1000, 2),
+                "executor_wait": round((thread_started - submitted) * 1000, 2),
+                "i2c_io": round((completed - thread_started) * 1000, 2),
+            }
             self._relay_shadows[address] = confirmed
             return self._xdo8_module(address, True, None)
 
@@ -327,8 +414,8 @@ class ExtensionHardware:
         if _is_mock_platform():
             self._relay_shadows[address] = shadow
             return self._xdo8_module(address, True, None)
-        async with self._lock:
-            confirmed = await asyncio.to_thread(self._write_xdo8_outputs, address, shadow)
+        async with self._lock.acquire(priority=0):
+            confirmed = await self._run_i2c(self._write_xdo8_outputs, address, shadow)
             self._relay_shadows[address] = confirmed
             return self._xdo8_module(address, True, None)
 
@@ -338,13 +425,13 @@ class ExtensionHardware:
             raise ValueError("xDO-8 address is outside supported range 0x20-0x27")
         if _is_mock_platform():
             return await self.set_xdo8_relays(address_text, relays)
-        async with self._lock:
-            await asyncio.to_thread(self._initialize_xdo8, address)
+        async with self._lock.acquire(priority=0):
+            await self._run_i2c(self._initialize_xdo8, address)
             shadow = 0
             for index, on in enumerate(relays[:8]):
                 if on:
                     shadow |= 1 << index
-            confirmed = await asyncio.to_thread(self._write_xdo8_outputs, address, shadow)
+            confirmed = await self._run_i2c(self._write_xdo8_outputs, address, shadow)
             self._relay_shadows[address] = confirmed
             return self._xdo8_module(address, True, None)
 
@@ -354,9 +441,11 @@ class ExtensionHardware:
             raise ValueError("xDI-16 address is outside supported range 0x20-0x27")
         if _is_mock_platform():
             return self._xdi16_module(address, True, None)
-        async with self._lock:
-            await asyncio.to_thread(self._initialize_xdi16, address)
-            await asyncio.to_thread(self._read_xdi16_inputs, address)
+        async with self._lock.acquire(priority=2):
+            if address not in self._xdi_initialized:
+                await self._run_i2c(self._initialize_xdi16, address)
+                self._xdi_initialized.add(address)
+            await self._run_i2c(self._read_xdi16_inputs, address)
             return self._xdi16_module(address, True, None)
 
     def _xdo8_module(self, address: int, available: bool, error: str | None, relays: dict[int, bool] | None = None) -> ExtensionModule:
@@ -559,7 +648,8 @@ class ExtensionManager:
         self.error: str | None = "startup pending"
         self._lock = asyncio.Lock()
         self._relay_command_lock = asyncio.Lock()
-        self._module_persistence_tasks: set[asyncio.Task] = set()
+        self._module_persistence_task: asyncio.Task | None = None
+        self._pending_modules_snapshot: list[ExtensionModule] | None = None
         self._publisher: Callable[[dict[str, Any]], Any] | None = None
         self._xdi16_task: asyncio.Task | None = None
         self._xdi16_wake = asyncio.Event()
@@ -604,15 +694,27 @@ class ExtensionManager:
             except asyncio.CancelledError:
                 pass
             self._xdi16_task = None
+        if self._module_persistence_task is not None:
+            await self._module_persistence_task
+            self._module_persistence_task = None
         await self.store.save_power(self.power_on)
         await self.store.save_modules(list(self.modules.values()))
 
     def _persist_modules_nowait(self) -> None:
-        """Persist the latest relay state without delaying a hardware command."""
-        snapshot = copy.deepcopy(list(self.modules.values()))
-        task = asyncio.create_task(self.store.save_modules(snapshot))
-        self._module_persistence_tasks.add(task)
-        task.add_done_callback(self._module_persistence_tasks.discard)
+        self._pending_modules_snapshot = copy.deepcopy(list(self.modules.values()))
+        if self._module_persistence_task is None or self._module_persistence_task.done():
+            self._module_persistence_task = asyncio.create_task(
+                self._drain_module_persistence(), name="intellegyhub_extension_persistence"
+            )
+
+    async def _drain_module_persistence(self) -> None:
+        while self._pending_modules_snapshot is not None:
+            snapshot = self._pending_modules_snapshot
+            self._pending_modules_snapshot = None
+            try:
+                await self.store.save_modules(snapshot)
+            except Exception:
+                LOGGER.exception("X-BUS state persistence failed")
 
     def snapshot(self) -> dict[str, Any]:
         return {
@@ -652,9 +754,12 @@ class ExtensionManager:
             return self.snapshot()
 
     async def set_relay(self, module_id: str, channel: int, on: bool) -> dict[str, Any]:
+        started = time.perf_counter()
+        trace_id = f"{time.monotonic_ns():x}"
         # XDI interrupt reads use the manager lock. Keep relay commands on a
         # separate lane so an input interrupt cannot delay an output command.
         async with self._relay_command_lock:
+            queue_acquired = time.perf_counter()
             if not self.power_on:
                 raise RuntimeError("Extension bus power is off")
             module = self.modules.get(module_id)
@@ -663,6 +768,7 @@ class ExtensionManager:
             if module.kind != "relay_output":
                 raise ValueError("Extension module is not a relay output module")
             updated = await self.hardware.set_xdo8_relay(module.address, channel, on)
+            hardware_done = time.perf_counter()
             self.modules[module_id] = updated
             self._persist_modules_nowait()
             result = {"module": asdict(updated), "channel": channel, "on": on}
@@ -671,6 +777,16 @@ class ExtensionManager:
             asyncio.create_task(
                 self._publish({"type": "extension_module_changed", "module": result["module"]})
             )
+            timing = {
+                "command_queue_wait": round((queue_acquired - started) * 1000, 2),
+                "hardware_total": round((hardware_done - queue_acquired) * 1000, 2),
+                "after_hardware": round((time.perf_counter() - hardware_done) * 1000, 2),
+                **getattr(self.hardware, "last_relay_timing", {}),
+            }
+            timing["total"] = round((time.perf_counter() - started) * 1000, 2)
+            result["trace_id"] = trace_id
+            result["timing_ms"] = timing
+            LOGGER.info("XDO8_TRACE id=%s module=%s channel=%s on=%s timing_ms=%s", trace_id, module_id, channel, on, timing)
             return result
 
     async def delete_module(self, module_id: str) -> dict[str, Any]:
