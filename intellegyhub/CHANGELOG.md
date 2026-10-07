@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.192
+
+- Add explicit per-port priority queues so relay commands always run before pending polling jobs.
+- Preserve FIFO ordering within command and polling priorities while keeping RS-485 interfaces isolated.
+- Cancel stale queued polling jobs when a command arrives to reduce relay response latency.
+
 ## 0.5.191
 
 - Bind RS-485 WebSocket publishing to the lazily-created production runtime.

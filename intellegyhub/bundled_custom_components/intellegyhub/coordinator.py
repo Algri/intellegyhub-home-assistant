@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import logging
 from collections.abc import Callable
 
@@ -116,7 +117,34 @@ class IntellegyHubGpioManager:
         self._notify()
 
     async def async_set_rs485_capability(self, device_id: str, capability_id: str, value) -> dict:
-        result = await self.client.set_rs485_capability(device_id, capability_id, value)
+        # Switch commands must feel immediate in HA while the Modbus transaction
+        # is in flight. The add-on remains authoritative: a failed command
+        # restores the previous snapshot, and a successful response replaces
+        # this optimistic value with the confirmed device state.
+        previous_rs485 = copy.deepcopy(self.rs485)
+        device_template_id = next(
+            (device.get("template_id") for device in self.rs485.get("devices", []) if device.get("id") == device_id),
+            None,
+        )
+        template = next(
+            (item for item in self.rs485.get("template_details", []) if item.get("template_id") == device_template_id),
+            {},
+        )
+        capability = (template.get("capabilities") or {}).get(capability_id)
+        optimistic = capability is not None and capability.get("type") == "switch"
+        if optimistic:
+            for device in self.rs485.get("devices", []):
+                if device.get("id") == device_id:
+                    device.setdefault("values", {})[capability_id] = bool(value)
+                    break
+            self._notify()
+        try:
+            result = await self.client.set_rs485_capability(device_id, capability_id, value)
+        except Exception:
+            if optimistic:
+                self.rs485 = previous_rs485
+                self._notify()
+            raise
         if isinstance(result.get("devices"), list):
             self.rs485 = result
         else:

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import heapq
+import itertools
 import copy
 import json
 import logging
@@ -195,6 +197,8 @@ class Rs485Device:
 
 @dataclass
 class Rs485BusJob:
+    priority: int
+    sequence: int
     operation: Any
     future: asyncio.Future
 
@@ -916,8 +920,10 @@ class Rs485Manager:
         self._scan_stop_event: asyncio.Event | None = None
         self._poll_tasks: dict[str, asyncio.Task] = {}
         self._bus_worker_tasks: dict[str, asyncio.Task] = {}
-        self._command_queues: dict[str, asyncio.Queue[Rs485BusJob]] = {}
-        self._poll_queues: dict[str, asyncio.Queue[Rs485BusJob]] = {}
+        # One heap per physical port keeps command writes ahead of polling
+        # while preserving FIFO order within each priority class.
+        self._bus_queues: dict[str, list[tuple[int, int, Rs485BusJob]]] = {}
+        self._bus_sequence = itertools.count()
         self._bus_queue_events: dict[str, asyncio.Event] = {}
         self._poll_tick_seconds = 0.05
         self._poll_due: dict[tuple[str, str], float] = {}
@@ -1169,40 +1175,45 @@ class Rs485Manager:
                 job.future.set_result(result)
 
     def _next_bus_job(self, serial_port: str) -> Rs485BusJob | None:
-        try:
-            return self._command_queues[serial_port].get_nowait()
-        except asyncio.QueueEmpty:
-            pass
-        try:
-            return self._poll_queues[serial_port].get_nowait()
-        except asyncio.QueueEmpty:
-            return None
+        queue = self._bus_queues[serial_port]
+        while queue:
+            _priority, _sequence, job = heapq.heappop(queue)
+            if not job.future.cancelled():
+                return job
+        return None
 
     def _port_queues_empty(self, serial_port: str) -> bool:
-        return self._command_queues[serial_port].empty() and self._poll_queues[serial_port].empty()
+        return not self._bus_queues[serial_port]
 
     async def _run_bus_job(self, priority: str, operation, serial_port: str) -> Any:
         self._ensure_bus_worker(serial_port)
         loop = asyncio.get_running_loop()
         future = loop.create_future()
-        job = Rs485BusJob(operation=operation, future=future)
+        job = Rs485BusJob(
+            priority=0 if priority == "command" else 1,
+            sequence=next(self._bus_sequence),
+            operation=operation,
+            future=future,
+        )
         if priority == "command":
             self._drop_pending_poll_jobs(serial_port)
-            await self._command_queues[serial_port].put(job)
-        else:
-            await self._poll_queues[serial_port].put(job)
+        heapq.heappush(self._bus_queues[serial_port], (job.priority, job.sequence, job))
         self._bus_queue_events[serial_port].set()
         return await future
 
     def _drop_pending_poll_jobs(self, serial_port: str | None = None) -> None:
-        queues = [self._poll_queues[serial_port]] if serial_port and serial_port in self._poll_queues else list(self._poll_queues.values())
-        while True:
-            try:
-                job = next(queue for queue in queues if not queue.empty()).get_nowait()
-            except (asyncio.QueueEmpty, StopIteration):
-                return
-            if not job.future.done():
-                job.future.cancel()
+        ports = [serial_port] if serial_port and serial_port in self._bus_queues else list(self._bus_queues)
+        for port in ports:
+            queue = self._bus_queues[port]
+            retained = []
+            for item in queue:
+                if item[2].priority == 1:
+                    if not item[2].future.done():
+                        item[2].future.cancel()
+                else:
+                    retained.append(item)
+            queue[:] = retained
+            heapq.heapify(queue)
 
     async def _read_point(self, bus: dict[str, Any], point: dict[str, Any], slave_address: int, priority: str) -> Any:
         return await self._run_bus_job(priority, lambda: self.transport.read_point(bus, point, slave_address), str(bus["serial_port"]))
@@ -1709,8 +1720,7 @@ class Rs485Manager:
     def _ensure_bus_worker(self, serial_port: str) -> None:
         if not serial_port or serial_port in self._bus_worker_tasks:
             return
-        self._command_queues[serial_port] = asyncio.Queue()
-        self._poll_queues[serial_port] = asyncio.Queue()
+        self._bus_queues[serial_port] = []
         self._bus_queue_events[serial_port] = asyncio.Event()
         self._bus_worker_tasks[serial_port] = asyncio.create_task(
             self._bus_worker(serial_port),
