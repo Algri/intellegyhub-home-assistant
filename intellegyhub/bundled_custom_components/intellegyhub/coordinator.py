@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import copy
 import logging
+import time
 from collections.abc import Callable
 
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
@@ -262,10 +263,23 @@ class IntellegyHubGpioManager:
         self._notify()
 
     async def async_set_extension_relay(self, module_id: str, channel: int, on: bool) -> None:
+        started = time.perf_counter()
         result = await self.client.set_extension_relay(module_id, channel, on)
-        self._apply_extension_module(result.get("module"))
+        response_at = time.perf_counter()
+        changed = self._apply_extension_module(result.get("module"))
+        was_connected = self.connected
         self.connected = True
-        self._notify()
+        if changed or not was_connected:
+            self._notify()
+        completed = time.perf_counter()
+        LOGGER.info(
+            "XDO8_HA_TRACE id=%s module=%s channel=%s on=%s ha_http_ms=%.2f ha_notify_ms=%.2f ha_total_ms=%.2f addon_ms=%s",
+            result.get("trace_id"), module_id, channel, on,
+            (response_at - started) * 1000,
+            (completed - response_at) * 1000,
+            (completed - started) * 1000,
+            (result.get("timing_ms") or {}).get("total"),
+        )
 
     async def async_delete_extension_module(self, module_id: str) -> None:
         result = await self.client.delete_extension_module(module_id)
@@ -453,7 +467,8 @@ class IntellegyHubGpioManager:
         elif event_type == "buzzer_changed":
             self.buzzer = event.get("buzzer", self.buzzer)
         elif event_type == "extension_module_changed":
-            self._apply_extension_module(event.get("module"))
+            if not self._apply_extension_module(event.get("module")):
+                return
         elif event_type == "extension_module_removed" and isinstance(event.get("module_id"), str):
             self._remove_extension_module(event["module_id"])
             self._remove_extension_registry_entries(event["module_id"])
@@ -593,17 +608,20 @@ class IntellegyHubGpioManager:
                 self._last_xport_group_mode = group_mode
 
     @callback
-    def _apply_extension_module(self, module: dict | None) -> None:
+    def _apply_extension_module(self, module: dict | None) -> bool:
         if not isinstance(module, dict):
-            return
+            return False
         modules = list(self.extensions.get("modules", []))
         for index, item in enumerate(modules):
             if item.get("id") == module.get("id"):
+                if item == module:
+                    return False
                 modules[index] = module
                 break
         else:
             modules.append(module)
         self.extensions["modules"] = sorted(modules, key=lambda item: item.get("id", ""))
+        return True
 
     @callback
     def _remove_extension_module(self, module_id: str) -> None:

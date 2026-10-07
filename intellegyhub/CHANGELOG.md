@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.208
+
+- Disable Home Assistant polling for WebSocket-backed entities, including XDO-8 and XDI-16.
+- Avoid duplicate entity notifications when an XDO-8 command is confirmed by both WebSocket and HTTP.
+- Add correlated Home Assistant timing logs for XDO-8 relay commands.
+
 ## 0.5.207
 
 - Fix X-BUS scanning stopping after the first address, which hid modules such as xDO-8 at 0x21.
