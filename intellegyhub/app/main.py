@@ -256,7 +256,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.203 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.204 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -311,7 +311,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.203", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.204", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -3159,6 +3159,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           paintExtensions(message.extensions);
         } else if (message.type === 'extension_module_changed') {
           applyExtensionModule(message.module);
+        } else if (message.type === 'rs485_device_changed') {
+          paintRs485(mergeRs485CommandPayload({ device: message.device, selected_id: message.device && message.device.id }));
         } else if (message.type === 'extension_module_removed') {
           renderExtensions();
         } else if (message.type === 'extension_power_changed') {
@@ -3284,6 +3286,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     let rs485ScanPollTimer = null;
     let rs485ScanStartedAt = 0;
     let rs485LivePollTimer = null;
+    let rs485DiagnosticsLiveInFlight = false;
     let rs485LivePollInFlight = false;
     let rs485LiveRequestVersion = 0;
     let rs485DetailSignature = '';
@@ -3531,7 +3534,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         } finally {
           rs485LivePollInFlight = false;
         }
-      }, 1000);
+      }, 100);
     }
     function rs485UserEditing() {
       const section = document.getElementById('rs485-section');
@@ -3729,6 +3732,20 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         document.getElementById('rs485-status').textContent = `RS-485: ${level} toggle failed - ${errorDetail(error)}`;
       }
     }
+    function mergeRs485CommandPayload(payload) {
+      if (!payload || Array.isArray(payload.devices) || !payload.device) return payload;
+      const current = rs485ApiState || {};
+      const devices = (current.devices || []).map((device) => {
+        if (device.id !== payload.device.id) return device;
+        const merged = { ...device, ...payload.device };
+        if (device.diagnostics && payload.device.diagnostics && !Array.isArray(payload.device.diagnostics.entries)) {
+          merged.diagnostics = { ...device.diagnostics, ...payload.device.diagnostics, entries: device.diagnostics.entries };
+        }
+        return merged;
+      });
+      if (!devices.some((device) => device.id === payload.device.id)) devices.push(payload.device);
+      return { ...current, ...payload, devices };
+    }
     async function setRs485PollingSettings(deviceId) {
       const inputsInput = document.getElementById(`rs485-poll-inputs-${deviceId}`);
       const outputsInput = document.getElementById(`rs485-poll-outputs-${deviceId}`);
@@ -3745,7 +3762,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
             }
           })
         }));
-        paintRs485(payload);
+        paintRs485(mergeRs485CommandPayload(payload));
       } catch (error) {
         document.getElementById('rs485-status').textContent = `RS-485: polling settings failed - ${errorDetail(error)}`;
       }
@@ -3753,7 +3770,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     async function toggleRs485MockCollapse(deviceId) {
       try {
         const payload = await requestJson(`api/v1/rs485/devices/${encodeURIComponent(deviceId)}/collapse`, { method: 'POST' });
-        paintRs485(payload);
+        paintRs485(mergeRs485CommandPayload(payload));
       } catch (error) {
         document.getElementById('rs485-status').textContent = 'RS-485: collapse failed';
       }
@@ -3765,7 +3782,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ value })
         }));
-        paintRs485(payload);
+        paintRs485(mergeRs485CommandPayload(payload));
       } catch (error) {
         document.getElementById('rs485-status').textContent = 'RS-485: capability update failed';
       }
@@ -3793,6 +3810,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ value })
           }));
+          payload = mergeRs485CommandPayload(payload);
           deviceId = payload.selected_id || deviceId;
         }
         delete rs485PendingSettings[originalDeviceId];
@@ -3813,7 +3831,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           delete rs485PendingSettings[deviceId];
           rs485InitialSettingsRead.add(deviceId);
         }
-        paintRs485(payload);
+        paintRs485(mergeRs485CommandPayload(payload));
       } catch (error) {
         document.getElementById('rs485-status').textContent = `RS-485: read failed - ${errorDetail(error)}`;
       }
@@ -3868,7 +3886,25 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       patchRs485LiveStatus(devices);
       if (rs485DetailTab === 'logs') patchRs485LogsTable();
       if (rs485DetailTab === 'diagnostics') patchRs485DiagnosticsLog();
+      refreshRs485DiagnosticsLive();
       syncRs485LivePolling(rs485ApiState);
+    }
+    async function refreshRs485DiagnosticsLive() {
+      if (!['diagnostics', 'logs'].includes(rs485DetailTab) || rs485DiagnosticsLiveInFlight || !rs485SelectedId) return;
+      rs485DiagnosticsLiveInFlight = true;
+      try {
+        const payload = await requestJson(`api/v1/rs485/devices/${encodeURIComponent(rs485SelectedId)}/diagnostics/live`);
+        const device = (rs485ApiState && rs485ApiState.devices || []).find((item) => item.id === payload.device_id);
+        if (device && payload.diagnostics) {
+          device.diagnostics = payload.diagnostics;
+          if (rs485DetailTab === 'logs') patchRs485LogsTable();
+          else patchRs485DiagnosticsLog();
+        }
+      } catch (_error) {
+        // The normal full snapshot remains the fallback if diagnostics refresh fails.
+      } finally {
+        rs485DiagnosticsLiveInFlight = false;
+      }
     }
     function patchRs485LiveStatus(devices) {
       const byId = new Map(devices.map((device) => [device.id, device]));
@@ -5388,6 +5424,13 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     async def get_rs485_live() -> dict:
         return rs485_or_404().live_snapshot()
 
+    @app.get("/api/v1/rs485/devices/{device_id}/diagnostics/live")
+    async def get_rs485_diagnostics_live(device_id: str) -> dict:
+        try:
+            return rs485_or_404().diagnostics_live_snapshot(device_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
     @app.put("/api/v1/rs485/bus")
     async def put_rs485_bus(payload: Rs485BusPayload) -> dict:
         result = await rs485_or_404().save_bus(payload.model_dump())
@@ -5490,7 +5533,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     async def put_rs485_capability(device_id: str, capability_id: str, payload: Rs485CapabilityPayload) -> dict:
         try:
             result = await rs485_or_404().set_capability(device_id, capability_id, payload.value)
-            app.state.runtime.broadcast_nowait({"type": "rs485_changed", "rs485": result})
+            app.state.runtime.broadcast_nowait({"type": "rs485_device_changed", "device": result["device"]})
             return result
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc

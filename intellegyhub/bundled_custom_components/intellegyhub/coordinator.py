@@ -547,7 +547,15 @@ class IntellegyHubGpioManager:
         devices = list(self.rs485.get("devices", []))
         for index, item in enumerate(devices):
             if item.get("id") == device["id"]:
-                devices[index] = device
+                merged = {**item, **device}
+                if isinstance(item.get("diagnostics"), dict) and isinstance(device.get("diagnostics"), dict):
+                    if not isinstance(device["diagnostics"].get("entries"), list):
+                        merged["diagnostics"] = {
+                            **item["diagnostics"],
+                            **device["diagnostics"],
+                            "entries": item["diagnostics"].get("entries", []),
+                        }
+                devices[index] = merged
                 break
         else:
             devices.append(device)

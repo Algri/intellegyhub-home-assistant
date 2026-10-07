@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.204
+
+- Prioritize RS-485 relay writes over user-initiated reads and polling.
+- Return compact RS-485 command responses without dropping diagnostic entries.
+- Add lightweight live diagnostics updates for reliable Start/Stop and Logs views.
+- Refresh RS-485 live I/O values at 100 ms without restoring heavy snapshots.
+- Keep XDO-8 persistence and WebSocket delivery outside the relay command critical path.
+
 ## 0.5.203
 
 - Give XDO-8 relay commands a dedicated lock so XDI-16 interrupt reads cannot delay output switching.

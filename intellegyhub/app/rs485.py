@@ -1300,7 +1300,7 @@ class Rs485Manager:
         self._ensure_bus_worker(serial_port)
         loop = asyncio.get_running_loop()
         future = loop.create_future()
-        priority_value = {"command": 0, "mode": 1, "poll": 2, "scan": 3}.get(priority, 2)
+        priority_value = {"command": 0, "mode": 1, "read_command": 1, "poll": 2, "scan": 3}.get(priority, 2)
         job = Rs485BusJob(
             priority=priority_value,
             sequence=next(self._bus_sequence),
@@ -1793,7 +1793,7 @@ class Rs485Manager:
                             elif hasattr(self.transport, "close_bus"):
                                 await self.transport.close_bus(bus)
                             await self.store.save_device(device)
-                            return self.snapshot(selected_id=device.id, status=f"RS-485: {capability.get('name', capability_id)} failed: {error}")
+                            return self.command_snapshot(device, f"RS-485: {capability.get('name', capability_id)} failed: {error}")
                 device.values[capability_id] = normalized
                 device.values.pop(f"{capability_id}__error", None)
                 mark_device_runtime(device, template, capability, success=True)
@@ -1832,8 +1832,8 @@ class Rs485Manager:
                 name = capability.get("name", capability_id)
                 if capability.get("type") == "switch":
                     state = "ON" if bool(normalized) else "OFF"
-                    return self.snapshot(selected_id=device.id, status=f"RS-485: {name} {state}")
-                return self.snapshot(selected_id=device.id, status=f"RS-485: updated {name}")
+                    return self.command_snapshot(device, f"RS-485: {name} {state}")
+                return self.command_snapshot(device, f"RS-485: updated {name}")
         finally:
             remaining = self._command_pending_by_port.get(serial_port, 1) - 1
             if remaining > 0:
@@ -1855,18 +1855,18 @@ class Rs485Manager:
                 if self._device_is_mock(device):
                     mark_device_runtime(device, template, None, success=True, group_id=poll_group)
                     await self.store.save_device(device)
-                    return self.snapshot(selected_id=device.id, status=f"RS-485: read {device.name}")
+                    return self.command_snapshot(device, f"RS-485: read {device.name}")
                 failed_error: str | None = None
                 try:
-                    await self._read_device_values(device, template, poll_group=poll_group, log_transport=True, log_result="read", priority="command")
+                    await self._read_device_values(device, template, poll_group=poll_group, log_transport=True, log_result="read", priority="read_command")
                     mark_device_runtime(device, template, None, success=True, group_id=poll_group)
                 except Exception as exc:
                     failed_error = str(exc)
                     mark_device_runtime(device, template, None, success=False, error=failed_error, group_id=poll_group)
                 await self.store.save_device(device)
                 if failed_error:
-                    return self.snapshot(selected_id=device.id, status=f"RS-485: read failed for {device.name}: {failed_error}")
-                return self.snapshot(selected_id=device.id, status=f"RS-485: read {device.name}")
+                    return self.command_snapshot(device, f"RS-485: read failed for {device.name}: {failed_error}")
+                return self.command_snapshot(device, f"RS-485: read {device.name}")
             finally:
                 self._command_pending = max(0, self._command_pending)
 
@@ -2132,6 +2132,19 @@ class Rs485Manager:
             "serial_ports": serial_port_options(),
         }
 
+    def command_snapshot(self, device: Rs485Device, status: str) -> dict[str, Any]:
+        """Return only the state needed to acknowledge a device command."""
+        template = self.registry.get(device.template_id)
+        diagnostics = self._diagnostics_for(device.id)
+        device_snapshot = device.snapshot()
+        device_snapshot["identity"] = device_identity_snapshot(template, device)
+        device_snapshot["mock"] = self._device_is_mock(device)
+        device_snapshot["diagnostics"] = {
+            "paused": device.id in self.diagnostics_paused,
+            "last_error": diagnostics.get("last_error"),
+        }
+        return {"status": status, "selected_id": device.id, "device": device_snapshot}
+
     def live_snapshot(self) -> dict[str, Any]:
         """Return only the small mutable state needed by the live UI refresh."""
         devices = []
@@ -2144,6 +2157,14 @@ class Rs485Manager:
                 "runtime": copy.deepcopy(device.runtime or {}),
             })
         return {"devices": devices}
+
+    def diagnostics_live_snapshot(self, device_id: str) -> dict[str, Any]:
+        device = self._device(device_id)
+        diagnostics = copy.deepcopy(self._diagnostics_for(device.id))
+        diagnostics["entries"] = diagnostics.get("entries", [])[-100:]
+        diagnostics["errors"] = diagnostics.get("errors", [])[-100:]
+        diagnostics["paused"] = device.id in self.diagnostics_paused
+        return {"device_id": device.id, "diagnostics": diagnostics}
 
     def _bus_is_mock(self, bus: dict[str, Any]) -> bool:
         if str(bus.get("mode") or "mock") == "usb_real":

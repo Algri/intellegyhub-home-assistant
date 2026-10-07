@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import errno
 import json
 import os
@@ -558,6 +559,7 @@ class ExtensionManager:
         self.error: str | None = "startup pending"
         self._lock = asyncio.Lock()
         self._relay_command_lock = asyncio.Lock()
+        self._module_persistence_tasks: set[asyncio.Task] = set()
         self._publisher: Callable[[dict[str, Any]], Any] | None = None
         self._xdi16_task: asyncio.Task | None = None
         self._xdi16_wake = asyncio.Event()
@@ -604,6 +606,13 @@ class ExtensionManager:
             self._xdi16_task = None
         await self.store.save_power(self.power_on)
         await self.store.save_modules(list(self.modules.values()))
+
+    def _persist_modules_nowait(self) -> None:
+        """Persist the latest relay state without delaying a hardware command."""
+        snapshot = copy.deepcopy(list(self.modules.values()))
+        task = asyncio.create_task(self.store.save_modules(snapshot))
+        self._module_persistence_tasks.add(task)
+        task.add_done_callback(self._module_persistence_tasks.discard)
 
     def snapshot(self) -> dict[str, Any]:
         return {
@@ -655,7 +664,7 @@ class ExtensionManager:
                 raise ValueError("Extension module is not a relay output module")
             updated = await self.hardware.set_xdo8_relay(module.address, channel, on)
             self.modules[module_id] = updated
-            await self.store.save_modules(list(self.modules.values()))
+            self._persist_modules_nowait()
             result = {"module": asdict(updated), "channel": channel, "on": on}
             # The relay command must not wait for a slow WebSocket client or
             # a full extensions snapshot to finish sending.
