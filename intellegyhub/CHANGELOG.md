@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.195
+
+- Keep FC05/FC06/FC15/FC16 write commands independent from read and device polling toggles.
+- Route RS-485 command validation through the selected device port configuration.
+- Preserve visible ON/OFF status inside all project toggles without duplicate external labels.
+
 ## 0.5.194
 
 - Separate RTC Clock into its own navigation card while keeping Functions focused on buzzer and LED services.

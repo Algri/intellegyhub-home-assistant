@@ -1733,7 +1733,8 @@ class Rs485Manager:
 
     async def set_capability(self, device_id: str, capability_id: str, value: Any) -> dict[str, Any]:
         device = self._device(device_id)
-        if not bool(self.bus.get("enabled", True)) and str(device.serial_port) == str(self.bus.get("serial_port") or ""):
+        device_bus_settings = self._bus_for_port(str(device.serial_port))
+        if not bool(device_bus_settings.get("enabled", True)):
             raise ValueError("RS-485 port is disabled")
         if not device.write_enabled:
             raise ValueError("device writes are disabled")
@@ -1846,7 +1847,7 @@ class Rs485Manager:
             self._command_pending -= 1
             try:
                 device = self._device(device_id)
-                if not bool(self.bus.get("enabled", True)) and str(device.serial_port) == str(self.bus.get("serial_port") or ""):
+                if not bool(self._bus_for_port(str(device.serial_port)).get("enabled", True)):
                     raise ValueError("RS-485 port is disabled")
                 if not device.read_enabled:
                     raise ValueError("device reads are disabled")
@@ -1874,7 +1875,7 @@ class Rs485Manager:
         async with self._command_lock:
             self._command_pending -= 1
             device = self._device(device_id)
-            if not bool(self.bus.get("enabled", True)) and str(device.serial_port) == str(self.bus.get("serial_port") or ""):
+            if not bool(self._bus_for_port(str(device.serial_port)).get("enabled", True)):
                 raise ValueError("RS-485 port is disabled")
             if function in {1, 2, 3, 4} and not device.read_enabled:
                 raise ValueError("device reads are disabled")
@@ -2137,7 +2138,8 @@ class Rs485Manager:
         return self.mock and str(bus.get("serial_port") or "") in MOCK_SERIAL_PORTS
 
     def _device_is_mock(self, device: Rs485Device) -> bool:
-        if str(self.bus.get("mode") or "mock") == "usb_real" and device.serial_port not in MOCK_SERIAL_PORTS:
+        device_bus_settings = self._bus_for_port(str(device.serial_port))
+        if str(device_bus_settings.get("mode") or "mock") == "usb_real" and device.serial_port not in MOCK_SERIAL_PORTS:
             return False
         return self.mock and device.serial_port in MOCK_SERIAL_PORTS
 
