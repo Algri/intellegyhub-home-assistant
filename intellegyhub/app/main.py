@@ -69,6 +69,11 @@ class Rs485DeviceEnabledPayload(BaseModel):
     enabled: bool
 
 
+class Rs485DeviceAccessPayload(BaseModel):
+    read_enabled: bool | None = None
+    write_enabled: bool | None = None
+
+
 class Rs485PollingPayload(BaseModel):
     groups: dict[str, dict[str, int | str]] | None = None
 
@@ -111,6 +116,16 @@ class Rs485BusPayload(BaseModel):
     stop_bits: int = 1
     mode: Literal["mock", "usb_real"] = "mock"
     template_id: str | None = None
+    enabled: bool = True
+
+
+class Rs485BusPatchPayload(BaseModel):
+    serial_port: str | None = None
+    baudrate: int | None = None
+    parity: str | None = None
+    stop_bits: int | None = None
+    mode: Literal["mock", "usb_real"] | None = None
+    enabled: bool | None = None
 
 
 class Rs485CapabilityPayload(BaseModel):
@@ -241,7 +256,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.193 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.194 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -296,7 +311,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.193", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.194", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -621,9 +636,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .xport-control-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .toggle {
       position: relative;
-      width: 40px;
-      height: 24px;
-      min-height: 24px;
+      width: 58px;
+      height: 26px;
+      min-height: 26px;
       border: 0;
       border-radius: 999px;
       background: #5f6368;
@@ -633,8 +648,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .toggle::before {
       content: "";
       position: absolute;
-      width: 20px;
-      height: 20px;
+      width: 22px;
+      height: 22px;
       left: 2px;
       top: 2px;
       border-radius: 50%;
@@ -643,8 +658,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       transition: transform .16s ease;
     }
     .toggle.on { background: var(--ha-primary); }
-    .toggle.on::before { transform: translateX(16px); }
-    .toggle span { display: none; }
+    .toggle.on::before { transform: translateX(32px); }
+    .toggle span { position: relative; z-index: 1; display: block; padding-left: 7px; color: #fff; font-size: 9px; font-weight: 900; line-height: 26px; text-align: left; pointer-events: none; }
+    .toggle:not(.on) span { padding-left: 28px; color: #202124; }
     .toggle.readonly {
       cursor: default;
       pointer-events: none;
@@ -722,7 +738,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       --rs485-label-height: 16px;
       --rs485-control-height: 42px;
       display: grid;
-      grid-template-columns: minmax(190px, 280px) 250px 140px 120px 100px 220px auto;
+      grid-template-columns: minmax(190px, 280px) 250px 140px 120px 100px 220px 220px;
       column-gap: 14px;
       row-gap: 12px;
       align-items: end;
@@ -730,6 +746,23 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .rs485-toolbar > * { min-width: 0; }
     .rs485-toolbar .rs485-connection-intro { min-width: 0; }
     .rs485-toolbar + .rs485-layout { margin-top: 18px; }
+    .rs485-port-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; padding: 10px 12px; border: 1px solid var(--ha-card-border); border-radius: 8px; background: var(--ha-surface); }
+    .rs485-port-controls-title { margin-right: auto; color: var(--ha-secondary); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+    .rs485-port-controls .toggle { min-height: 32px; padding: 5px 10px; border: 1px solid var(--ha-row-border); border-radius: 7px; background: transparent; color: var(--ha-secondary); }
+    .rs485-port-controls .toggle.on { border-color: var(--ha-primary); color: var(--ha-primary); background: rgba(3,169,244,.12); }
+    .rs485-settings-polling-controls { display: grid; grid-template-columns: auto repeat(3, minmax(140px, 1fr)); align-items: center; gap: 8px; margin: 0 0 16px; padding: 10px 12px; border: 1px solid var(--ha-row-border); border-radius: 8px; background: var(--ha-row); }
+    .rs485-device-access-controls { grid-template-columns: repeat(3, minmax(170px, 1fr)); grid-template-rows: auto auto; padding: 9px 14px 10px; column-gap: 22px; row-gap: 7px; }
+    .rs485-device-access-controls > .polling-control-label { grid-column: 1 / -1; }
+    .rs485-device-access-controls .rs485-polling-group-toggle { flex-direction: column; align-items: flex-start; gap: 6px; border: 0; border-radius: 0; padding: 3px 0; background: transparent; }
+    .rs485-device-access-controls .rs485-polling-group-toggle .toggle { align-self: flex-start; }
+    .rs485-device-access-controls .rs485-polling-group-toggle > span { display: flex; flex-direction: column; gap: 2px; color: var(--ha-text); font-size: 12px; line-height: 1.2; }
+    .rs485-device-access-controls .rs485-polling-group-toggle > span small { color: var(--ha-secondary); font-size: 10px; font-weight: 600; line-height: 1.2; }
+    .rs485-polling-strip + .rs485-settings-polling-controls { margin-top: -1px; border-top: 0; border-radius: 0 0 8px 8px; }
+    .rs485-polling-strip:has(+ .rs485-settings-polling-controls) { border-radius: 8px 8px 0 0; }
+    .rs485-settings-polling-controls .polling-control-label { color: var(--ha-secondary); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .rs485-polling-group-toggle { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; padding: 4px 6px 4px 10px; border: 1px solid var(--ha-row-border); border-radius: 7px; }
+    .rs485-polling-group-toggle > span { min-width: 0; overflow: hidden; color: var(--ha-secondary); font-size: 11px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+    @media (max-width: 900px) { .rs485-settings-polling-controls { grid-template-columns: 1fr 1fr; } .rs485-settings-polling-controls .polling-control-label { grid-column: 1 / -1; } }
     .rs485-field {
       min-width: 0;
       display: grid;
@@ -776,8 +809,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       padding-top: 0;
       padding-bottom: 0;
     }
-    .rs485-actions { display: flex; gap: 10px; align-items: center; justify-content: flex-end; flex-wrap: nowrap; height: var(--rs485-control-height, 42px); align-self: end; min-width: 0; }
-    .rs485-actions button { height: var(--rs485-control-height, 42px); min-height: var(--rs485-control-height, 42px); min-width: 70px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; }
+    .rs485-actions { display: flex; flex-direction: column; gap: 6px; align-items: stretch; justify-content: flex-end; flex-wrap: nowrap; height: auto; align-self: end; min-width: 0; }
+    .rs485-actions .rs485-connection-polling { width: 100%; min-width: 0; margin-left: 0; justify-content: flex-end; box-sizing: border-box; }
+    .rs485-actions > #rs485-scan-button { width: 100%; min-width: 0; height: var(--rs485-control-height, 42px); min-height: var(--rs485-control-height, 42px); box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; }
     #rs485-section button:not(.toggle):not(.mode-trigger):not(.mode-option) {
       transform: none !important;
       transition: none !important;
@@ -963,16 +997,59 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .rs485-template-strip { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: center; border: 1px solid var(--ha-row-border); border-radius: 10px; padding: 10px 12px; background: var(--ha-row); }
     .rs485-template-strip strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .rs485-template-strip span { color: var(--ha-secondary); font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
-    .rs485-detail-tabs { grid-column: 1 / -1; width: min(100%, 680px); justify-self: start; margin-top: 0; display: grid; grid-template-columns: repeat(3, minmax(130px, 1fr)); gap: 2px; overflow: hidden; border: 1px solid var(--ha-row-border); border-radius: 8px; background: var(--ha-row); }
-    .rs485-detail-tabs button { min-height: 50px; padding: 8px 16px; border: 0 !important; border-radius: 0 !important; background: transparent !important; color: var(--ha-secondary) !important; font-weight: 800; box-shadow: none !important; }
+    .rs485-detail-tabs { grid-column: 1 / -1; width: min(100%, 780px); min-width: 0; justify-self: start; margin-top: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; overflow: hidden; border: 1px solid var(--ha-row-border); border-radius: 8px; background: var(--ha-row); }
+    .rs485-detail-tabs button { min-width: 0; min-height: 44px; padding: 7px 9px; overflow: hidden; border: 0 !important; border-radius: 0 !important; background: transparent !important; color: var(--ha-secondary) !important; font-size: 12px; font-weight: 800; white-space: nowrap; text-overflow: ellipsis; box-shadow: none !important; }
     .rs485-detail-tabs button::before { display: inline-block; margin-right: 10px; color: currentColor; font-size: 18px; vertical-align: -1px; }
     .rs485-detail-tabs button:nth-child(1)::before { content: '▦'; }
     .rs485-detail-tabs button:nth-child(2)::before { content: '⚙'; }
     .rs485-detail-tabs button:nth-child(3)::before { content: '▤'; }
+    .rs485-detail-tabs button:nth-child(4)::before { content: '☷'; }
     .rs485-detail-tabs button.active { background: var(--ha-primary) !important; color: #fff !important; }
     .rs485-detail-tabs button:hover, .rs485-detail-tabs button:focus-visible { background: var(--ha-field) !important; color: var(--ha-text) !important; outline: none; }
     .rs485-detail-tabs button.active:hover, .rs485-detail-tabs button.active:focus-visible { background: var(--ha-primary) !important; color: #fff !important; }
     .rs485-tab-panel.hidden { display: none; }
+    .rs485-logs-panel .rs485-diagnostics-cards { display: none; }
+    .rs485-logs-panel .rs485-traffic-panel { order: 1; }
+    .rs485-logs-component { border: 1px solid var(--ha-row-border); border-radius: 10px; background: var(--ha-row); overflow: hidden; }
+    .rs485-logs-toolbar { display: grid; grid-template-columns: repeat(5, minmax(110px, 1fr)); gap: 8px; padding: 12px; border-bottom: 1px solid var(--ha-row-border); align-items: center; }
+    .rs485-logs-toolbar select, .rs485-logs-toolbar button { box-sizing: border-box; min-height: 42px; border: 1px solid var(--ha-border); border-radius: 8px; background: var(--ha-field); color: var(--ha-text); font: inherit; font-size: 12px; font-weight: 800; }
+    .rs485-logs-toolbar select { grid-row: 2; width: 100%; min-width: 0; padding: 0 30px 0 10px; appearance: auto; }
+    .rs485-logs-toolbar button { padding: 8px 14px; color: var(--ha-primary); border-color: var(--ha-primary); background: transparent; white-space: nowrap; }
+    .rs485-logs-toolbar button:hover, .rs485-logs-toolbar button:focus-visible { background: var(--ha-primary); color: #fff; outline: none; }
+    .rs485-logs-toolbar label { display: inline-flex; align-items: center; gap: 7px; min-height: 42px; color: var(--ha-text); font-size: 12px; font-weight: 800; white-space: nowrap; }
+    .rs485-logs-actions { grid-column: 1 / -1; grid-row: 1; display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-height: 42px; }
+    .rs485-logs-actions button { width: auto; min-width: 0; flex: 0 0 auto; padding: 8px 14px; }
+    .rs485-logs-toolbar input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--ha-primary); }
+    .rs485-logs-table { max-height: 430px; overflow-y: auto; overflow-x: hidden; }
+    .rs485-logs-head, .rs485-log-row { display: grid; grid-template-columns: 38px 72px minmax(62px, .8fr) 42px minmax(58px, .8fr) minmax(70px, 1fr) minmax(68px, .9fr) 58px 68px 68px minmax(80px, 1.2fr); gap: 5px; align-items: center; min-width: 0; padding: 6px 8px; }
+    .rs485-logs-head { position: sticky; top: 0; z-index: 1; color: var(--ha-secondary); font-size: 10px; font-weight: 800; border-bottom: 1px solid var(--ha-row-border); background: var(--ha-row); }
+    .rs485-log-row { border-bottom: 1px solid var(--ha-row-border); font-size: 11px; }
+    .rs485-log-row:last-child { border-bottom: 0; }
+    .rs485-log-row .error { color: var(--ha-error); font-weight: 800; }
+    .rs485-log-row details { min-width: 0; }
+    .rs485-log-row details div { white-space: normal; color: var(--ha-secondary); }
+    .rs485-log-empty { padding: 48px 20px; text-align: center; color: var(--ha-secondary); }
+    .rs485-diagnostics-shell:not(.rs485-logs-panel) .rs485-traffic-panel { display: flex; flex-direction: column; }
+    .rs485-diagnostics-shell:not(.rs485-logs-panel) .rs485-traffic-head { order: 1; }
+    .rs485-diagnostics-shell:not(.rs485-logs-panel) .rs485-traffic-filters { order: 2; }
+    .rs485-diagnostics-shell:not(.rs485-logs-panel) .rs485-manual-command { order: 3; }
+    .rs485-diagnostics-shell:not(.rs485-logs-panel) .rs485-traffic-table-head { order: 4; }
+    .rs485-diagnostics-shell:not(.rs485-logs-panel) .rs485-traffic-empty { order: 5; }
+    .rs485-diagnostics-shell:not(.rs485-logs-panel) .rs485-diagnostics-footer { order: 6; }
+    .rs485-diagnostics-shell:not(.rs485-logs-panel) .rs485-traffic-filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; align-items: center; }
+    .rs485-diagnostics-shell:not(.rs485-logs-panel) .rs485-traffic-filters > .mode-select:nth-child(2),
+    .rs485-diagnostics-shell:not(.rs485-logs-panel) .rs485-traffic-filters > .mode-select:nth-child(5) { display: none; }
+    .rs485-diagnostics-shell:not(.rs485-logs-panel) .rs485-traffic-filters > .mode-select { grid-row: 1; width: 100% !important; min-width: 0; flex: none; box-sizing: border-box; }
+    .rs485-diagnostics-shell:not(.rs485-logs-panel) .rs485-traffic-filters > button { grid-row: 2; justify-self: start; margin-left: 0; }
+    .rs485-diagnostics-shell:not(.rs485-logs-panel) .rs485-traffic-filters > button:nth-last-child(3) { grid-column: 2; }
+    .rs485-diagnostics-shell:not(.rs485-logs-panel) .rs485-traffic-filters > button:nth-last-child(2) { grid-column: 3; }
+    .rs485-diagnostics-shell:not(.rs485-logs-panel) .rs485-traffic-filters > button:nth-last-child(1) { grid-column: 4; }
+    .rs485-diagnostics-shell:not(.rs485-logs-panel) .rs485-traffic-head { align-items: start; }
+    .rs485-diagnostics-shell:not(.rs485-logs-panel) .rs485-traffic-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; align-self: start; }
+    .rs485-diagnostics-shell:not(.rs485-logs-panel) .rs485-export-actions-row,
+    .rs485-diagnostics-shell:not(.rs485-logs-panel) .rs485-primary-actions-row { display: flex; justify-content: flex-end; gap: 8px; }
+    .rs485-diagnostics-shell:not(.rs485-logs-panel) .rs485-traffic-actions button { width: auto; min-width: 0; }
+    @media (max-width: 800px) { .rs485-logs-toolbar { grid-template-columns: repeat(2, minmax(120px, 1fr)); } }
     .rs485-polling-strip.hidden { display: none; }
     .rs485-scan-banner { display: none; min-height: 42px; grid-template-columns: auto minmax(180px, 1fr) auto repeat(3, auto); align-items: center; gap: 18px; padding: 8px 18px; border: 1px solid var(--ha-row-border); border-radius: 8px; background: var(--ha-row); color: var(--ha-secondary); font-size: 13px; }
     .rs485-scan-banner.active { display: grid; }
@@ -1145,6 +1222,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .rs485-empty-cell { color: var(--ha-secondary); }
     .rs485-header-actions { margin-top: 34px; }
     .rs485-connection-intro { display: flex; align-items: center; gap: 12px; min-width: 220px; }
+    .rs485-connection-polling { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 150px; margin-left: auto; white-space: nowrap; }
+    .rs485-connection-polling .rs485-polling-title { margin: 0; font-size: 11px; }
     .rs485-connection-intro strong, .rs485-connection-intro span { display: block; }
     .rs485-connection-intro strong { font-size: 16px; }
     .rs485-connection-intro span { margin-top: 3px; color: var(--ha-secondary); font-size: 12px; line-height: 1.35; }
@@ -1240,6 +1319,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .relay-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .state-text { min-width: 30px; text-align: right; color: var(--ha-secondary); font-size: 12px; font-weight: 800; letter-spacing: .04em; }
     .state-text.on { color: var(--ha-primary); }
+    /* Toggle buttons carry their own ON/OFF label; avoid rendering a duplicate
+       status when a legacy row still contains a separate state element. */
+    .state-text:has(+ .toggle) { display: none; }
     .rs485-mode-row .mode-trigger::after {
       right: 12px;
       top: 16px;
@@ -1335,6 +1417,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       <button type="button" data-ui-nav-target="rs485-section">RS-485</button>
       <button type="button" data-ui-nav-target="onewire-section">1-Wire</button>
       <button type="button" data-ui-nav-target="diagnostics-section">Functions</button>
+      <button type="button" data-ui-nav-target="rtc-section">RTC</button>
       <button type="button" data-ui-nav-target="controls-section">Controls</button>
       <button type="button" data-ui-nav-target="tools-section">Tools</button>
       <div class="theme-switcher" role="group" aria-label="Theme">
@@ -1444,7 +1527,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       <p class="notice">X-BUS is the external I2C expansion bus. Detected modules stay stored until removed.</p>
       <div class="extension-actions bus-toolbar">
         <div class="bus-power-control">
-          <span class="metric">Bus power: <strong id="extension-power-label">OFF</strong></span>
+          <span class="metric">Bus power</span>
           <button id="extension-power-toggle" class="toggle" type="button" onclick="toggleExtensionPower()"><span>OFF</span></button>
         </div>
         <button class="bus-action" onclick="scanExtensions()">Scan modules</button>
@@ -1496,6 +1579,11 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           <div id="rs485-template" class="mode-select" data-value="mio-8"></div>
         </div>
         <div class="rs485-actions">
+          <div class="rs485-connection-polling" aria-label="Selected RS-485 interface polling">
+            <span class="rs485-polling-title">Bus polling</span>
+            <span class="state-text ${(rs485ApiState?.bus?.enabled !== false) ? 'on' : ''}" data-rs485-bus-state>${(rs485ApiState?.bus?.enabled !== false) ? 'ON' : 'OFF'}</span>
+            <button class="toggle ${(rs485ApiState?.bus?.enabled !== false) ? 'on' : ''}" type="button" data-rs485-port-control="port" onclick="toggleRs485Port()" aria-label="Toggle selected RS-485 interface polling"><span>${(rs485ApiState?.bus?.enabled !== false) ? 'ON' : 'OFF'}</span></button>
+          </div>
           <button id="rs485-scan-button" class="rs485-scan-primary" type="button" onclick="scanRs485Mock()">Scan devices</button>
         </div>
       </div>
@@ -1591,7 +1679,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       <p class="notice">The 1-Wire sensor bus is powered through the controller GPIO extender MCP23017 at I2C-10 address 0x20, pin GPB6. DS2482S-100 bridges are scanned on I2C-10 at addresses 0x1A and 0x1B.</p>
       <div class="extension-actions bus-toolbar">
         <div class="bus-power-control">
-          <span class="metric">Bus power: <strong id="onewire-power-label">OFF</strong></span>
+          <span class="metric">Bus power</span>
           <button id="onewire-power-toggle" class="toggle" type="button" onclick="toggleOneWirePower()"><span>OFF</span></button>
         </div>
         <button class="bus-action" onclick="scanOneWire()">Scan sensors</button>
@@ -1608,7 +1696,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           <div class="subtitle">Onboard status indicators and GPIO18 hardware PWM test</div>
           <div id="buzzer-status" class="status">BUZZER: loading...</div>
         </div>
-        <div class="transport">GPIO18 / GPIO19 / GPIO21 / RTC</div>
+        <div class="transport">GPIO18 / GPIO19 / GPIO21</div>
       </div>
       <div id="buzzer-detail" class="buzzer-status"></div>
       <div class="buzzer-panel">
@@ -1639,7 +1727,6 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
             <div class="buzzer-row">
               <span class="buzzer-volume-label">Enabled</span>
               <div class="buzzer-toggle-control">
-                <strong id="buzzer-power-state">ON</strong>
                 <button id="buzzer-power-toggle" class="toggle on" type="button" onclick="toggleBuzzerPower()"><span>ON</span></button>
               </div>
             </div>
@@ -1679,6 +1766,16 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           </div>
           <div class="diagnostic-led-note">Reserved for add-on and hardware error indication.</div>
         </div>
+      </div>
+    </section>
+    <section id="rtc-section" class="extension-panel ui-nav-section">
+      <div class="module-row">
+        <div>
+          <div class="eyebrow">Board Services</div>
+          <h1>RTC</h1>
+          <div class="subtitle">Real-time clock status and synchronization</div>
+        </div>
+        <div class="transport">HOST RTC</div>
       </div>
       <div class="buzzer-group diagnostic-rtc-card">
         <div class="buzzer-group-title">RTC Clock</div>
@@ -2770,7 +2867,6 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       extensionState = payload;
       const powerOn = Boolean(payload.power && payload.power.on);
       document.getElementById('extension-status').textContent = `X-BUS: ${payload.modules.length} module${payload.modules.length === 1 ? '' : 's'} detected`;
-      document.getElementById('extension-power-label').textContent = powerOn ? 'ON' : 'OFF';
       const powerToggle = document.getElementById('extension-power-toggle');
       powerToggle.className = `toggle ${powerOn ? 'on' : ''}`;
       powerToggle.querySelector('span').textContent = powerOn ? 'ON' : 'OFF';
@@ -2843,7 +2939,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           indicator.className = `toggle readonly ${active ? 'on' : ''}`;
           indicator.type = 'button';
           indicator.disabled = true;
-          indicator.innerHTML = `<span>${active ? 'ACTIVE' : 'INACTIVE'}</span>`;
+          indicator.innerHTML = `<span>${active ? 'ON' : 'OFF'}</span>`;
           row.append(label, state, indicator);
           grid.appendChild(row);
         });
@@ -2912,7 +3008,6 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       const sensors = payload.sensors || [];
       const bridges = payload.bridges || [];
       document.getElementById('onewire-status').textContent = `1-WIRE: ${bridges.length} bridge${bridges.length === 1 ? '' : 's'}, ${sensors.length} sensor${sensors.length === 1 ? '' : 's'}`;
-      document.getElementById('onewire-power-label').textContent = powerOn ? 'ON' : 'OFF';
       const powerToggle = document.getElementById('onewire-power-toggle');
       powerToggle.className = `toggle ${powerOn ? 'on' : ''}`;
       powerToggle.querySelector('span').textContent = powerOn ? 'ON' : 'OFF';
@@ -3100,7 +3195,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       });
     }
     function renderRs485Select(id, options, value, onChange) {
-      const wrap = document.getElementById(id);
+      const wraps = [...document.querySelectorAll(`#${id}`)];
+      const wrap = wraps.find((item) => !item.closest('.hidden')) || wraps[wraps.length - 1];
       if (!wrap || !options.length) return;
       const selected = options.find((option) => String(option.value) === String(value)) || options[0];
       wrap.className = 'mode-select';
@@ -3168,6 +3264,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       catch (_error) { /* Browser storage may be disabled. */ }
     }
     let rs485DiagnosticsFilter = 'all';
+    let rs485DiagnosticsPortFilter = 'all';
+    let rs485DiagnosticsGroupFilter = 'all';
+    let rs485DiagnosticsOperationFilter = 'all';
     const RS485_DIAGNOSTICS_BUFFER_KEY = 'intellegyhub.rs485.diagnostics-buffer';
     function rs485DiagnosticsBufferSize() {
       const stored = Number(localStorage.getItem(RS485_DIAGNOSTICS_BUFFER_KEY) || 1000);
@@ -3230,15 +3329,38 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       return value || busValue || '/dev/ttyAMA3';
     }
     function rs485BusPayload() {
+      const bus = rs485ApiState && rs485ApiState.bus ? rs485ApiState.bus : {};
       return {
         serial_port: rs485CurrentSerialPort(),
         baudrate: Number(rs485ControlValue('rs485-baudrate') || 9600),
         parity: rs485ControlValue('rs485-parity') || 'none',
         stop_bits: Number(rs485ControlValue('rs485-stopbits') || 1),
         mode: rs485LocalMode === 'usb_real' ? 'usb_real' : 'mock',
-        template_id: rs485ControlValue('rs485-template') || 'mio-8'
+        template_id: rs485ControlValue('rs485-template') || 'mio-8',
+        enabled: bus.enabled !== false,
       };
     }
+    function paintRs485PortControls() {
+      const bus = rs485ApiState && rs485ApiState.bus || {};
+      [['port', bus.enabled !== false, 'Port']].forEach(([kind, enabled, label]) => {
+        document.querySelectorAll(`[data-rs485-port-control="${kind}"]`).forEach((button) => {
+          button.classList.toggle('on', Boolean(enabled));
+          button.innerHTML = `<span>${kind === 'port' ? '' : `${label} `}${enabled ? 'ON' : 'OFF'}</span>`;
+          if (kind === 'port') {
+            const state = button.closest('.rs485-connection-polling')?.querySelector('[data-rs485-bus-state]') || button.closest('.rs485-polling-toggle')?.querySelector('.state-text');
+            if (state) {
+              state.textContent = enabled ? 'ON' : 'OFF';
+              state.classList.toggle('on', Boolean(enabled));
+            }
+          }
+        });
+      });
+    }
+    async function updateRs485PortSettings(changes) {
+      const payload = { enabled: Boolean(changes.enabled) };
+      try { paintRs485(await rs485Command(() => requestJson('api/v1/rs485/bus', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }))); } catch (error) { document.getElementById('rs485-status').textContent = `RS-485: port setting failed - ${errorDetail(error)}`; }
+    }
+    function toggleRs485Port() { updateRs485PortSettings({ enabled: !(rs485ApiState?.bus?.enabled !== false) }); }
     function rs485TemplateOptions() {
       const templates = rs485ApiState && rs485ApiState.templates && rs485ApiState.templates.length ? rs485ApiState.templates : [{ template_id: 'mio-8', model: 'MIO-8' }];
       return templates.map((template) => ({ value: template.template_id, label: template.model }));
@@ -3548,7 +3670,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       paintRs485ConfiguredDevices();
     }
     function setRs485DetailTab(tab) {
-      rs485DetailTab = ['settings', 'diagnostics'].includes(tab) ? tab : 'io';
+      rs485DetailTab = ['settings', 'diagnostics', 'logs'].includes(tab) ? tab : 'io';
       const detail = document.getElementById('rs485-device-detail');
       if (!detail || !detail.querySelector('.rs485-detail-stack')) {
         rs485DetailSignature = '';
@@ -3556,7 +3678,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         return;
       }
       detail.querySelectorAll('.rs485-detail-tabs button').forEach((button, index) => {
-        const target = index === 0 ? 'io' : index === 1 ? 'settings' : 'diagnostics';
+        const target = index === 0 ? 'io' : index === 1 ? 'settings' : index === 2 ? 'diagnostics' : 'logs';
         const active = target === rs485DetailTab;
         button.classList.toggle('active', active);
         button.setAttribute('aria-selected', String(active));
@@ -3565,8 +3687,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         panel.classList.toggle('hidden', panel.dataset.rs485Panel !== rs485DetailTab);
       });
       const polling = detail.querySelector('.rs485-polling-strip');
-      if (polling) polling.classList.toggle('hidden', rs485DetailTab === 'diagnostics');
+      if (polling) polling.classList.toggle('hidden', ['diagnostics', 'logs'].includes(rs485DetailTab));
       if (rs485DetailTab === 'diagnostics') refreshRs485DiagnosticsPanel(detail);
+      if (rs485DetailTab === 'logs') refreshRs485LogsPanel(detail);
     }
     async function setRs485PollingEnabled(deviceId, enabled) {
       try {
@@ -3578,6 +3701,17 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         paintRs485(payload);
       } catch (error) {
         document.getElementById('rs485-status').textContent = `RS-485: polling toggle failed - ${errorDetail(error)}`;
+      }
+    }
+    async function setRs485DeviceAccess(deviceId, level, enabled) {
+      const body = level === 'read' ? { read_enabled: Boolean(enabled) } : { write_enabled: Boolean(enabled) };
+      try {
+        const payload = await rs485Command(() => requestJson(`api/v1/rs485/devices/${encodeURIComponent(deviceId)}/access`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+        }));
+        paintRs485(payload);
+      } catch (error) {
+        document.getElementById('rs485-status').textContent = `RS-485: ${level} toggle failed - ${errorDetail(error)}`;
       }
     }
     async function setRs485PollingSettings(deviceId) {
@@ -3680,6 +3814,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     function paintRs485(payload, options = {}) {
       if (!payload) return;
       rs485ApiState = payload;
+      paintRs485PortControls();
       const currentPort = rs485CurrentSerialPort();
       const devices = (payload.devices || []).filter((device) => device.serial_port === currentPort);
       if (!rs485SelectedId || !devices.some((device) => device.id === rs485SelectedId)) {
@@ -3710,7 +3845,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       paintRs485ConfiguredDevices();
       paintRs485ScanResults();
       paintRs485ScanLog();
-      patchRs485DiagnosticsLog();
+      if (rs485DetailTab === 'logs') patchRs485LogsTable();
+      if (rs485DetailTab === 'diagnostics') patchRs485DiagnosticsLog();
     }
     function patchRs485LiveStatus(devices) {
       const byId = new Map(devices.map((device) => [device.id, device]));
@@ -3793,6 +3929,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if (rs485DiagnosticsFilter === 'slave' && entry.direction !== 'SLAVE') return false;
         if (rs485DiagnosticsSlaveFilter !== 'all' && String(entry.slave_address) !== rs485DiagnosticsSlaveFilter) return false;
         if (rs485DiagnosticsFunctionFilter !== 'all' && String(entry.function) !== rs485DiagnosticsFunctionFilter) return false;
+        if (rs485DiagnosticsPortFilter !== 'all' && String(entry.serial_port) !== rs485DiagnosticsPortFilter) return false;
+        if (rs485DiagnosticsGroupFilter !== 'all' && String(entry.group) !== rs485DiagnosticsGroupFilter) return false;
+        if (rs485DiagnosticsOperationFilter !== 'all' && String(entry.operation) !== rs485DiagnosticsOperationFilter) return false;
         return true;
       });
       return filteredTraffic.map((entry) => {
@@ -3803,7 +3942,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         const payload = rs485DiagnosticsView === 'raw' ? (raw || '—') : rs485HexPayload(entry);
         const frame = raw.replaceAll("'", '').replaceAll('"', '');
         const decoded = rs485DecodeFrame(raw, entry);
-        return `<div class="rs485-traffic-entry ${entry.result === 'error' ? 'error' : ''}" data-rs485-entry="${id}"><span>${entry.seq || '—'}</span><span>${rs485RuntimeTime(entry.ts)}</span><span>${entry.response_ms ? '+' + entry.response_ms + ' ms' : '+0 ms'}</span><span class="traffic-direction ${entry.direction === 'SLAVE' ? 'slave' : ''}">${entry.direction || 'MASTER'}</span><span>${entry.slave_address}</span><span>${entry.function || '—'}</span><span>${functionCode}</span><span class="rs485-traffic-payload">${payload}</span><span>${entry.bytes || '—'}</span><span class="rs485-traffic-crc">${entry.crc || 'OK'}</span></div><div class="rs485-traffic-detail hidden" data-rs485-detail="${id}"><div><strong>Transaction ${id}</strong><span>TX ${entry.tx_ts || entry.ts || '—'}</span><span>RX ${entry.rx_ts || (entry.result === 'response' ? entry.ts : '—')}</span></div><div><span>TX: ${entry.tx_hex || '—'}</span><span>RX: ${entry.rx_hex || '—'}</span><span>Decoded: ${decoded}</span><span>CRC: ${entry.crc || '—'}</span><span>Exception: ${rs485ExceptionLabel(raw) || '—'}</span></div><button type="button" onclick="copyRs485Frame('${frame}')">Copy frame</button></div>`;
+        return `<div class="rs485-traffic-entry ${entry.result === 'error' ? 'error' : ''}" data-rs485-entry="${id}"><span>${entry.seq || '—'}</span><span>${rs485RuntimeTime(entry.ts)}</span><span>${entry.response_ms ? '+' + entry.response_ms + ' ms' : '+0 ms'}</span><span class="traffic-direction ${entry.direction === 'SLAVE' ? 'slave' : ''}">${entry.direction || 'MASTER'}</span><span>${entry.slave_address}</span><span>${entry.function || '—'}</span><span>${functionCode}</span><span class="rs485-traffic-payload">${payload}</span><span>${entry.bytes || '—'}</span><span class="rs485-traffic-crc">${entry.crc || 'OK'}</span></div><div class="rs485-traffic-detail hidden" data-rs485-detail="${id}"><div><strong>Transaction ${id}</strong><span>Port: ${entry.serial_port || '—'} · ${entry.group || 'unknown'} · ${entry.operation || 'READ'}</span><span>TX ${entry.tx_ts || entry.ts || '—'}</span><span>RX ${entry.rx_ts || (entry.result === 'response' ? entry.ts : '—')}</span></div><div><span>TX: ${entry.tx_hex || '—'}</span><span>RX: ${entry.rx_hex || '—'}</span><span>Decoded: ${decoded}</span><span>CRC: ${entry.crc || '—'}</span><span>Online: ${entry.online == null ? '—' : entry.online ? 'yes' : 'no'} · Backoff: ${entry.backoff_ms || 0} ms · WebSocket: ${entry.ws_published ? 'published' : 'pending'}</span><span>Exception: ${rs485ExceptionLabel(raw) || '—'}</span></div><button type="button" onclick="copyRs485Frame('${frame}')">Copy frame</button></div>`;
       }).join('');
     }
     const RS485_EXCEPTION_CODES = { '01': 'Illegal Function', '02': 'Illegal Data Address', '03': 'Illegal Data Value', '04': 'Server Device Failure', '06': 'Server Device Busy', '0A': 'Gateway Path Unavailable', '0B': 'Gateway Target Device Failed to Respond' };
@@ -3844,7 +3983,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     function setRs485DiagnosticsSlaveFilter(value) { rs485DiagnosticsSlaveFilter = value; patchRs485DiagnosticsLog(); }
     function setRs485DiagnosticsFunctionFilter(value) { rs485DiagnosticsFunctionFilter = value; patchRs485DiagnosticsLog(); }
     function patchRs485DiagnosticsLog() {
-      const panel = document.querySelector('#rs485-device-detail [data-rs485-panel="diagnostics"]');
+      const panel = document.querySelector(`#rs485-device-detail [data-rs485-panel="${rs485DetailTab === 'logs' ? 'logs' : 'diagnostics'}"]`);
       if (!panel) return;
       const device = (rs485ApiState && rs485ApiState.devices || []).find((item) => item.id === rs485SelectedId);
       if (!device) return;
@@ -4195,23 +4334,20 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
             <button type="button" class="${rs485DetailTab === 'io' ? 'active' : ''}" onclick="setRs485DetailTab('io')" role="tab" aria-selected="${rs485DetailTab === 'io'}">I/O Channels</button>
             <button type="button" class="${rs485DetailTab === 'settings' ? 'active' : ''}" onclick="setRs485DetailTab('settings')" role="tab" aria-selected="${rs485DetailTab === 'settings'}">Settings</button>
             <button type="button" class="${rs485DetailTab === 'diagnostics' ? 'active' : ''}" onclick="setRs485DetailTab('diagnostics')" role="tab" aria-selected="${rs485DetailTab === 'diagnostics'}">Diagnostics</button>
+            <button type="button" class="${rs485DetailTab === 'logs' ? 'active' : ''}" onclick="setRs485DetailTab('logs')" role="tab" aria-selected="${rs485DetailTab === 'logs'}">Logs</button>
           </div>
         </div>
         <div class="rs485-detail-stack">
           ${settingsFields.length ? `
             <div data-rs485-panel="settings" class="rs485-capability-group rs485-tab-panel ${rs485DetailTab === 'settings' ? '' : 'hidden'}">
-              <div class="rs485-polling-strip">
-                <div>
-                  <div class="rs485-polling-title">Polling</div>
-                  <div class="rs485-polling-line">${rs485RuntimeSummary(selected)}</div>
-                </div>
-                <div class="rs485-polling-toggle">
-                  <span class="state-text ${selected.enabled !== false ? 'on' : ''}">${selected.enabled !== false ? 'ON' : 'OFF'}</span>
-                  <button class="toggle ${selected.enabled !== false ? 'on' : ''}" type="button" onclick="setRs485PollingEnabled('${selected.id}', ${selected.enabled === false})"><span>${selected.enabled !== false ? 'ON' : 'OFF'}</span></button>
-                </div>
+              <div class="rs485-settings-polling-controls rs485-device-access-controls" aria-label="Device controls">
+                <span class="polling-control-label">Device control</span>
+                <div class="rs485-polling-group-toggle"><span>Device polling<small>Automatic device updates</small></span><button class="toggle ${selected.enabled ? 'on' : ''}" type="button" data-rs485-device-control="device" onclick="setRs485PollingEnabled('${selected.id}', ${!selected.enabled})" aria-label="Toggle device polling"><span>${selected.enabled ? 'ON' : 'OFF'}</span></button></div>
+                <div class="rs485-polling-group-toggle"><span>Read access<small>Read inputs and state</small></span><button class="toggle ${selected.read_enabled !== false ? 'on' : ''}" type="button" data-rs485-device-control="read" onclick="setRs485DeviceAccess('${selected.id}', 'read', ${selected.read_enabled === false})"><span>${selected.read_enabled !== false ? 'ON' : 'OFF'}</span></button></div>
+                <div class="rs485-polling-group-toggle"><span>Write access<small>Control relay outputs</small></span><button class="toggle ${selected.write_enabled !== false ? 'on' : ''}" type="button" data-rs485-device-control="write" onclick="setRs485DeviceAccess('${selected.id}', 'write', ${selected.write_enabled === false})"><span>${selected.write_enabled !== false ? 'ON' : 'OFF'}</span></button></div>
               </div>
               <div class="rs485-panel-head rs485-runtime-config-head">
-                <div class="rs485-panel-title">Runtime configuration</div>
+                <div class="rs485-panel-title">Read polling intervals</div>
               </div>
               <div class="rs485-polling-settings-block">
                 ${renderRs485PollingControls(selected)}
@@ -4238,10 +4374,47 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           <div data-rs485-panel="diagnostics" class="rs485-tab-panel ${rs485DetailTab === 'diagnostics' ? '' : 'hidden'}">
             ${renderRs485Diagnostics(selected)}
           </div>
+          <div data-rs485-panel="logs" class="rs485-tab-panel ${rs485DetailTab === 'logs' ? '' : 'hidden'}">
+            ${renderRs485Logs(selected)}
+          </div>
         </div>`;
       detail.dataset.rs485DeviceId = selected.id;
       bindRs485DiagnosticsActions(detail);
+      bindRs485LogsActions(detail);
     }
+    function refreshRs485LogsPanel(detail) {
+      const device = (rs485ApiState.devices || []).find((item) => item.id === rs485SelectedId);
+      const panel = detail.querySelector('[data-rs485-panel="logs"]');
+      if (!device || !panel) return;
+      panel.innerHTML = renderRs485Logs(device);
+      bindRs485LogsActions(detail);
+    }
+    function bindRs485LogsActions(detail) {
+      const panel = detail.querySelector('[data-rs485-panel="logs"]');
+      if (!panel) return;
+      const toolbar = panel.querySelector('.rs485-logs-toolbar');
+      if (toolbar && !toolbar.querySelector('.rs485-logs-actions')) {
+        const actions = document.createElement('div');
+        actions.className = 'rs485-logs-actions';
+        toolbar.querySelectorAll('label, button').forEach((node) => actions.appendChild(node));
+        toolbar.appendChild(actions);
+      }
+      panel.querySelectorAll('[data-rs485-log-filter]').forEach((select) => { select.onchange = () => patchRs485LogsTable(); });
+      panel.querySelector('[data-rs485-log-clear]')?.addEventListener('click', () => rs485DiagnosticsClear(panel.querySelector('[data-rs485-log-clear]').dataset.rs485LogClear));
+      panel.querySelector('[data-rs485-log-capture]')?.addEventListener('click', () => rs485DiagnosticsTogglePause(panel.querySelector('[data-rs485-log-capture]').dataset.rs485LogCapture));
+      panel.querySelectorAll('[data-rs485-log-export]').forEach((button) => { button.onclick = () => exportRs485Logs(button.dataset.rs485LogExport); });
+    }
+    function patchRs485LogsTable() {
+      const panel = document.querySelector('#rs485-device-detail [data-rs485-panel="logs"]');
+      const device = (rs485ApiState.devices || []).find((item) => item.id === rs485SelectedId);
+      const body = panel && panel.querySelector('[data-rs485-logs-body]');
+      if (!panel || !device || !body) return;
+      const values = Object.fromEntries([...panel.querySelectorAll('[data-rs485-log-filter]')].map((node) => [node.dataset.rs485LogFilter, node.value]));
+      const errors = panel.querySelector('[data-rs485-log-errors]')?.checked;
+      const entries = (device.diagnostics && device.diagnostics.entries || []).slice(-rs485DiagnosticsBufferSize()).filter((entry) => (!errors || entry.result === 'error') && (!values.port || values.port === 'all' || String(entry.serial_port) === values.port) && (!values.slave || values.slave === 'all' || String(entry.slave_address) === values.slave) && (!values.group || values.group === 'all' || String(entry.group) === values.group) && (!values.operation || values.operation === 'all' || String(entry.operation) === values.operation) && (!values.function || values.function === 'all' || String(entry.function) === values.function));
+      body.innerHTML = entries.length ? entries.map((entry) => `<div class="rs485-log-row"><span>${entry.seq ?? '—'}</span><span>${rs485RuntimeTime(entry.ts)}</span><span>${entry.serial_port || '—'}</span><span>${entry.slave_address ?? '—'}</span><span>${entry.group || '—'}</span><span>${entry.operation || '—'}</span><span>${entry.direction || '—'}</span><span>${entry.function || '—'}</span><span>${entry.response_ms == null ? '—' : `${entry.response_ms} ms`}</span><span class="${entry.result === 'error' ? 'error' : ''}">${entry.result || '—'}</span><span title="${entry.message || ''}">${entry.error_type || entry.message || 'details'}</span></div>`).join('') : '<div class="rs485-log-empty">No matching transactions.</div>';
+    }
+    function exportRs485Logs(format) { exportRs485Diagnostics(format); }
     function refreshRs485DiagnosticsPanel(detail) {
       const device = (rs485ApiState.devices || []).find((item) => item.id === rs485SelectedId);
       const panel = detail.querySelector('[data-rs485-panel="diagnostics"]');
@@ -4251,12 +4424,38 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       const optionValues = (key) => [...new Set(entries.map((entry) => String(entry[key] ?? '')).filter(Boolean))].sort();
       const slaveValues = optionValues('slave_address').map((value) => ({ value, label: `Slave ${value}` }));
       const functionValues = optionValues('function').map((value) => ({ value, label: value }));
+      const portValues = optionValues('serial_port').map((value) => ({ value, label: value }));
+      const groupValues = optionValues('group').map((value) => ({ value, label: value }));
+      const operationValues = optionValues('operation').map((value) => ({ value, label: value }));
       renderRs485Select('rs485-diagnostics-filter', [{ value: 'all', label: 'All traffic' }, { value: 'master', label: 'Master TX' }, { value: 'slave', label: 'Slave RX' }, { value: 'errors', label: 'Errors only' }], rs485DiagnosticsFilter, setRs485DiagnosticsFilter);
+      renderRs485Select('rs485-diagnostics-port-filter', [{ value: 'all', label: 'All ports' }, ...portValues], rs485DiagnosticsPortFilter, (value) => { rs485DiagnosticsPortFilter = value; patchRs485DiagnosticsLog(); });
+      renderRs485Select('rs485-diagnostics-group-filter', [{ value: 'all', label: 'All groups' }, ...groupValues], rs485DiagnosticsGroupFilter, (value) => { rs485DiagnosticsGroupFilter = value; patchRs485DiagnosticsLog(); });
+      renderRs485Select('rs485-diagnostics-operation-filter', [{ value: 'all', label: 'All operations' }, ...operationValues], rs485DiagnosticsOperationFilter, (value) => { rs485DiagnosticsOperationFilter = value; patchRs485DiagnosticsLog(); });
       renderRs485Select('rs485-diagnostics-slave-filter', [{ value: 'all', label: 'All slaves' }, ...slaveValues], rs485DiagnosticsSlaveFilter, setRs485DiagnosticsSlaveFilter);
       renderRs485Select('rs485-diagnostics-function-filter', [{ value: 'all', label: 'All functions' }, ...functionValues], rs485DiagnosticsFunctionFilter, setRs485DiagnosticsFunctionFilter);
       bindRs485DiagnosticsActions(detail);
     }
     function bindRs485DiagnosticsActions(detail) {
+      const diagnosticsFilters = detail.querySelector('[data-rs485-panel="diagnostics"] .rs485-traffic-filters');
+      const diagnosticsActions = detail.querySelector('[data-rs485-panel="diagnostics"] .rs485-traffic-actions');
+      if (diagnosticsFilters && diagnosticsActions) {
+        diagnosticsFilters.querySelectorAll(':scope > button').forEach((button) => {
+          const action = button.getAttribute('onclick') || '';
+          button.classList.add(action.includes('exportRs485Diagnostics') ? 'rs485-export-action' : 'rs485-primary-action');
+          if (action.includes("'csv'")) button.classList.add('rs485-export-csv');
+          if (action.includes("'json'")) button.classList.add('rs485-export-json');
+          diagnosticsActions.appendChild(button);
+        });
+        if (!diagnosticsActions.querySelector('.rs485-export-actions-row')) {
+          const buttons = [...diagnosticsActions.querySelectorAll(':scope > button')];
+          const topRow = document.createElement('div');
+          const bottomRow = document.createElement('div');
+          topRow.className = 'rs485-export-actions-row';
+          bottomRow.className = 'rs485-primary-actions-row';
+          buttons.forEach((button) => (button.classList.contains('rs485-export-action') ? topRow : bottomRow).appendChild(button));
+          diagnosticsActions.append(topRow, bottomRow);
+        }
+      }
       const device = (rs485ApiState.devices || []).find((item) => item.id === rs485SelectedId);
       if (device) {
         const entries = (device.diagnostics && device.diagnostics.entries) || [];
@@ -4266,6 +4465,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         const knownFunctions = ['Read', 'Write', 'Write Single Coil', 'Write Single Register', 'Write Multiple Coils', 'Write Multiple Registers'];
         const functionLabels = [...new Set([...knownFunctions, ...values('function')])];
         renderRs485Select('rs485-diagnostics-function-filter', [{ value: 'all', label: 'All functions' }, ...functionLabels.map((value) => ({ value, label: value }))], rs485DiagnosticsFunctionFilter, setRs485DiagnosticsFunctionFilter);
+        renderRs485Select('rs485-diagnostics-port-filter', [{ value: 'all', label: 'All ports' }, ...values('serial_port').map((value) => ({ value, label: value }))], rs485DiagnosticsPortFilter, (value) => { rs485DiagnosticsPortFilter = value; patchRs485DiagnosticsLog(); });
+        renderRs485Select('rs485-diagnostics-group-filter', [{ value: 'all', label: 'All groups' }, ...values('group').map((value) => ({ value, label: value }))], rs485DiagnosticsGroupFilter, (value) => { rs485DiagnosticsGroupFilter = value; patchRs485DiagnosticsLog(); });
+        renderRs485Select('rs485-diagnostics-operation-filter', [{ value: 'all', label: 'All operations' }, ...values('operation').map((value) => ({ value, label: value }))], rs485DiagnosticsOperationFilter, (value) => { rs485DiagnosticsOperationFilter = value; patchRs485DiagnosticsLog(); });
       }
       const diagnosticsClear = detail.querySelector('[data-rs485-diagnostics-clear]');
       const diagnosticsReset = detail.querySelector('[data-rs485-diagnostics-reset]');
@@ -4508,6 +4710,19 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       }
     }
     function renderRs485Diagnostics(device) {
+      return renderRs485LegacyDiagnostics(device);
+    }
+    function rs485LogFilterOptions(entries, key, allLabel) {
+      const values = [...new Set(entries.map((entry) => String(entry[key] ?? '')).filter(Boolean))].sort();
+      return `<option value="all">${allLabel}</option>${values.map((value) => `<option value="${value}">${value}</option>`).join('')}`;
+    }
+    function renderRs485Logs(device) {
+      const entries = (device.diagnostics && device.diagnostics.entries || []).slice(-rs485DiagnosticsBufferSize());
+      const id = String(device.id).replace(/[^a-zA-Z0-9_-]/g, '_');
+      const rowMarkup = entries.length ? entries.map((entry) => `<div class="rs485-log-row" data-rs485-log-row data-result="${entry.result || ''}" data-port="${entry.serial_port || ''}" data-group="${entry.group || ''}" data-operation="${entry.operation || ''}" data-slave="${entry.slave_address || ''}" data-function="${entry.function || ''}"><span>${entry.seq ?? '—'}</span><span>${rs485RuntimeTime(entry.ts)}</span><span>${entry.serial_port || '—'}</span><span>${entry.slave_address ?? '—'}</span><span>${entry.group || '—'}</span><span>${entry.operation || '—'}</span><span>${entry.direction || '—'}</span><span>${entry.function || '—'}</span><span>${entry.response_ms == null ? '—' : `${entry.response_ms} ms`}</span><span class="${entry.result === 'error' ? 'error' : ''}">${entry.result || '—'}</span><details><summary>details</summary><div>TX: ${entry.tx_hex || '—'} · RX: ${entry.rx_hex || '—'} · Error: ${entry.error_type || entry.message || '—'} · ${entry.online == null ? '—' : entry.online ? 'ONLINE' : 'OFFLINE'} · Backoff: ${entry.backoff_ms || 0} ms · WebSocket: ${entry.ws_published ? 'published' : 'pending'}</div></details></div>`).join('') : '<div class="rs485-log-empty" data-rs485-log-empty>No Modbus transactions recorded yet.</div>';
+      return `<section class="rs485-logs-component" data-rs485-logs-component="${id}"><div class="rs485-logs-toolbar"><select data-rs485-log-filter="port"><option value="all">All ports</option>${rs485LogFilterOptions(entries, 'serial_port', '').replace('<option value="all"></option>', '')}</select><select data-rs485-log-filter="slave"><option value="all">All slaves</option>${rs485LogFilterOptions(entries, 'slave_address', '').replace('<option value="all"></option>', '')}</select><select data-rs485-log-filter="group"><option value="all">All groups</option>${rs485LogFilterOptions(entries, 'group', '').replace('<option value="all"></option>', '')}</select><select data-rs485-log-filter="operation"><option value="all">All operations</option>${rs485LogFilterOptions(entries, 'operation', '').replace('<option value="all"></option>', '')}</select><select data-rs485-log-filter="function"><option value="all">All functions</option>${rs485LogFilterOptions(entries, 'function', '').replace('<option value="all"></option>', '')}</select><label><input type="checkbox" data-rs485-log-errors> Errors</label><button type="button" data-rs485-log-export="csv">Export CSV</button><button type="button" data-rs485-log-export="json">Export JSON</button><button type="button" data-rs485-log-clear="${device.id}">Clear logs</button><button type="button" data-rs485-log-capture="${device.id}">${(device.diagnostics || {}).paused ? 'Start' : 'Stop'}</button></div><div class="rs485-logs-table"><div class="rs485-logs-head"><span>#</span><span>Timestamp</span><span>Port</span><span>Slave</span><span>Group</span><span>Operation</span><span>Direction</span><span>Function</span><span>Duration</span><span>Result</span><span>Details</span></div><div class="rs485-logs-body" data-rs485-logs-body>${rowMarkup}</div></div></section>`;
+    }
+    function renderRs485LegacyDiagnostics(device, logsOnly = false) {
       const manual = rs485ManualCommandState[device.id] || { slave_id: device.slave_address, function: 3, address: 0, count: 1, value: 0 };
       const runtime = rs485Runtime(device);
       const state = rs485RuntimeGroup(device, 'state');
@@ -4536,7 +4751,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       const dataAgeSeconds = diagnostics.last_valid_response_at ? Math.max(0, Math.round((Date.now() - Date.parse(diagnostics.last_valid_response_at)) / 1000)) : null;
       const dataAge = dataAgeSeconds == null ? '—' : `${dataAgeSeconds} s${dataAgeSeconds > 5 ? ' · STALE' : ''}`;
       const latencyAvg = totalRequests ? Math.round(Number(diagnostics.latency_total_ms || 0) / totalRequests) : null;
-      return `<div class="rs485-diagnostics-shell">
+      return `<div class="rs485-diagnostics-shell${logsOnly ? ' rs485-logs-panel' : ''}">
         <div class="rs485-diagnostics-cards">
           <section class="rs485-diagnostics-card">
             <div class="rs485-diagnostics-card-head"><span class="diag-icon">[ ]</span>Communication Status</div>
@@ -4581,7 +4796,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           </section>
         </div>
         <section class="rs485-traffic-panel">
-          <div class="rs485-traffic-filters"><div id="rs485-diagnostics-filter" class="mode-select"></div><div id="rs485-diagnostics-slave-filter" class="mode-select"></div><div id="rs485-diagnostics-function-filter" class="mode-select"></div><button type="button" onclick="toggleRs485DiagnosticsView()">${rs485DiagnosticsView === 'decoded' ? 'Show raw' : 'Show decoded'}</button><button type="button" onclick="exportRs485Diagnostics('csv')">Export CSV</button><button type="button" onclick="exportRs485Diagnostics('json')">Export JSON</button></div>
+          <div class="rs485-traffic-filters"><div id="rs485-diagnostics-filter" class="mode-select"></div><div id="rs485-diagnostics-port-filter" class="mode-select"></div><div id="rs485-diagnostics-group-filter" class="mode-select"></div><div id="rs485-diagnostics-operation-filter" class="mode-select"></div><div id="rs485-diagnostics-slave-filter" class="mode-select"></div><div id="rs485-diagnostics-function-filter" class="mode-select"></div><button type="button" onclick="toggleRs485DiagnosticsView()">${rs485DiagnosticsView === 'decoded' ? 'Show raw' : 'Show decoded'}</button><button type="button" onclick="exportRs485Diagnostics('csv')">Export CSV</button><button type="button" onclick="exportRs485Diagnostics('json')">Export JSON</button></div>
           <div class="rs485-traffic-head"><div class="rs485-traffic-title">Modbus Traffic Log</div><div class="rs485-traffic-actions"><button type="button" data-rs485-manual-open="${device.id}">Send packet</button><button type="button" data-rs485-diagnostics-reset="${device.id}">Reset counters</button><button type="button" class="danger-button" data-rs485-diagnostics-clear="${device.id}">Clear log</button><button type="button" data-rs485-diagnostics-toggle="${device.id}">${diagnostics.paused ? 'Start' : 'Stop'}</button></div></div>
           <div class="rs485-manual-command ${rs485ManualCommandOpen ? 'open' : ''}" data-rs485-manual-panel="${device.id}">
             <div class="rs485-manual-command-head"><span>Send packet</span><button type="button" data-rs485-manual-close="${device.id}" aria-label="Close">&times;</button></div>
@@ -4624,7 +4839,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           <input id="rs485-poll-inputs-${device.id}" type="number" min="50" max="600000" step="50" value="${inputs.interval_ms || 100}" onchange="setRs485PollingSettings('${device.id}')">
         </div>
         <div class="rs485-polling-field">
-          <label>Relay interval ms</label>
+          <label>Relay state read interval ms</label>
           <input id="rs485-poll-outputs-${device.id}" type="number" min="50" max="600000" step="50" value="${outputs.interval_ms || 250}" onchange="setRs485PollingSettings('${device.id}')">
         </div>`;
     }
@@ -4652,9 +4867,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       return parts.join('');
     }
     function rs485DeviceWritable(device) {
-      // Polling is background traffic only. Manual relay writes remain
-      // available when polling is paused and are executed on demand.
-      return Boolean(device);
+      return Boolean(device && device.enabled && device.write_enabled !== false && rs485ApiState?.bus?.enabled !== false);
     }
     function renderRs485RowCapability(device, capability, labelOverride = '') {
       const displayName = labelOverride || capability.name;
@@ -4888,10 +5101,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     function paintBuzzerPower(volume, lastVolume) {
       const enabled = Number(volume) > 0;
-      const state = document.getElementById('buzzer-power-state');
       const toggle = document.getElementById('buzzer-power-toggle');
-      if (!state || !toggle) return;
-      state.textContent = enabled ? 'ON' : 'OFF';
+      if (!toggle) return;
       toggle.className = `toggle ${enabled ? 'on' : ''}`;
       toggle.innerHTML = `<span>${enabled ? 'ON' : 'OFF'}</span>`;
       toggle.title = enabled ? 'Turn buzzer volume off' : `Restore buzzer volume to ${lastVolume || 50}%`;
@@ -5155,6 +5366,12 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         await app.state.runtime.broadcast({"type": "rs485_changed", "rs485": result})
         return result
 
+    @app.patch("/api/v1/rs485/bus")
+    async def patch_rs485_bus(payload: Rs485BusPatchPayload) -> dict:
+        result = await rs485_or_404().patch_bus(payload.model_dump(exclude_none=True))
+        await app.state.runtime.broadcast({"type": "rs485_changed", "rs485": result})
+        return result
+
     @app.post("/api/v1/rs485/scan")
     async def post_rs485_scan(payload: Rs485BusPayload) -> dict:
         return await rs485_or_404().scan(payload.model_dump())
@@ -5261,6 +5478,19 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     async def put_rs485_device_enabled(device_id: str, payload: Rs485DeviceEnabledPayload) -> dict:
         try:
             result = await rs485_or_404().set_device_enabled(device_id, payload.enabled)
+            await app.state.runtime.broadcast({"type": "rs485_changed", "rs485": result})
+            return result
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.put("/api/v1/rs485/devices/{device_id}/access")
+    async def put_rs485_device_access(device_id: str, payload: Rs485DeviceAccessPayload) -> dict:
+        try:
+            result = await rs485_or_404().set_device_access(
+                device_id,
+                read_enabled=payload.read_enabled,
+                write_enabled=payload.write_enabled,
+            )
             await app.state.runtime.broadcast({"type": "rs485_changed", "rs485": result})
             return result
         except ValueError as exc:

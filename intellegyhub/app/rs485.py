@@ -201,6 +201,8 @@ class Rs485Device:
     stop_bits: int
     slave_address: int
     enabled: bool = True
+    read_enabled: bool = True
+    write_enabled: bool = True
     collapsed: bool = False
     values: dict[str, Any] = field(default_factory=dict)
     runtime: dict[str, Any] = field(default_factory=dict)
@@ -411,9 +413,16 @@ class Rs485Store:
     async def load_bus(self) -> dict[str, Any]:
         return await asyncio.to_thread(self._load_bus_sync)
 
+    async def load_buses(self) -> dict[str, dict[str, Any]]:
+        return await asyncio.to_thread(self._load_buses_sync)
+
     async def save_bus(self, settings: dict[str, Any]) -> None:
         async with self._lock:
             await asyncio.to_thread(self._save_bus_sync, settings)
+
+    async def save_bus_for_port(self, serial_port: str, settings: dict[str, Any]) -> None:
+        async with self._lock:
+            await asyncio.to_thread(self._save_bus_for_port_sync, serial_port, settings)
 
     async def load_devices(self) -> list[Rs485Device]:
         return await asyncio.to_thread(self._load_devices_sync)
@@ -452,6 +461,8 @@ class Rs485Store:
                     stop_bits INTEGER NOT NULL,
                     slave_address INTEGER NOT NULL,
                     enabled INTEGER NOT NULL,
+                    read_enabled INTEGER NOT NULL DEFAULT 1,
+                    write_enabled INTEGER NOT NULL DEFAULT 1,
                     collapsed INTEGER NOT NULL,
                     values_json TEXT NOT NULL,
                     polling_json TEXT NOT NULL DEFAULT '{}'
@@ -459,6 +470,10 @@ class Rs485Store:
                 """
             )
             columns = {row[1] for row in db.execute("PRAGMA table_info(rs485_devices)").fetchall()}
+            if "read_enabled" not in columns:
+                db.execute("ALTER TABLE rs485_devices ADD COLUMN read_enabled INTEGER NOT NULL DEFAULT 1")
+            if "write_enabled" not in columns:
+                db.execute("ALTER TABLE rs485_devices ADD COLUMN write_enabled INTEGER NOT NULL DEFAULT 1")
             if "polling_json" not in columns:
                 db.execute("ALTER TABLE rs485_devices ADD COLUMN polling_json TEXT NOT NULL DEFAULT '{}'")
             db.execute("CREATE TABLE IF NOT EXISTS rs485_diagnostics (device_id TEXT PRIMARY KEY, data_json TEXT NOT NULL)")
@@ -484,12 +499,39 @@ class Rs485Store:
         settings = default_bus_settings()
         with self._connect() as db:
             rows = db.execute("SELECT key,value FROM rs485_bus_settings").fetchall()
+        port_rows: dict[str, Any] = {}
         for key, value in rows:
+            if key.startswith("port::"):
+                _, port, field = key.split("::", 2)
+                if port == str(settings["serial_port"]):
+                    port_rows[field] = value
+            elif key in {"baudrate", "stop_bits", "slave_address"}:
+                settings[key] = int(value)
+            else:
+                settings[key] = value
+        for key, value in port_rows.items():
             if key in {"baudrate", "stop_bits", "slave_address"}:
                 settings[key] = int(value)
             else:
                 settings[key] = value
         return normalize_bus_settings(settings)
+
+    def _load_buses_sync(self) -> dict[str, dict[str, Any]]:
+        with self._connect() as db:
+            rows = db.execute("SELECT key,value FROM rs485_bus_settings").fetchall()
+        grouped: dict[str, dict[str, Any]] = {}
+        legacy: dict[str, Any] = {}
+        for key, value in rows:
+            if key.startswith("port::"):
+                _, port, field = key.split("::", 2)
+                target = grouped.setdefault(port, default_bus_settings())
+                target[field] = value
+            else:
+                legacy[key] = int(value) if key in {"baudrate", "stop_bits", "slave_address"} else value
+        if legacy:
+            old = normalize_bus_settings({**default_bus_settings(), **legacy})
+            grouped.setdefault(str(old["serial_port"]), old)
+        return {port: normalize_bus_settings({**bus, "serial_port": port}) for port, bus in grouped.items()}
 
     def _save_bus_sync(self, settings: dict[str, Any]) -> None:
         normalized = normalize_bus_settings(settings)
@@ -501,11 +543,21 @@ class Rs485Store:
                     (key, str(value)),
                 )
 
+    def _save_bus_for_port_sync(self, serial_port: str, settings: dict[str, Any]) -> None:
+        normalized = normalize_bus_settings({**settings, "serial_port": serial_port})
+        with self._connect() as db:
+            for key, value in normalized.items():
+                db.execute(
+                    "INSERT INTO rs485_bus_settings(key,value) VALUES(?,?) "
+                    "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                    (f"port::{serial_port}::{key}", str(value)),
+                )
+
     def _load_devices_sync(self) -> list[Rs485Device]:
         with self._connect() as db:
             rows = db.execute(
                 """
-                SELECT id,name,template_id,serial_port,baudrate,parity,stop_bits,slave_address,enabled,collapsed,values_json,polling_json
+                    SELECT id,name,template_id,serial_port,baudrate,parity,stop_bits,slave_address,enabled,read_enabled,write_enabled,collapsed,values_json,polling_json
                 FROM rs485_devices ORDER BY serial_port,slave_address
                 """
             ).fetchall()
@@ -519,8 +571,8 @@ class Rs485Store:
             db.execute(
                 """
                 INSERT INTO rs485_devices(
-                    id,name,template_id,serial_port,baudrate,parity,stop_bits,slave_address,enabled,collapsed,values_json,polling_json
-                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+                    id,name,template_id,serial_port,baudrate,parity,stop_bits,slave_address,enabled,read_enabled,write_enabled,collapsed,values_json,polling_json
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(id) DO UPDATE SET
                     name=excluded.name,
                     template_id=excluded.template_id,
@@ -530,6 +582,8 @@ class Rs485Store:
                     stop_bits=excluded.stop_bits,
                     slave_address=excluded.slave_address,
                     enabled=excluded.enabled,
+                    read_enabled=excluded.read_enabled,
+                    write_enabled=excluded.write_enabled,
                     collapsed=excluded.collapsed,
                     values_json=excluded.values_json,
                     polling_json=excluded.polling_json
@@ -544,6 +598,8 @@ class Rs485Store:
                     device.stop_bits,
                     device.slave_address,
                     1 if device.enabled else 0,
+                    1 if device.read_enabled else 0,
+                    1 if device.write_enabled else 0,
                     1 if device.collapsed else 0,
                     json.dumps(device.values, separators=(",", ":")),
                     json.dumps(device.polling, separators=(",", ":")),
@@ -556,9 +612,9 @@ class Rs485Store:
 
 
 def _device_from_store_row(row: tuple[Any, ...]) -> Rs485Device:
-    values = json.loads(row[10] or "{}")
+    values = json.loads(row[12] or "{}")
     legacy_polling = values.pop("__polling", {})
-    polling = json.loads(row[11] or "{}") if len(row) > 11 else legacy_polling
+    polling = json.loads(row[13] or "{}") if len(row) > 13 else legacy_polling
     return Rs485Device(
                 id=row[0],
                 name=row[1],
@@ -569,7 +625,9 @@ def _device_from_store_row(row: tuple[Any, ...]) -> Rs485Device:
                 stop_bits=int(row[6]),
                 slave_address=int(row[7]),
                 enabled=bool(row[8]),
-                collapsed=bool(row[9]),
+                read_enabled=bool(row[9]),
+                write_enabled=bool(row[10]),
+                collapsed=bool(row[11]),
                 values=values,
                 polling=polling if isinstance(polling, dict) else {},
     )
@@ -923,6 +981,7 @@ class Rs485Manager:
         self.transport = transport or Rs485ModbusTransport()
         self.mock = mock
         self.bus = default_bus_settings()
+        self.buses: dict[str, dict[str, Any]] = {}
         self.devices: dict[str, Rs485Device] = {}
         self.scanned: list[dict[str, Any]] = []
         self.scan_errors: list[dict[str, Any]] = []
@@ -947,6 +1006,7 @@ class Rs485Manager:
         self._command_pending_by_port: dict[str, int] = {}
         self._command_pending = 0
         self._publisher: Callable[[dict[str, Any]], Awaitable[None]] | None = None
+        self._stopping = False
 
     def set_publisher(self, publisher: Callable[[dict[str, Any]], Awaitable[None]]) -> None:
         self._publisher = publisher
@@ -960,15 +1020,26 @@ class Rs485Manager:
 
     async def _publish_device(self, device: Rs485Device) -> None:
         template = self.registry.get(device.template_id)
+        diagnostics = self._diagnostics_for(device.id)
+        for entry in diagnostics.get("entries", [])[-4:]:
+            entry["ws_published"] = True
+            entry["online"] = device.runtime.get("online")
+            entry["backoff_ms"] = device.runtime.get("backoff_ms", 0)
         snapshot = device.snapshot()
         snapshot["identity"] = device_identity_snapshot(template, device)
         snapshot["mock"] = self._device_is_mock(device)
+        snapshot["diagnostics"] = copy.deepcopy(diagnostics)
         await self._publish({"type": "rs485_device_changed", "device": snapshot})
 
     async def start(self) -> None:
+        self._stopping = False
         self.registry.reload()
         await self.store.initialize()
         self.bus = await self.store.load_bus()
+        self.buses = await self.store.load_buses()
+        self.buses.setdefault(str(self.bus["serial_port"]), dict(self.bus))
+        for port in {str(device.serial_port) for device in await self.store.load_devices()}:
+            self.buses.setdefault(port, {**default_bus_settings(), "serial_port": port})
         self.devices = {device.id: device for device in await self.store.load_devices()}
         # Older versions embedded the Modbus address in the display name (for
         # example, ``MIO-8 #1``). Keep user-defined names intact, but migrate
@@ -982,13 +1053,14 @@ class Rs485Manager:
                 await self.store.save_device(device)
                 await self._publish_device(device)
         self.diagnostics = await self.store.load_diagnostics()
-        # Traffic capture is an explicit user action. Never resume it from a
-        # persisted session after the add-on restarts; keep the collected log
-        # and counters, but require Start for a new capture session.
+        # Traffic capture is opt-in. Restore an explicit persisted choice, but
+        # old diagnostic records without the flag start with capture disabled.
         for device_id, diagnostics in self.diagnostics.items():
-            diagnostics["paused"] = True
-            self.diagnostics_paused.add(device_id)
-            await self.store.save_diagnostics(device_id, diagnostics.copy())
+            diagnostics.setdefault("paused", True)
+            if diagnostics["paused"]:
+                self.diagnostics_paused.add(device_id)
+            else:
+                self.diagnostics_paused.discard(device_id)
         for serial_port in {str(device.serial_port) for device in self.devices.values()}:
             self._ensure_bus_worker(serial_port)
         await self.refresh()
@@ -999,7 +1071,16 @@ class Rs485Manager:
             self._ensure_poll_task(serial_port)
 
     async def stop(self) -> None:
+        self._stopping = True
         await self.stop_scan()
+        scan_task = self._scan_task
+        self._scan_task = None
+        if scan_task and not scan_task.done():
+            scan_task.cancel()
+            try:
+                await scan_task
+            except asyncio.CancelledError:
+                pass
         await self.flush_diagnostics()
         poll_tasks = list(self._poll_tasks.values())
         self._poll_tasks.clear()
@@ -1103,10 +1184,15 @@ class Rs485Manager:
         message: str,
         started: float,
         transaction_id: str | None = None,
+        group_id: str | None = None,
+        operation: str | None = None,
     ) -> None:
-        if device.id in self.diagnostics_paused:
-            return
         diagnostics = self._diagnostics_for(device.id)
+        # Diagnostics capture is independent from RS-485 polling. When the
+        # user presses Stop, freeze the complete diagnostic measurement rather
+        # than only hiding journal rows while counters keep increasing.
+        if device.id in self.diagnostics_paused or diagnostics.get("paused", False):
+            return
         diagnostics["sequence"] += 1
         transaction_id = transaction_id or f"{device.id}:{diagnostics['sequence']}"
         if result == "scan":
@@ -1145,6 +1231,11 @@ class Rs485Manager:
         diagnostics["entries"].append({
             "seq": diagnostics["sequence"], "ts": datetime.now(timezone.utc).isoformat(), "result": result,
             "slave_address": device.slave_address, "message": message,
+            "serial_port": device.serial_port, "group": group_id or "unknown",
+            "operation": operation or ("WRITE" if message.lower().startswith("write") else "READ"),
+            "online": device.runtime.get("online"),
+            "backoff_ms": device.runtime.get("backoff_ms", 0),
+            "ws_published": False,
             "direction": "MASTER" if result == "scan" else "SLAVE", "function": message.split(" ", 1)[0],
             "payload": rx_hex or tx_hex or "—", "bytes": len(bytes.fromhex((rx_hex or tx_hex or "").replace(" ", ""))) if (rx_hex or tx_hex) else 0,
             "crc": "OK" if result != "error" else "—", "tx_hex": tx_hex, "rx_hex": rx_hex,
@@ -1306,38 +1397,77 @@ class Rs485Manager:
         self._command_pending += 1
         try:
             async with self._command_lock:
-                previous_bus = dict(self.bus)
-                self.bus = normalize_bus_settings(settings)
+                requested_port = str(settings.get("serial_port") or self.bus.get("serial_port") or "")
+                previous_bus = dict(self.buses.get(requested_port) or {**default_bus_settings(), "serial_port": requested_port})
+                next_bus = normalize_bus_settings({**previous_bus, **settings, "serial_port": requested_port})
+                self.buses[requested_port] = next_bus
+                self.bus = next_bus
+                previous_transport = (
+                    previous_bus.get("serial_port"),
+                    previous_bus.get("baudrate"),
+                    previous_bus.get("parity"),
+                    previous_bus.get("stop_bits"),
+                    previous_bus.get("mode"),
+                )
+                next_transport = (
+                    self.bus.get("serial_port"),
+                    self.bus.get("baudrate"),
+                    self.bus.get("parity"),
+                    self.bus.get("stop_bits"),
+                    self.bus.get("mode"),
+                )
                 affected_ports = {
                     str(previous_bus.get("serial_port") or ""),
                     str(self.bus.get("serial_port") or ""),
                 }
-                for port in affected_ports:
-                    if port:
-                        self._drop_pending_poll_jobs(port)
                 affected_device_ids = {
                     device.id
                     for device in self.devices.values()
                     if str(device.serial_port) in affected_ports
                 }
-                self._poll_due = {
-                    key: due
-                    for key, due in self._poll_due.items()
-                    if key[0] not in affected_device_ids
-                }
-                if previous_bus != self.bus:
+                transport_changed = previous_transport != next_transport
+                master_changed = bool(previous_bus.get("enabled", True)) != bool(self.bus.get("enabled", True))
+                master_disabled = previous_bus.get("enabled", True) and not self.bus.get("enabled", True)
+                if transport_changed or master_changed:
+                    for port in affected_ports:
+                        if port:
+                            self._drop_pending_poll_jobs(port)
+                if transport_changed or master_disabled:
                     if hasattr(self.transport, "close_port"):
                         await self.transport.close_port(str(previous_bus.get("serial_port") or ""))
-                        if previous_bus.get("serial_port") != self.bus.get("serial_port"):
+                        if transport_changed and previous_bus.get("serial_port") != self.bus.get("serial_port"):
                             await self.transport.close_port(str(self.bus.get("serial_port") or ""))
                     elif hasattr(self.transport, "close_bus"):
                         await self.transport.close_bus(previous_bus)
-                await self.store.save_bus(self.bus)
+                await self.store.save_bus_for_port(requested_port, self.bus)
+                for device in self.devices.values():
+                    if device.enabled and str(device.serial_port) in affected_ports:
+                        if transport_changed or master_changed:
+                            self._schedule_device_polling(device)
                 mode = "USB/Real" if self.bus.get("mode") == "usb_real" else ("mock" if self._bus_is_mock(self.bus) else "Modbus")
                 self.status = f"RS-485: {mode} on {self.bus['serial_port']} {self.bus['baudrate']} {self.bus['parity']} {self.bus['stop_bits']} stop"
                 return self.snapshot(status=self.status)
         finally:
             self._command_pending = max(0, self._command_pending - 1)
+
+    async def patch_bus(self, changes: dict[str, Any]) -> dict[str, Any]:
+        """Apply a partial bus update without allowing stale UI state to overwrite siblings."""
+        selected_port = str(changes.get("serial_port") or self.bus.get("serial_port") or "")
+        merged = dict(self.buses.get(selected_port) or self.bus)
+        for key in ("serial_port", "baudrate", "parity", "stop_bits", "mode", "enabled"):
+            if key in changes:
+                merged[key] = changes[key]
+        return await self.save_bus(merged)
+
+    def _bus_for_port(self, serial_port: str) -> dict[str, Any]:
+        port = str(serial_port or "")
+        if port in self.buses:
+            return self.buses[port]
+        # Keep direct manager.bus assignment compatible with older callers and
+        # tests while normal runtime state is always persisted per port.
+        if port and str(self.bus.get("serial_port") or "") == port:
+            return self.bus
+        return {**default_bus_settings(), "serial_port": port} if port else self.bus
 
     async def scan(self, settings: dict[str, Any]) -> dict[str, Any]:
         if self._scan_task and not self._scan_task.done():
@@ -1603,6 +1733,10 @@ class Rs485Manager:
 
     async def set_capability(self, device_id: str, capability_id: str, value: Any) -> dict[str, Any]:
         device = self._device(device_id)
+        if not bool(self.bus.get("enabled", True)) and str(device.serial_port) == str(self.bus.get("serial_port") or ""):
+            raise ValueError("RS-485 port is disabled")
+        if not device.write_enabled:
+            raise ValueError("device writes are disabled")
         serial_port = str(device.serial_port)
         self._command_pending_by_port[serial_port] = self._command_pending_by_port.get(serial_port, 0) + 1
         try:
@@ -1630,17 +1764,17 @@ class Rs485Manager:
                     write_started = time.monotonic()
                     write_function = int(point.get("write_function") or (0x05 if point.get("table") == "coil" else 0x06))
                     write_transaction_id = f"{device.id}:{int(write_started * 1000)}"
-                    self._record_diagnostic(device, "scan", f"Write FC{write_function:02d} {capability_id}", write_started, write_transaction_id)
+                    self._record_diagnostic(device, "scan", f"Write FC{write_function:02d} {capability_id}", write_started, write_transaction_id, "settings" if write_priority == "mode" else "outputs", "WRITE")
                     try:
                         await self._write_point(bus, point, device.slave_address, normalized, write_priority)
-                        self._record_diagnostic(device, "response", f"Write FC{write_function:02d} {capability_id}", write_started, write_transaction_id)
+                        self._record_diagnostic(device, "response", f"Write FC{write_function:02d} {capability_id}", write_started, write_transaction_id, "settings" if write_priority == "mode" else "outputs", "WRITE")
                         self._append_transport_log(device, "write", f"{capability_id}={normalized}")
                         if capability.get("type") != "switch" and not communication_setting:
                             normalized = await self._read_point(bus, point, device.slave_address, write_priority)
                             self._append_transport_log(device, "readback", f"{capability_id}={normalized}")
                     except Exception as exc:
                         error = str(exc)
-                        self._record_diagnostic(device, "error", f"Write FC{write_function:02d} {capability_id}: {error}", write_started, write_transaction_id)
+                        self._record_diagnostic(device, "error", f"Write FC{write_function:02d} {capability_id}: {error}", write_started, write_transaction_id, "settings" if write_priority == "mode" else "outputs", "WRITE")
                         self._append_transport_log(device, "error", f"{capability_id}: {error}")
                         if communication_setting:
                             self._append_transport_log(device, "write-pending", f"{capability_id}={normalized}; device may have switched communication settings")
@@ -1712,6 +1846,10 @@ class Rs485Manager:
             self._command_pending -= 1
             try:
                 device = self._device(device_id)
+                if not bool(self.bus.get("enabled", True)) and str(device.serial_port) == str(self.bus.get("serial_port") or ""):
+                    raise ValueError("RS-485 port is disabled")
+                if not device.read_enabled:
+                    raise ValueError("device reads are disabled")
                 template = self.registry.get(device.template_id)
                 if self._device_is_mock(device):
                     mark_device_runtime(device, template, None, success=True, group_id=poll_group)
@@ -1736,6 +1874,12 @@ class Rs485Manager:
         async with self._command_lock:
             self._command_pending -= 1
             device = self._device(device_id)
+            if not bool(self.bus.get("enabled", True)) and str(device.serial_port) == str(self.bus.get("serial_port") or ""):
+                raise ValueError("RS-485 port is disabled")
+            if function in {1, 2, 3, 4} and not device.read_enabled:
+                raise ValueError("device reads are disabled")
+            if function in {5, 6, 15, 16} and not device.write_enabled:
+                raise ValueError("device writes are disabled")
             started = time.monotonic()
             transaction_id = f"{device.id}:manual:{int(started * 1000)}"
             try:
@@ -1761,7 +1905,7 @@ class Rs485Manager:
 
     async def refresh(self) -> dict[str, Any]:
         for device in list(self.devices.values()):
-            if not device.enabled:
+            if not device.enabled or not device.read_enabled:
                 continue
             template = self.registry.get(device.template_id)
             if self._device_is_mock(device):
@@ -1777,7 +1921,7 @@ class Rs485Manager:
         return self.snapshot(status="RS-485: refreshed")
 
     def _ensure_bus_worker(self, serial_port: str) -> None:
-        if not serial_port or serial_port in self._bus_worker_tasks:
+        if self._stopping or not serial_port or serial_port in self._bus_worker_tasks:
             return
         self._bus_queues[serial_port] = []
         self._bus_queue_events[serial_port] = asyncio.Event()
@@ -1787,14 +1931,14 @@ class Rs485Manager:
         )
 
     def _ensure_poll_task(self, serial_port: str) -> None:
-        if serial_port and serial_port not in self._poll_tasks:
+        if not self._stopping and serial_port and serial_port not in self._poll_tasks:
             self._poll_tasks[serial_port] = asyncio.create_task(
                 self._poll_loop(serial_port),
                 name=f"intellegyhub_rs485_poll_{serial_port.rsplit('/', 1)[-1]}",
             )
 
     async def _poll_loop(self, serial_port: str) -> None:
-        while True:
+        while not self._stopping:
             await asyncio.sleep(self._poll_tick_seconds)
             try:
                 await self._poll_due_groups(serial_port)
@@ -1811,21 +1955,33 @@ class Rs485Manager:
     async def _poll_due_groups(self, serial_port: str | None = None) -> None:
         now = time.monotonic()
         target_serial_port = serial_port or str(self.bus.get("serial_port") or "")
+        bus = self._bus_for_port(target_serial_port)
+        if not bool(bus.get("enabled", True)):
+            return
         if self._command_pending_by_port.get(target_serial_port, 0):
             return
         for device in list(self.devices.values()):
-            if not device.enabled:
+            if not device.enabled or not device.read_enabled:
                 continue
             if str(device.serial_port) != target_serial_port:
                 continue
             template = self.registry.get(device.template_id)
             for group_id, interval_seconds in poll_intervals_seconds(template, device.polling).items():
                 key = (device.id, group_id)
+                retry_at = float(device.runtime.get("backoff_until", 0) or 0)
+                if now < retry_at and group_id != "outputs":
+                    continue
                 if now < self._poll_due.get(key, 0):
                     continue
                 self._poll_due[key] = now + interval_seconds
                 previous_values = dict(device.values)
-                previous_polling = device.runtime.get("polling")
+                previous_health = (
+                    device.runtime.get("online"),
+                    device.runtime.get("communication_status"),
+                    device.runtime.get("polling"),
+                    device.runtime.get("port_status"),
+                    (device.runtime.get("groups") or {}).get(group_id, {}).get("status"),
+                )
                 try:
                     if self._command_pending_by_port.get(target_serial_port, 0):
                         return
@@ -1833,6 +1989,14 @@ class Rs485Manager:
                         # Live state polling updates device values/runtime only. It must
                         # not flood the user-facing scan log with successful heartbeats.
                         await self._read_device_values(device, template, poll_group=group_id, log_transport=False, log_result="poll", priority="poll")
+                    else:
+                        # Mock mode must exercise the same observable logger
+                        # contract as real Modbus mode, even without raw RTU
+                        # frames or serial I/O.
+                        started = time.monotonic()
+                        transaction_id = f"{device.id}:mock:{int(started * 1000)}"
+                        self._record_diagnostic(device, "scan", f"Read {group_id}", started, transaction_id, group_id, "READ")
+                        self._record_diagnostic(device, "response", f"Read {group_id}", started, transaction_id, group_id, "READ")
                     if not device.enabled:
                         continue
                     mark_device_runtime(device, template, None, success=True, group_id=group_id)
@@ -1847,7 +2011,19 @@ class Rs485Manager:
                         continue
                     self._append_transport_log(device, "poll-error", f"{group_id}: {exc}")
                     mark_device_runtime(device, template, None, success=False, error=str(exc), group_id=group_id)
-                if device.values != previous_values or device.runtime.get("polling") != previous_polling:
+                current_health = (
+                    device.runtime.get("online"),
+                    device.runtime.get("communication_status"),
+                    device.runtime.get("polling"),
+                    device.runtime.get("port_status"),
+                    (device.runtime.get("groups") or {}).get(group_id, {}).get("status"),
+                )
+                # A successful poll is also a state transition for the UI. The
+                # values can remain unchanged while a device moves from the
+                # persisted OFFLINE state to ONLINE. Publish that health change
+                # even when no channel value changed; otherwise the UI keeps
+                # showing stale availability until a later unrelated update.
+                if device.values != previous_values or current_health != previous_health:
                     await self._publish_device(device)
 
     async def toggle_collapsed(self, device_id: str) -> dict[str, Any]:
@@ -1881,6 +2057,19 @@ class Rs485Manager:
             self._poll_due = {key: value for key, value in self._poll_due.items() if key[0] != device.id}
         await self.store.save_device(device)
         return self.snapshot(selected_id=device.id, status=f"RS-485: polling {'enabled' if enabled else 'disabled'} for {device.name}")
+
+    async def set_device_access(self, device_id: str, *, read_enabled: bool | None = None, write_enabled: bool | None = None) -> dict[str, Any]:
+        device = self._device(device_id)
+        if read_enabled is not None:
+            device.read_enabled = bool(read_enabled)
+            if not device.read_enabled:
+                self._poll_due = {key: value for key, value in self._poll_due.items() if key[0] != device.id}
+            elif device.enabled:
+                self._schedule_device_polling(device)
+        if write_enabled is not None:
+            device.write_enabled = bool(write_enabled)
+        await self.store.save_device(device)
+        return self.snapshot(selected_id=device.id, status=f"RS-485: access updated for {device.name}")
 
     async def set_device_polling(self, device_id: str, settings: dict[str, Any]) -> dict[str, Any]:
         device = self._device(device_id)
@@ -1958,20 +2147,25 @@ class Rs485Manager:
             raise ValueError("device not found")
         return device
 
-    def _schedule_device_polling(self, device: Rs485Device) -> None:
-        """Make enabled device groups immediately eligible for a poll."""
+    def _schedule_device_polling(self, device: Rs485Device, group_ids: set[str] | None = None) -> None:
+        """Make selected enabled device groups immediately eligible for a poll."""
         template = self.registry.get(device.template_id)
-        self._poll_due = {key: value for key, value in self._poll_due.items() if key[0] != device.id}
-        if device.enabled:
-            self._poll_due.update({(device.id, group_id): 0.0 for group_id in poll_intervals_seconds(template, device.polling)})
+        intervals = poll_intervals_seconds(template, device.polling)
+        selected = set(intervals) if group_ids is None else set(group_ids)
+        for group_id in selected:
+            key = (device.id, group_id)
+            if not device.enabled or group_id not in intervals:
+                self._poll_due.pop(key, None)
+            else:
+                self._poll_due[key] = 0.0
 
     def _effective_device_bus(self, device: Rs485Device) -> dict[str, Any]:
         bus = device_bus(device)
-        if str(self.bus.get("serial_port") or "") == str(device.serial_port):
-            bus["baudrate"] = int(self.bus.get("baudrate") or bus["baudrate"])
-            bus["parity"] = str(self.bus.get("parity") or bus["parity"])
-            bus["stop_bits"] = int(self.bus.get("stop_bits") or bus["stop_bits"])
-            bus["mode"] = str(self.bus.get("mode") or bus.get("mode") or "mock")
+        port_bus = self._bus_for_port(str(device.serial_port))
+        bus["baudrate"] = int(port_bus.get("baudrate") or bus["baudrate"])
+        bus["parity"] = str(port_bus.get("parity") or bus["parity"])
+        bus["stop_bits"] = int(port_bus.get("stop_bits") or bus["stop_bits"])
+        bus["mode"] = str(port_bus.get("mode") or bus.get("mode") or "mock")
         return bus
 
     async def _read_device_values(
@@ -2016,10 +2210,10 @@ class Rs485Manager:
             started = time.monotonic()
             transaction_id = f"{device.id}:{int(started * 1000)}"
             function = str(batch[0][1].get("function") or batch[0][1].get("table") or "read")
-            self._record_diagnostic(device, "scan", f"Read {function} ({len(batch)} point(s))", started, transaction_id)
+            self._record_diagnostic(device, "scan", f"Read {function} ({len(batch)} point(s))", started, transaction_id, poll_group or "state", "READ")
             try:
                 batch_values = await self._read_points(bus, batch, device.slave_address, priority)
-                self._record_diagnostic(device, "response", f"Read {function} ({len(batch_values)} point(s))", started, transaction_id)
+                self._record_diagnostic(device, "response", f"Read {function} ({len(batch_values)} point(s))", started, transaction_id, poll_group or "state", "READ")
                 values.update(batch_values)
                 for capability_id, value in batch_values.items():
                     device.values[capability_id] = value
@@ -2027,7 +2221,7 @@ class Rs485Manager:
             except RuntimeError as exc:
                 errors.append((batch, exc))
                 error = str(exc)
-                self._record_diagnostic(device, "error", error, started, transaction_id)
+                self._record_diagnostic(device, "error", error, started, transaction_id, poll_group or "state", "READ")
                 for capability_id, _point in batch:
                     device.values[f"{capability_id}__error"] = error
                 if log_transport:
@@ -2073,6 +2267,11 @@ def runtime_state_for_template(
         "availability_successes": 0,
         "availability_failure_started_at": None,
         "availability_failure_seconds": 0.0,
+        "backoff_level": 0,
+        "backoff_ms": 0,
+        "backoff_until": 0.0,
+        "last_error_type": None,
+        "port_status": "ONLINE" if online is True else "UNKNOWN",
         "groups": groups,
     }
 
@@ -2112,6 +2311,12 @@ def mark_device_runtime(
         if failure_elapsed >= RS485_OFFLINE_AFTER_SECONDS:
             runtime["online"] = False
             runtime["communication_status"] = "OFFLINE"
+        level = min(5, int(runtime.get("backoff_level") or 0) + 1)
+        backoff_ms = min(10000, 500 * (2 ** (level - 1)))
+        runtime["backoff_level"] = level
+        runtime["backoff_ms"] = backoff_ms
+        runtime["backoff_until"] = time.monotonic() + (backoff_ms / 1000)
+        runtime["last_error_type"] = classify_modbus_error(error or "polling error")
     runtime["availability_failures"] = failures
     runtime["availability_successes"] = successes
     runtime["polling"] = "live" if success else "error"
@@ -2119,6 +2324,11 @@ def mark_device_runtime(
     if success:
         runtime["last_seen"] = now
         runtime["last_error"] = None
+        runtime["backoff_level"] = 0
+        runtime["backoff_ms"] = 0
+        runtime["backoff_until"] = 0.0
+        runtime["last_error_type"] = None
+        runtime["port_status"] = "ONLINE"
     else:
         runtime["last_error"] = error or "polling error"
     group_id = group_id or (str(capability.get("group")) if capability else "state")
@@ -2264,6 +2474,7 @@ def default_bus_settings() -> dict[str, Any]:
         "parity": "none",
         "stop_bits": 1,
         "mode": "mock",
+        "enabled": True,
     }
 
 
@@ -2369,7 +2580,24 @@ def normalize_bus_settings(settings: dict[str, Any]) -> dict[str, Any]:
         "parity": parity,
         "stop_bits": stop_bits,
         "mode": mode,
+        "enabled": _coerce_bool(settings.get("enabled", True), True),
     }
+
+
+def _coerce_bool(value: Any, default: bool = False) -> bool:
+    """Decode booleans persisted by SQLite and received from JSON consistently."""
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return default
+    if isinstance(value, (int, float)):
+        return value != 0
+    normalized = str(value).strip().lower()
+    if normalized in {"true", "1", "yes", "on"}:
+        return True
+    if normalized in {"false", "0", "no", "off", ""}:
+        return False
+    return default
 
 
 def is_allowed_serial_port(serial_port: str) -> bool:

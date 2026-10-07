@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.194
+
+- Separate RTC Clock into its own navigation card while keeping Functions focused on buzzer and LED services.
+- Unify project toggles with visible ON/OFF labels and remove duplicated external status text.
+- Clarify RS-485 bus and device control naming, including independent per-port state and device read/write access.
+
 ## 0.5.193
 
 - Ensure relay FC05 commands enter the per-port priority queue without waiting behind mode updates.
