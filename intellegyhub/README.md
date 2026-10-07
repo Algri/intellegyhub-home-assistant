@@ -1,269 +1,298 @@
-# IntellegyHUB Add-on
+# IntellegyHUB
 
-This Home Assistant App/Add-on runs the IntellegyHUB hardware runtime.
-The current CM4 diagnostic build also maps `/dev/i2c-1` and `/dev/i2c-10`.
+## Automation that becomes part of the space
 
-Install it from the local repository folder that contains root `repository.yaml` and this `addon/` directory.
+**IntellegyHUB** is an expandable hardware platform for Home Assistant, built for reliable intelligent spaces.
 
-Default options:
+A home, apartment, office, workshop, retail space, or technical facility — the location does not matter. The principle is the same: the system should understand what is happening around it, handle repetitive tasks automatically, and involve the user only when a real decision is needed.
 
-```yaml
-diagnostics:
-  carrier_monitoring_poll_interval_seconds: 30
-  ste_heartbeat_on_seconds: 0.2
-  ste_heartbeat_off_seconds: 1.8
-onewire:
-  bus1_poll_interval_seconds: 30
-  bus2_poll_interval_seconds: 30
-power_button:
-  shutdown_enabled: true
-  shutdown_hold_seconds: 1.0
-buzzer:
-  startup_enabled: true
-  shutdown_enabled: true
-  frequency: 2000
-  duration_ms: 200
-```
+Not more buttons.  
+Not more apps.  
+Not more manual control of every individual device.
 
-When `buzzer.startup_enabled` is true, the add-on emits one short GPIO18
-hardware PWM beep after the runtime starts successfully.
+**You define how the space should work. IntellegyHUB helps it do the rest.**
 
-When `buzzer.shutdown_enabled` is true, a confirmed Power button shutdown plays
-the same configured GPIO18 beep first at fixed 80% volume, waits until it
-finishes, and only then sends the host shutdown command.
+---
 
-## Board Diagnostics LEDs
+## From controlling devices to controlling outcomes
 
-The Board Diagnostics page controls the onboard `STE`, `NET`, and `ERR` LEDs.
-The enable/disable state for each diagnostic LED feature is stored in the add-on
-SQLite database and is restored after restart.
+Most actions inside a building are predictable.
 
-`STE LED` is the runtime heartbeat indicator. It blinks while the add-on runtime
-is running and the STE feature is enabled. It does not depend on the UI or Home
-Assistant WebSocket connection.
+Lighting is needed under certain conditions.  
+Temperature needs to be maintained.  
+Equipment should run when it is actually required.  
+Engineering systems need to be monitored.  
+Events need an appropriate response.
 
-`NET LED` is the WebSocket connection indicator:
+There is no reason for people to repeat the same actions manually every day.
 
-- connected: solid on;
-- reconnect grace period: blinking;
-- timeout/error: off.
+That is where real automation begins.
 
-`ERR LED` is reserved for real hardware/runtime errors. WebSocket disconnects do
-not drive `ERR LED`; they are indicated only by `NET LED`.
+IntellegyHUB connects Home Assistant to the physical world — sensors, switches, lighting, relays, meters, actuators, and industrial equipment.
 
-The 1-Wire polling toggles in the Ingress UI enable or disable periodic
-temperature polling per 1-Wire bus. The interval for each bus is configured with
-`onewire.bus1_poll_interval_seconds` and `onewire.bus2_poll_interval_seconds`.
+Home Assistant provides the logic.
 
-When `power_button.shutdown_enabled` is true, holding the physical Power input
-on GPIO17 for `power_button.shutdown_hold_seconds` requests a graceful HAOS host
-shutdown through the Home Assistant Supervisor API. The hold time is configurable
-from `0.1` to `1.5` seconds and defaults to `1.0` second.
+IntellegyHUB connects that logic to real devices.
 
-The service listens inside the Home Assistant internal app network on port `8098`.
-For a local repository install, Home Assistant Core should reach it at:
+The user gets what ultimately matters most:
 
-```text
-http://local-intellegyhub:8098
-```
+**the desired result without constant interaction.**
 
-Mock mode is for local tests only and is enabled with `INTELLEGY_GPIO_MOCK=1`.
+This is not simply remote control for a building.
 
-For the confirmed Studio Code Server install flow, deploy the add-on to:
+It is a step toward a space that can take care of routine tasks on its own.
 
-```text
-~/addons/intellegyhub
-```
+---
 
-and deploy the Home Assistant custom integration to:
+## A reliable foundation where reliability matters
 
-```text
-~/config/custom_components/intellegyhub
-```
+The more responsibility automation takes on, the more important its foundation becomes.
 
-After copying or extracting files, refresh the Add-on Store with the three-dot
-menu `Check for updates`, install `IntellegyHUB`, configure the options, and
-start it.
+That is why IntellegyHUB is built around **reliable wired connectivity**.
 
-When installed from a Home Assistant Store repository, the add-on includes a
-bundled copy of the `intellegyhub` custom integration. On startup it compares the
-bundled integration version with `/config/custom_components/intellegyhub` and
-copies the files only when the installed integration is missing or older.
+Not because wireless technology is inherently bad.
 
-After the add-on installs or updates the integration, restart Home Assistant
-Core so the integration appears under `Settings -> Devices & services -> Add
-integration`.
+But because lighting, climate, engineering systems, and critical sensors should work predictably every day — regardless of Wi-Fi congestion, radio interference, or the state of a battery.
 
-## Dashboard Cards
+Two independent **RS-485 channels** allow Modbus RTU devices to become part of the system, including meters, sensors, actuators, relay modules, and industrial automation equipment.
 
-Host entities keep their `Hardware Host` device association, but expose compact
-entity names for dashboard tiles. Use explicit Lovelace `name` values when a
-card needs a custom label or a wider slider layout.
+Each channel operates independently, allowing devices to be separated across different parts of the installation and configured according to the needs of the project.
 
-Recommended buzzer volume tile:
+Two independent **1-Wire channels** provide a reliable wired foundation for temperature monitoring across rooms, heating systems, and technical equipment.
 
-```yaml
-type: tile
-entity: number.intellegyhub_buzzer_volume
-name: Buzzer Volume
-icon: mdi:volume-high
-features:
-  - type: numeric-input
-    style: slider
-features_position: inline
-grid_options:
-  columns: 12
-  rows: 1
-```
+IntellegyHUB continuously communicates with connected devices, reads their state, sends commands, and monitors availability.
 
-Recommended compact buzzer setting tiles:
+**Wired infrastructure becomes part of one coherent system instead of a collection of isolated integrations.**
 
-```yaml
-type: grid
-columns: 2
-square: false
-cards:
-  - type: tile
-    entity: number.intellegyhub_buzzer_duration
-    name: Buzzer Duration
-    icon: mdi:timer-outline
-  - type: tile
-    entity: number.intellegyhub_buzzer_frequency
-    name: Buzzer Frequency
-    icon: mdi:sine-wave
-  - type: tile
-    entity: number.intellegyhub_buzzer_volume
-    name: Buzzer Volume
-    icon: mdi:volume-high
-    features:
-      - type: numeric-input
-        style: slider
-    features_position: inline
-```
+---
 
-## Version Bump And Release Archive Checklist
+## Local by design
 
-Before building release archives, bump the same version in every packaged
-surface. Keep these files in sync:
+Your home or building exists here.
 
-```text
-addon/config.yaml
-addon/Dockerfile
-custom_components/intellegyhub/manifest.json
-addon/app/main.py
-addon/app/carrier.py
-addon/CHANGELOG.md
-```
+Its essential functions should work here too.
 
-Use the changelog entry to describe the user-visible change. Example:
+IntellegyHUB is designed for **local automation** together with Home Assistant.
 
-```text
-## 0.5.107
+Controlling connected equipment does not require a mandatory external cloud service.
 
-- Align X-Port mode controls with the shared row style, including counter reset placement, read-only DI indicators, and compact PWM slider layout.
-```
+The internet can still be used for remote access, external services, and additional functionality — but core automation should not stop simply because a service somewhere outside the building becomes unavailable.
 
-Run the local checks before packaging:
+That means:
 
-```powershell
-python -m compileall addon custom_components tests
-python -m pytest tests/test_addon_api.py
-```
+**fast local response, fewer external dependencies, and greater control over your own system.**
 
-Build all release archives from the repository root:
+Your equipment, automation logic, and operational data remain where they belong — inside your own infrastructure.
 
-```powershell
-python scripts/build_haos_deploy.py
-```
+---
 
-The build script validates that the add-on config, Docker label, integration
-manifest, app version, and changelog all use the same version. It also rebuilds:
+## Wired where reliability matters. Wireless where flexibility matters.
 
-```text
-dist/intellegyhub_haos_deploy.zip
-dist/intellegyhub_ha_repository.zip
-dist/intellegyhub_ha_integration.zip
-```
+A good automation system should not force you to choose one technology for every task.
 
-Use a commit title that starts with the release version and names the change,
-for example:
+Each approach has its place.
 
-```text
-0.5.107: align X-Port mode controls
-```
+Permanent equipment can use wired connections for stable communication and minimal maintenance.
 
-## CM4 I2C Notes
+Where running cables is impractical, or where devices need to be added quickly, wireless technologies provide flexibility.
 
-For Home Assistant OS on Raspberry Pi CM4, enable I2C in the boot partition `config.txt`:
+IntellegyHUB brings both approaches together.
 
-```ini
-arm_64bit=1
-dtparam=i2c_arm=on
+Internal expansion ports allow additional communication capabilities to be added, including a **Zigbee coordinator**.
 
-[cm4]
-otg_mode=1
+As a result, wired sensors, Modbus RTU equipment, physical inputs and outputs, relay modules, and Zigbee devices no longer need to exist as separate systems.
 
-[all]
-enable_uart=1
-dtoverlay=uart3
-dtoverlay=uart5
-dtparam=i2c1=on
-dtparam=i2c_vc=on
-dtparam=spi=off
-gpio=16=ip,np
-gpio=23=ip,np
-dtoverlay=gpio-shutdown,gpio_pin=17,active_low=1,gpio_pull=up,debounce=1000
-dtoverlay=pwm,pin=18,func=2
-dtparam=ant2
-dtoverlay=i2c-rtc,pcf85063a,i2c_csi_dsi
-```
+They become parts of **one intelligent space with Home Assistant providing the shared logic**.
 
-Also create this boot-partition file:
+The user does not need to care how a device is connected.
 
-```text
-CONFIG/modules/rpi-i2c.conf
-```
+What matters is that the system can see it, understand it, and use it in automation.
 
-with:
+---
 
-```text
-i2c-dev
-```
+## X-Port — hardware that adapts to the project
 
-On Windows, write that file as ASCII/LF, not UTF-16:
+No two installations are exactly the same.
 
-```powershell
-New-Item -ItemType Directory -Force -Path E:\CONFIG\modules | Out-Null
-[System.IO.File]::WriteAllText("E:\CONFIG\modules\rpi-i2c.conf", "i2c-dev`n", [System.Text.Encoding]::ASCII)
-```
+One project may need more buttons.
 
-Then boot HAOS, import the boot `CONFIG` folder, and reboot:
+Another may need lighting control.
 
-```sh
-ha os import
-ha host reboot
-hwclock -w
-hwclock -r
-cat /sys/class/rtc/rtc0/hctosys
-```
+A third may require sensors, analog signals, or pulse counting.
 
-For HAOS host root SSH, put the Windows public key into:
+IntellegyHUB does not try to decide in advance what every channel must be used for.
 
-```text
-E:\CONFIG\authorized_keys
-```
+The universal **X-Port** allows the same hardware resource to serve different purposes depending on the project.
 
-then run the same `ha os import` flow. Connect to the host on port `22222`,
-which is separate from the Terminal & SSH add-on.
+It can work with buttons and sensors, monitor equipment states, control loads and lighting, adjust brightness, process analog signals, or count pulses.
 
-The tested CM4 setup exposes the main/user bus as `/dev/i2c-1` and the VC/left bus as `/dev/i2c-10`.
-The add-on maps those buses explicitly:
+That creates an important advantage:
 
-```yaml
-devices:
-  - /dev/gpiochip0
-  - /dev/i2c-1
-  - /dev/i2c-10
-```
+**the controller adapts to the project — not the project to the controller.**
 
-Use the add-on Ingress UI buttons `Devices`, `Scan I2C-1`, and `Scan I2C-10` to verify what the add-on container can see and open.
+If the purpose of the space changes, the configuration can change with it.
+
+If a new requirement appears, it can often be handled without replacing the entire hardware platform.
+
+Flexibility remains available not only during design, but throughout the lifetime of the installation.
+
+---
+
+## Expand when the project grows
+
+Automation rarely stays exactly as it was on day one.
+
+New rooms appear.  
+More equipment is added.  
+New scenarios are introduced.  
+The number of inputs and outputs grows.
+
+IntellegyHUB is designed for that from the beginning.
+
+The **XDO-8** expansion module adds eight relay outputs for controlling lighting, valves, actuators, contactors, and other equipment.
+
+The **XDI-16** adds sixteen digital inputs for buttons, switches, status sensors, and signals from engineering systems.
+
+Additional communication capabilities can be added through internal expansion ports.
+
+And the system does not fragment into new isolated islands as it grows.
+
+Expansion modules become part of the same platform and the same Home Assistant environment.
+
+**Start with what you need today. Expand when new requirements appear.**
+
+---
+
+## Home Assistant remains the intelligence layer
+
+IntellegyHUB does not create another closed ecosystem next to Home Assistant.
+
+It gives Home Assistant reliable access to the physical world.
+
+Connected equipment is represented through familiar **native Home Assistant entities**.
+
+A relay appears as a relay.
+
+A digital input appears as a state.
+
+A temperature sensor appears as temperature.
+
+Lighting appears as lighting.
+
+The user does not need to know whether an entity is backed by RS-485, 1-Wire, X-Port, or an expansion module.
+
+They interact with **what the device does**, not with the protocol behind it.
+
+Everything can participate in dashboards, automations, scenes, history, notifications, and the wider Home Assistant logic.
+
+Communication between the IntellegyHUB add-on and the Home Assistant integration stays local through **REST and WebSocket**, providing control and up-to-date device states.
+
+---
+
+## A system that watches itself
+
+Automation should understand more than the current value of a device.
+
+It should also know whether that device is available at all.
+
+IntellegyHUB automatically polls connected equipment, monitors communication, and tracks device availability.
+
+Different devices can use update rates and read/write behavior appropriate to their role.
+
+If a device stops responding, the system knows.
+
+If communication returns, the device can return to normal operation.
+
+After a restart, IntellegyHUB restores its configuration and required operating state.
+
+The user should not have to check every day whether their automation is still working.
+
+**The automation should monitor what it is responsible for.**
+
+---
+
+## Diagnostics without working blind
+
+A reliable system is not one in which nothing ever goes wrong.
+
+A reliable system is one that helps you understand the cause quickly when something does.
+
+IntellegyHUB provides RS-485 diagnostics and a Modbus traffic log that makes communication between the controller and connected devices visible.
+
+This simplifies commissioning new equipment and helps identify communication problems directly on site.
+
+System **LED indicators** provide an immediate view of controller status without additional tools.
+
+The built-in **buzzer** can provide local notifications and confirmations with configurable frequency, duration, and volume.
+
+The **RTC Clock** provides local system time with viewing and synchronization support.
+
+All of these functions serve the same purpose:
+
+**the system should be easy not only to use, but also to operate and maintain.**
+
+---
+
+## Not a collection of devices. One space.
+
+The real value of automation does not appear when many devices are connected.
+
+It appears when those devices **begin to work together**.
+
+A temperature sensor can influence climate control.
+
+A window state can affect heating.
+
+Presence can influence lighting.
+
+Energy tariffs can change equipment behavior.
+
+A single button can trigger an entire scenario instead of one relay.
+
+An engineering system can report a problem before the user notices it.
+
+Wired and wireless devices stop being separate technologies.
+
+They become sources of information and actions inside the shared logic of the space.
+
+That is the moment when automation stops being a collection of gadgets.
+
+**It becomes infrastructure.**
+
+---
+
+## Technology should save attention
+
+Human attention is too valuable to spend every day on the same repetitive actions.
+
+IntellegyHUB is built around a simple idea:
+
+**if an action can be determined reliably and performed automatically, a person should not have to repeat it manually again and again.**
+
+The user defines preferences and boundaries.
+
+Home Assistant provides the intelligence of the space.
+
+IntellegyHUB turns that intelligence into real-world actions.
+
+Lighting.  
+Climate.  
+Energy.  
+Sensors.  
+Engineering equipment.  
+Security.  
+Everyday routines.
+
+Over time, these systems require less and less attention.
+
+The user steps in when they want to change the outcome.
+
+The rest of the time, the system simply works.
+
+---
+
+> # IntellegyHUB
+>
+> **Reliable wired infrastructure. Local operation. Flexible expansion. Wired and wireless devices working together in one Home Assistant system.**
+>
+> **Build spaces you do not have to constantly manage.**

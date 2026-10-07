@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.196
+
+- Refresh the public add-on description with the full IntellegyHUB platform capabilities.
+- Document independent RS-485 and 1-Wire channels, X-Port, XDO-8, XDI-16 and Zigbee expansion.
+- Link the Home Assistant add-on page to https://intellegyhub.com.
+
 ## 0.5.195
 
 - Keep FC05/FC06/FC15/FC16 write commands independent from read and device polling toggles.
