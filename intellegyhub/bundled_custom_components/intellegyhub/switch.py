@@ -70,12 +70,8 @@ async def async_setup_entry(
         current_module_ids = xdo8_module_ids()
         known_xdo8.intersection_update(current_module_ids)
         new_module_ids = current_module_ids - known_xdo8
-        LOGGER.warning(
-            "IntellegyHUB xDO-8 switch discovery current=%s known=%s new=%s",
-            sorted(current_module_ids),
-            sorted(known_xdo8),
-            sorted(new_module_ids),
-        )
+        if new_module_ids:
+            LOGGER.debug("IntellegyHUB xDO-8 switches added: %s", sorted(new_module_ids))
         new_entities = extension_entities(new_module_ids)
         if new_entities:
             async_add_entities(new_entities)

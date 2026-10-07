@@ -13,7 +13,7 @@ import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable
 from typing import Any
 
 import yaml
@@ -424,6 +424,10 @@ class Rs485Store:
         async with self._lock:
             await asyncio.to_thread(self._save_bus_for_port_sync, serial_port, settings)
 
+    async def save_selected_bus(self, settings: dict[str, Any]) -> None:
+        async with self._lock:
+            await asyncio.to_thread(self._save_selected_bus_sync, settings)
+
     async def load_devices(self) -> list[Rs485Device]:
         return await asyncio.to_thread(self._load_devices_sync)
 
@@ -496,25 +500,23 @@ class Rs485Store:
             db.execute("INSERT INTO rs485_diagnostics(device_id,data_json) VALUES(?,?) ON CONFLICT(device_id) DO UPDATE SET data_json=excluded.data_json", (device_id, json.dumps(diagnostics, separators=(",", ":"))))
 
     def _load_bus_sync(self) -> dict[str, Any]:
-        settings = default_bus_settings()
         with self._connect() as db:
             rows = db.execute("SELECT key,value FROM rs485_bus_settings").fetchall()
-        port_rows: dict[str, Any] = {}
+        legacy: dict[str, Any] = {}
+        port_settings: dict[str, dict[str, Any]] = {}
         for key, value in rows:
             if key.startswith("port::"):
                 _, port, field = key.split("::", 2)
-                if port == str(settings["serial_port"]):
-                    port_rows[field] = value
-            elif key in {"baudrate", "stop_bits", "slave_address"}:
-                settings[key] = int(value)
+                port_settings.setdefault(port, {})[field] = value
             else:
-                settings[key] = value
-        for key, value in port_rows.items():
-            if key in {"baudrate", "stop_bits", "slave_address"}:
-                settings[key] = int(value)
-            else:
-                settings[key] = value
-        return normalize_bus_settings(settings)
+                legacy[key] = value
+        selected_port = str(legacy.get("serial_port") or default_bus_settings()["serial_port"])
+        return normalize_bus_settings({
+            **default_bus_settings(),
+            **legacy,
+            **port_settings.get(selected_port, {}),
+            "serial_port": selected_port,
+        })
 
     def _load_buses_sync(self) -> dict[str, dict[str, Any]]:
         with self._connect() as db:
@@ -552,6 +554,18 @@ class Rs485Store:
                     "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                     (f"port::{serial_port}::{key}", str(value)),
                 )
+
+    def _save_selected_bus_sync(self, settings: dict[str, Any]) -> None:
+        normalized = normalize_bus_settings(settings)
+        serial_port = str(normalized["serial_port"])
+        with self._connect() as db:
+            for key, value in normalized.items():
+                for stored_key in (key, f"port::{serial_port}::{key}"):
+                    db.execute(
+                        "INSERT INTO rs485_bus_settings(key,value) VALUES(?,?) "
+                        "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                        (stored_key, str(value)),
+                    )
 
     def _load_devices_sync(self) -> list[Rs485Device]:
         with self._connect() as db:
@@ -1005,10 +1019,10 @@ class Rs485Manager:
         self._command_locks: dict[str, asyncio.Lock] = {}
         self._command_pending_by_port: dict[str, int] = {}
         self._command_pending = 0
-        self._publisher: Callable[[dict[str, Any]], Awaitable[None]] | None = None
+        self._publisher: Callable[[dict[str, Any]], Any] | None = None
         self._stopping = False
 
-    def set_publisher(self, publisher: Callable[[dict[str, Any]], Awaitable[None]]) -> None:
+    def set_publisher(self, publisher: Callable[[dict[str, Any]], Any]) -> None:
         self._publisher = publisher
 
     def _command_lock_for_port(self, serial_port: str) -> asyncio.Lock:
@@ -1016,7 +1030,9 @@ class Rs485Manager:
 
     async def _publish(self, event: dict[str, Any]) -> None:
         if self._publisher is not None:
-            await self._publisher(event)
+            result = self._publisher(event)
+            if hasattr(result, "__await__"):
+                await result
 
     async def _publish_device(self, device: Rs485Device) -> None:
         template = self.registry.get(device.template_id)
@@ -1028,7 +1044,10 @@ class Rs485Manager:
         snapshot = device.snapshot()
         snapshot["identity"] = device_identity_snapshot(template, device)
         snapshot["mock"] = self._device_is_mock(device)
-        snapshot["diagnostics"] = copy.deepcopy(diagnostics)
+        snapshot["diagnostics"] = {
+            "paused": device.id in self.diagnostics_paused,
+            "last_error": diagnostics.get("last_error"),
+        }
         await self._publish({"type": "rs485_device_changed", "device": snapshot})
 
     async def start(self) -> None:
@@ -1103,11 +1122,21 @@ class Rs485Manager:
         if hasattr(self.transport, "close_all"):
             await self.transport.close_all()
 
-    async def stop_scan(self) -> dict[str, Any]:
+    async def stop_scan(self, compact: bool = False) -> dict[str, Any]:
         self.scan_state["stop_requested"] = True
         if self._scan_stop_event is not None:
             self._scan_stop_event.set()
-        return self.snapshot(status="RS-485: scan stop requested")
+        self.status = "RS-485: scan stop requested"
+        return self.scan_progress_snapshot() if compact else self.snapshot(status=self.status)
+
+    def scan_progress_snapshot(self) -> dict[str, Any]:
+        return {
+            "status": self.status,
+            "scan_state": dict(self.scan_state),
+            "scan_log": list(self.scan_log),
+            "scanned": list(self.scanned),
+            "scan_errors": list(self.scan_errors),
+        }
 
     async def clear_scan_results(self) -> dict[str, Any]:
         current_port = str(self.bus.get("serial_port") or "")
@@ -1439,7 +1468,7 @@ class Rs485Manager:
                             await self.transport.close_port(str(self.bus.get("serial_port") or ""))
                     elif hasattr(self.transport, "close_bus"):
                         await self.transport.close_bus(previous_bus)
-                await self.store.save_bus_for_port(requested_port, self.bus)
+                await self.store.save_selected_bus(self.bus)
                 for device in self.devices.values():
                     if device.enabled and str(device.serial_port) in affected_ports:
                         if transport_changed or master_changed:
@@ -1453,7 +1482,7 @@ class Rs485Manager:
     async def patch_bus(self, changes: dict[str, Any]) -> dict[str, Any]:
         """Apply a partial bus update without allowing stale UI state to overwrite siblings."""
         selected_port = str(changes.get("serial_port") or self.bus.get("serial_port") or "")
-        merged = dict(self.buses.get(selected_port) or self.bus)
+        merged = dict(self._bus_for_port(selected_port))
         for key in ("serial_port", "baudrate", "parity", "stop_bits", "mode", "enabled"):
             if key in changes:
                 merged[key] = changes[key]
@@ -1469,29 +1498,50 @@ class Rs485Manager:
             return self.bus
         return {**default_bus_settings(), "serial_port": port} if port else self.bus
 
-    async def scan(self, settings: dict[str, Any]) -> dict[str, Any]:
+    async def scan(self, settings: dict[str, Any], compact: bool = False) -> dict[str, Any]:
         if self._scan_task and not self._scan_task.done():
-            return self.snapshot(status="RS-485: scan already running")
+            return self.scan_progress_snapshot() if compact else self.snapshot(status="RS-485: scan already running")
+        scan_bus = normalize_bus_settings(settings)
+        self.bus = scan_bus
+        self.buses[str(scan_bus["serial_port"])] = scan_bus
+        await self.store.save_selected_bus(scan_bus)
         self._scan_stop_event = asyncio.Event()
         # Mock discovery is deterministic and short; return its completed
         # snapshot so API callers can immediately add a discovered device.
-        if self._bus_is_mock(normalize_bus_settings(settings)):
-            return await self._scan_impl(settings)
-        self._scan_task = asyncio.create_task(self._scan_impl(settings), name="rs485_scan")
-        return self.snapshot(status="RS-485: scan started")
+        if self._bus_is_mock(scan_bus):
+            return await self._scan_impl(settings, compact=compact)
+        template_id = str(settings.get("template_id") or "")
+        if template_id not in self.registry.templates:
+            template_id = next(iter(self.registry.templates), "mio-8")
+        template = self.registry.get(template_id)
+        self.status = "RS-485: scan started"
+        self.scan_state = {
+            "running": True,
+            "stop_requested": False,
+            "serial_port": scan_bus["serial_port"],
+            "template_id": template_id,
+            "current_address": None,
+            "scanned": 0,
+            "total": len(template_slave_addresses(template)),
+            "found": 0,
+            "last_error": None,
+            "started_at": datetime.now(timezone.utc).isoformat(),
+        }
+        self._scan_task = asyncio.create_task(self._scan_impl(settings, compact=True), name="rs485_scan")
+        return self.scan_progress_snapshot() if compact else self.snapshot(status=self.status)
 
-    async def _scan_impl(self, settings: dict[str, Any]) -> dict[str, Any]:
+    async def _scan_impl(self, settings: dict[str, Any], compact: bool = False) -> dict[str, Any]:
         self._command_pending += 1
         stop_event = self._scan_stop_event
         try:
-            self.bus = normalize_bus_settings(settings)
-            current_port = str(self.bus["serial_port"])
+            scan_bus = normalize_bus_settings(settings)
+            current_port = str(scan_bus["serial_port"])
             self._drop_pending_poll_jobs(current_port)
-            await self.store.save_bus(self.bus)
+            await self.store.save_bus_for_port(current_port, scan_bus)
             requested_template = str(settings.get("template_id") or "")
             default_template = requested_template if requested_template in self.registry.templates else next(iter(self.registry.templates), "mio-8")
             template = self.registry.get(default_template)
-            mock_bus = self._bus_is_mock(self.bus)
+            mock_bus = self._bus_is_mock(scan_bus)
             addresses = [1, 2] if mock_bus else template_slave_addresses(template)
             scanned_count = len(addresses)
             self.scanned = [item for item in self.scanned if item.get("serial_port") != current_port]
@@ -1513,7 +1563,7 @@ class Rs485Manager:
                 current_port,
                 0,
                 "started",
-                f"Starting scan on {current_port} ({self.bus['baudrate']}, {self.bus['parity'].capitalize()}, {self.bus['stop_bits']}) - addresses 1 - {scanned_count}",
+                f"Starting scan on {current_port} ({scan_bus['baudrate']}, {scan_bus['parity'].capitalize()}, {scan_bus['stop_bits']}) - addresses 1 - {scanned_count}",
             )
             found_count = 0
             stopped = False
@@ -1531,7 +1581,7 @@ class Rs485Manager:
                     if not mock_bus:
                         matched = await self._run_bus_job(
                             "scan",
-                            lambda: self.transport.probe(self.bus, template, found),
+                            lambda: self.transport.probe(scan_bus, template, found),
                             current_port,
                         )
                         tx_hex = getattr(self.transport, "last_tx_hex", None)
@@ -1590,9 +1640,9 @@ class Rs485Manager:
                             "serial_port": current_port,
                             "slave_address": found,
                             "template_id": default_template,
-                            "baudrate": int(self.bus.get("baudrate") or 9600),
-                            "parity": str(self.bus.get("parity") or "none"),
-                            "stop_bits": int(self.bus.get("stop_bits") or 1),
+                            "baudrate": int(scan_bus.get("baudrate") or 9600),
+                            "parity": str(scan_bus.get("parity") or "none"),
+                            "stop_bits": int(scan_bus.get("stop_bits") or 1),
                             "status": status,
                             "confidence": confidence,
                             "configured": already,
@@ -1612,15 +1662,15 @@ class Rs485Manager:
         mode = "mock scan" if mock_bus else "scan"
         if stopped:
             self.status = f"RS-485: {mode} stopped after {self.scan_state.get('scanned', 0)} address(es), found {found_count} result(s) on {current_port}"
-            return self.snapshot(status=self.status)
+            return self.scan_progress_snapshot() if compact else self.snapshot(status=self.status)
         if found_count:
             self.scan_errors = [item for item in self.scan_errors if item.get("serial_port") != current_port]
             self.status = f"RS-485: {mode} scanned {scanned_count} address(es), found {found_count} result(s) on {current_port}"
             self._append_scan_log(current_port, int(self.scan_state.get("scanned") or scanned_count), "progress", f"Scanning... {self.scan_state.get('scanned', scanned_count)} / {scanned_count} addresses ({found_count} devices found)")
-            return self.snapshot(status=self.status)
+            return self.scan_progress_snapshot() if compact else self.snapshot(status=self.status)
         suffix = f": {self.scan_errors[0]['error']}" if self.scan_errors else ""
         self.status = f"RS-485: {mode} scanned {scanned_count} address(es), found 0 result(s) on {current_port}{suffix}"
-        return self.snapshot(status=self.status)
+        return self.scan_progress_snapshot() if compact else self.snapshot(status=self.status)
 
     def _append_scan_log(
         self,
@@ -2143,7 +2193,7 @@ class Rs485Manager:
             "paused": device.id in self.diagnostics_paused,
             "last_error": diagnostics.get("last_error"),
         }
-        return {"status": status, "selected_id": device.id, "device": device_snapshot}
+        return {"status": status, "selected_id": device.id, "bus": self._bus_for_port(str(device.serial_port)), "device": device_snapshot}
 
     def live_snapshot(self) -> dict[str, Any]:
         """Return only the small mutable state needed by the live UI refresh."""
@@ -2160,9 +2210,12 @@ class Rs485Manager:
 
     def diagnostics_live_snapshot(self, device_id: str) -> dict[str, Any]:
         device = self._device(device_id)
-        diagnostics = copy.deepcopy(self._diagnostics_for(device.id))
-        diagnostics["entries"] = diagnostics.get("entries", [])[-100:]
-        diagnostics["errors"] = diagnostics.get("errors", [])[-100:]
+        source = self._diagnostics_for(device.id)
+        diagnostics = copy.deepcopy({
+            **source,
+            "entries": source.get("entries", [])[-100:],
+            "errors": source.get("errors", [])[-100:],
+        })
         diagnostics["paused"] = device.id in self.diagnostics_paused
         return {"device_id": device.id, "diagnostics": diagnostics}
 

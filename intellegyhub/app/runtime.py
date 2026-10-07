@@ -60,6 +60,9 @@ class AppRuntime:
         self.error: str | None = "startup pending"
         self._lock = asyncio.Lock()
         self._clients: set[WebSocket] = set()
+        self._pending_broadcasts: dict[tuple[str, str], dict[str, Any]] = {}
+        self._broadcast_task: asyncio.Task[None] | None = None
+        self._broadcast_sequence = 0
         self._startup_buzzer_enabled = startup_buzzer_enabled
         self._startup_buzzer_frequency = startup_buzzer_frequency
         self._startup_buzzer_duration_ms = startup_buzzer_duration_ms
@@ -78,11 +81,11 @@ class AppRuntime:
             await self.buzzer_store.initialize()
             self.buzzer.apply_settings(await self.buzzer_store.load())
             self.state = await self.backend.start(self.handle_button_changed)
-            self.carrier.set_publisher(self.broadcast)
+            self.carrier.set_publisher(self.broadcast_nowait)
             self.diagnostic_indicators.set_publisher(self.broadcast)
-            self.xport.set_publisher(self.broadcast)
-            self.extensions.set_publisher(self.broadcast)
-            self.onewire.set_publisher(self.broadcast)
+            self.xport.set_publisher(self.broadcast_nowait)
+            self.extensions.set_publisher(self.broadcast_nowait)
+            self.onewire.set_publisher(self.broadcast_nowait)
             await self.carrier.start()
             await self.diagnostic_indicators.start()
             await self.xport.start()
@@ -154,6 +157,14 @@ class AppRuntime:
         await self.diagnostic_indicators.stop()
         await self.carrier.stop()
         await self.backend.stop()
+        if self._broadcast_task is not None:
+            self._broadcast_task.cancel()
+            try:
+                await self._broadcast_task
+            except asyncio.CancelledError:
+                pass
+            self._broadcast_task = None
+        self._pending_broadcasts.clear()
         clients = list(self._clients)
         for ws in clients:
             try:
@@ -225,7 +236,7 @@ class AppRuntime:
             self.state.led_on = bool(self.state.outputs["user_led"])
             if previous != confirmed:
                 if output_id == "user_led":
-                    await self.broadcast({"type": "led_changed", "on": confirmed})
+                    self.broadcast_nowait({"type": "led_changed", "on": confirmed})
                 event = {
                     "type": "output_changed",
                     "output": {
@@ -235,7 +246,7 @@ class AppRuntime:
                         "on": confirmed,
                     },
                 }
-                await self.broadcast(event)
+                self.broadcast_nowait(event)
             return confirmed
 
     async def set_buzzer_volume(self, volume_percent: int) -> dict:
@@ -347,7 +358,7 @@ class AppRuntime:
         stale = []
         for websocket in list(self._clients):
             try:
-                await websocket.send_json(message)
+                await asyncio.wait_for(websocket.send_json(message), timeout=0.5)
             except Exception:
                 stale.append(websocket)
         for websocket in stale:
@@ -355,4 +366,24 @@ class AppRuntime:
 
     def broadcast_nowait(self, message: dict[str, Any]) -> None:
         """Publish an event without making the hardware command wait for clients."""
-        asyncio.create_task(self.broadcast(message))
+        if not self._clients:
+            return
+        event_type = str(message.get("type", ""))
+        key_id = None
+        if event_type in {"rs485_device_changed", "extension_module_changed", "carrier_output_changed", "output_changed", "xport_channel_changed"}:
+            item = message.get("device") or message.get("module") or message.get("output") or message.get("channel") or {}
+            key_id = item.get("id", item.get("channel"))
+        elif event_type in {"extensions_changed", "onewire_changed"}:
+            key_id = event_type
+        if key_id is None:
+            self._broadcast_sequence += 1
+            key_id = str(self._broadcast_sequence)
+        self._pending_broadcasts[(event_type, str(key_id))] = message
+        if self._broadcast_task is None or self._broadcast_task.done():
+            self._broadcast_task = asyncio.create_task(self._drain_broadcasts())
+
+    async def _drain_broadcasts(self) -> None:
+        while self._pending_broadcasts:
+            key = next(iter(self._pending_broadcasts))
+            message = self._pending_broadcasts.pop(key)
+            await self.broadcast(message)

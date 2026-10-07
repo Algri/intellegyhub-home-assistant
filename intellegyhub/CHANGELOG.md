@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.205
+
+- Keep WebSocket UI updates flowing while a control retains keyboard focus.
+- Correct RS-485 relay toggle callbacks after live state changes.
+- Keep RS-485 scan progress and selected-port settings responsive and independent.
+
 ## 0.5.204
 
 - Prioritize RS-485 relay writes over user-initiated reads and polling.

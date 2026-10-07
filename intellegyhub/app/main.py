@@ -256,7 +256,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.204 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.205 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -300,7 +300,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         # The production app creates AppRuntime lazily inside lifespan. Bind
         # RS-485 to the final runtime here, before polling starts, so live
         # device changes are published to the integration WebSocket.
-        app.state.rs485.set_publisher(app.state.runtime.broadcast)
+        app.state.rs485.set_publisher(app.state.runtime.broadcast_nowait)
         if app.state.rs485_enabled:
             await app.state.rs485.start()
         await app.state.runtime.start()
@@ -311,7 +311,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.204", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.205", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -320,7 +320,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     rs485_mock = is_mock_enabled() or (runtime is not None and isinstance(runtime.backend, MockGpioBackend))
     app.state.rs485 = Rs485Manager(store=Rs485Store(rs485_store_path), mock=rs485_mock)
     if runtime is not None:
-        app.state.rs485.set_publisher(runtime.broadcast)
+        app.state.rs485.set_publisher(runtime.broadcast_nowait)
 
     def runtime_or_503() -> AppRuntime:
         current: AppRuntime = app.state.runtime
@@ -2768,6 +2768,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           const item = byId[outputId] || { id: outputId, name: outputId, on: false };
           const row = document.createElement('div');
           row.className = 'carrier-io-row';
+          row.dataset.carrierOutputId = item.id;
           const label = document.createElement('span');
           label.textContent = carrierGroupItemLabel(group.title, item.name);
           const state = document.createElement('span');
@@ -2792,6 +2793,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     function hostOutputRow(item) {
       const row = document.createElement('div');
       row.className = 'carrier-io-row';
+      row.dataset.hostOutputId = item.id;
       const label = document.createElement('span');
       label.textContent = item.name;
       const state = document.createElement('span');
@@ -2808,6 +2810,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     function hostButtonRow(item) {
       const row = document.createElement('div');
       row.className = 'carrier-io-row';
+      row.dataset.hostButtonId = item.id;
       const label = document.createElement('span');
       label.textContent = item.name;
       const state = document.createElement('span');
@@ -2821,16 +2824,36 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       row.append(label, state, indicator);
       return row;
     }
+    function patchControlRow(attribute, id, active, action) {
+      const row = [...document.querySelectorAll(`[${attribute}]`)].find((item) => item.getAttribute(attribute) === id);
+      if (!row) return;
+      const state = row.querySelector('.state-text');
+      const toggle = row.querySelector('.toggle');
+      state.classList.toggle('on', active);
+      state.textContent = row.dataset.hostButtonId ? (active ? 'PRESSED' : 'OPEN') : (active ? 'ON' : 'OFF');
+      toggle.classList.toggle('on', active);
+      toggle.querySelector('span').textContent = active ? 'ON' : 'OFF';
+      if (action) toggle.onclick = () => action(!active);
+    }
+    function patchCarrierOutput(item) {
+      patchControlRow('data-carrier-output-id', item.id, Boolean(item.on), (on) => setCarrierOutput(item.id, on));
+    }
+    function patchHostOutput(item) {
+      patchControlRow('data-host-output-id', item.id, Boolean(item.on), (on) => setHostOutput(item.id, on));
+    }
+    function patchHostButton(item) {
+      patchControlRow('data-host-button-id', item.id, Boolean(item.pressed));
+    }
     async function setHostOutput(outputId, on) {
       const output = document.getElementById('output');
       output.classList.remove('visible');
       try {
-        await requestJson(`api/v1/outputs/${outputId}`, {
+        const item = await requestJson(`api/v1/outputs/${outputId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ on })
         });
-        await renderCarrierIO();
+        patchHostOutput(item);
       } catch (error) {
         output.textContent = JSON.stringify(error, null, 2);
         output.classList.add('visible');
@@ -2840,12 +2863,12 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       const output = document.getElementById('output');
       output.classList.remove('visible');
       try {
-        await requestJson(`api/v1/carrier/outputs/${outputId}`, {
+        const item = await requestJson(`api/v1/carrier/outputs/${outputId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ on })
         });
-        await renderCarrierIO();
+        patchCarrierOutput(item);
       } catch (error) {
         output.textContent = JSON.stringify(error, null, 2);
         output.classList.add('visible');
@@ -2882,6 +2905,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       for (const module of payload.modules) {
         const card = document.createElement('article');
         card.className = 'module-card';
+        card.dataset.moduleId = module.id;
         const title = document.createElement('div');
         title.className = 'module-title';
         title.textContent = module.name;
@@ -2986,7 +3010,45 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       } else {
         modules.push(module);
       }
-      paintExtensions({ ...extensionState, modules });
+      patchExtensions({ ...extensionState, modules });
+    }
+    function patchExtensions(payload) {
+      if (!extensionState || !Array.isArray(extensionState.modules) ||
+          Boolean(extensionState.power && extensionState.power.on) !== Boolean(payload.power && payload.power.on) ||
+          extensionState.modules.length !== payload.modules.length) {
+        paintExtensions(payload);
+        return;
+      }
+      const cards = new Map([...document.querySelectorAll('#modules .module-card')].map((card) => [card.dataset.moduleId, card]));
+      if (cards.size !== payload.modules.length || payload.modules.some((module) => !cards.has(module.id))) {
+        paintExtensions(payload);
+        return;
+      }
+      extensionState = payload;
+      for (const module of payload.modules) {
+        const card = cards.get(module.id);
+        const online = Boolean(module.available && payload.power.on);
+        const status = card.querySelector('.status-pill');
+        status.classList.toggle('offline', !online);
+        status.textContent = online ? 'Online' : 'Offline';
+        const values = module.kind === 'relay_output' ? module.relays : module.inputs;
+        const rows = card.querySelectorAll('.relay-row');
+        if (!Array.isArray(values) || rows.length !== values.length) {
+          paintExtensions(payload);
+          return;
+        }
+        for (let index = 0; index < rows.length; index++) {
+          const on = Boolean(values[index]);
+          const state = rows[index].querySelector('.state-text');
+          const toggle = rows[index].querySelector('.toggle');
+          state.classList.toggle('on', on);
+          state.textContent = on ? 'ON' : 'OFF';
+          toggle.classList.toggle('on', on);
+          toggle.querySelector('span').textContent = on ? 'ON' : 'OFF';
+          toggle.disabled = module.kind !== 'relay_output' || !payload.power.on || !module.available;
+          if (module.kind === 'relay_output') toggle.onclick = () => setExtensionRelay(module.id, index + 1, !on);
+        }
+      }
     }
     async function removeExtensionModule(moduleId) {
       const payload = await requestJson(`api/v1/extensions/modules/${moduleId}`, { method: 'DELETE' });
@@ -3104,31 +3166,30 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     let uiInteractionDepth = 0;
     let uiScheduledFrame = 0;
-    let uiPendingRender = null;
+    let uiPendingRenders = [];
     function uiInteractionStart() { uiInteractionDepth += 1; }
     function uiInteractionEnd() {
       uiInteractionDepth = Math.max(0, uiInteractionDepth - 1);
-      if (!uiInteractionDepth && uiPendingRender && !uiScheduledFrame) uiScheduleRender();
+      if (!uiInteractionDepth && uiPendingRenders.length && !uiScheduledFrame) uiScheduleRender();
     }
     function uiScheduleRender() {
-      if (uiScheduledFrame || !uiPendingRender || uiInteractionDepth) return;
+      if (uiScheduledFrame || !uiPendingRenders.length || uiInteractionDepth) return;
       uiScheduledFrame = window.requestAnimationFrame(() => {
         uiScheduledFrame = 0;
         if (uiInteractionDepth) return;
-        const render = uiPendingRender;
-        uiPendingRender = null;
-        if (render) render();
+        const renders = uiPendingRenders;
+        uiPendingRenders = [];
+        for (const render of renders) render();
+        if (uiPendingRenders.length) uiScheduleRender();
       });
     }
     function uiScheduleStateRender(render) {
-      uiPendingRender = render;
+      uiPendingRenders.push(render);
       uiScheduleRender();
     }
     document.addEventListener('pointerdown', uiInteractionStart, true);
     document.addEventListener('pointerup', uiInteractionEnd, true);
     document.addEventListener('pointercancel', uiInteractionEnd, true);
-    document.addEventListener('focusin', uiInteractionStart, true);
-    document.addEventListener('focusout', uiInteractionEnd, true);
     function connectEvents() {
       const url = websocketUrl('ws');
       const socket = new WebSocket(url);
@@ -3148,19 +3209,23 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           renderCarrierIO();
         } else if (message.type === 'carrier_output_changed') {
           paintCarrier(message.carrier);
-          renderCarrierIO();
+          patchCarrierOutput(message.output);
         } else if (message.type === 'output_changed' || message.type === 'button_changed') {
-          renderCarrierIO();
+          if (message.type === 'output_changed') patchHostOutput(message.output);
+          else patchHostButton(message);
         } else if (message.type === 'xport_changed') {
           paintXPort(message.xport);
         } else if (message.type === 'xport_channel_changed') {
           renderXPort();
         } else if (message.type === 'extensions_changed') {
-          paintExtensions(message.extensions);
+          patchExtensions(message.extensions);
         } else if (message.type === 'extension_module_changed') {
           applyExtensionModule(message.module);
         } else if (message.type === 'rs485_device_changed') {
-          paintRs485(mergeRs485CommandPayload({ device: message.device, selected_id: message.device && message.device.id }));
+          if (message.device) {
+            rs485ApiState = mergeRs485CommandPayload({ device: message.device, selected_id: message.device.id });
+            patchRs485Live({ devices: [message.device] });
+          }
         } else if (message.type === 'extension_module_removed') {
           renderExtensions();
         } else if (message.type === 'extension_power_changed') {
@@ -3284,6 +3349,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     let rs485DiagnosticsFunctionFilter = 'all';
     const rs485DiagnosticsTraffic = {};
     let rs485ScanPollTimer = null;
+    let rs485ScanPollInFlight = false;
+    let rs485ScanRequestVersion = 0;
+    let rs485ScanLogSignature = '';
     let rs485ScanStartedAt = 0;
     let rs485LivePollTimer = null;
     let rs485DiagnosticsLiveInFlight = false;
@@ -3292,6 +3360,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     let rs485DetailSignature = '';
     let rs485CommandDepth = 0;
     const rs485PendingSettings = {};
+    const rs485PendingCapabilityCommands = new Set();
     const rs485AddingScanIds = new Set();
     const rs485RemovingDeviceIds = new Set();
     const rs485InitialSettingsRead = new Set();
@@ -3328,7 +3397,6 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     function rs485CurrentSerialPort() {
       const busValue = rs485ApiState && rs485ApiState.bus && rs485ApiState.bus.serial_port;
       const value = rs485ControlValue('rs485-serial-port');
-      if (busValue && (rs485ApiState.scan_state && rs485ApiState.scan_state.serial_port === busValue)) return busValue;
       return value || busValue || '/dev/ttyAMA3';
     }
     function rs485BusPayload() {
@@ -3415,7 +3483,18 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       await saveRs485BusSettings();
     }
     async function saveRs485SerialPortSettings(value) {
-      await saveRs485BusSettings();
+      rs485ScanRequestVersion += 1;
+      try {
+        const payload = await rs485Command(() => requestJson('api/v1/rs485/bus', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ serial_port: value })
+        }));
+        paintRs485(payload);
+      } catch (error) {
+        document.getElementById('rs485-status').textContent = `RS-485: port change failed - ${errorDetail(error)}`;
+        renderRs485Mock();
+      }
     }
     function initRs485MockControls() {
       let bus = rs485ApiState && rs485ApiState.bus ? rs485ApiState.bus : {
@@ -3457,13 +3536,14 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     async function scanRs485Mock() {
       try {
+        rs485ScanRequestVersion += 1;
         rs485ScanStartedAt = Date.now();
-        const payload = await rs485Command(() => requestJson('api/v1/rs485/scan', {
+        const payload = await rs485Command(() => requestJson('api/v1/rs485/scan?compact=1', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(rs485BusPayload())
         }));
-        paintRs485(payload);
+        patchRs485ScanSnapshot(payload);
         startRs485ScanPolling();
       } catch (error) {
         document.getElementById('rs485-status').textContent = 'RS-485: scan failed';
@@ -3471,8 +3551,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     async function stopRs485Scan() {
       try {
-        const payload = await rs485Command(() => requestJson('api/v1/rs485/scan/stop', { method: 'POST' }));
-        paintRs485(payload);
+        rs485ScanRequestVersion += 1;
+        const payload = await rs485Command(() => requestJson('api/v1/rs485/scan/stop?compact=1', { method: 'POST' }));
+        patchRs485ScanSnapshot(payload);
         startRs485ScanPolling();
       } catch (error) {
         document.getElementById('rs485-status').textContent = `RS-485: stop failed - ${errorDetail(error)}`;
@@ -3480,22 +3561,35 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     function startRs485ScanPolling() {
       if (rs485ScanPollTimer) return;
-      rs485ScanPollTimer = window.setInterval(async () => {
-        try {
-          const payload = await requestJson('api/v1/rs485');
-          patchRs485Live(payload);
-          const running = payload.scan_state && payload.scan_state.running;
-          if (!running && rs485ScanPollTimer) {
-            window.clearInterval(rs485ScanPollTimer);
-            rs485ScanPollTimer = null;
-          }
-        } catch (error) {
-          if (rs485ScanPollTimer) {
-            window.clearInterval(rs485ScanPollTimer);
-            rs485ScanPollTimer = null;
-          }
+      rs485ScanPollTimer = window.setInterval(refreshRs485ScanProgress, 500);
+      refreshRs485ScanProgress();
+    }
+    function patchRs485ScanSnapshot(payload) {
+      if (!rs485ApiState || !payload || !payload.scan_state) return;
+      for (const key of ['scan_state', 'scan_log', 'scanned', 'scan_errors', 'status']) {
+        if (Object.prototype.hasOwnProperty.call(payload, key)) rs485ApiState[key] = payload[key];
+      }
+      paintRs485ConfiguredDevices();
+      paintRs485ScanResults();
+      paintRs485ScanLog();
+    }
+    async function refreshRs485ScanProgress() {
+      if (rs485ScanPollInFlight || rs485CommandDepth) return;
+      rs485ScanPollInFlight = true;
+      const version = rs485ScanRequestVersion;
+      try {
+        const payload = await requestJson('api/v1/rs485/scan/progress');
+        if (version !== rs485ScanRequestVersion) return;
+        patchRs485ScanSnapshot(payload);
+        if (!payload.scan_state.running && rs485ScanPollTimer) {
+          window.clearInterval(rs485ScanPollTimer);
+          rs485ScanPollTimer = null;
         }
-      }, 500);
+      } catch (error) {
+        document.getElementById('rs485-status').textContent = `RS-485: scan progress failed - ${errorDetail(error)}`;
+      } finally {
+        rs485ScanPollInFlight = false;
+      }
     }
     function stopRs485LivePolling() {
       if (rs485LivePollTimer) {
@@ -3776,15 +3870,31 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       }
     }
     async function setRs485Capability(deviceId, capabilityId, value) {
+      const commandKey = `${deviceId}:${capabilityId}`;
+      if (rs485PendingCapabilityCommands.has(commandKey)) return;
+      rs485PendingCapabilityCommands.add(commandKey);
+      const row = [...document.querySelectorAll('[data-rs485-live-value]')].find((item) => item.dataset.rs485LiveValue === capabilityId);
+      const toggle = row && row.querySelector('.toggle');
+      if (toggle) toggle.disabled = true;
       try {
         const payload = await rs485Command(() => requestJson(`api/v1/rs485/devices/${encodeURIComponent(deviceId)}/capabilities/${encodeURIComponent(capabilityId)}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ value })
         }));
-        paintRs485(mergeRs485CommandPayload(payload));
+        if (typeof value === 'boolean' && payload.device) {
+          rs485PendingCapabilityCommands.delete(commandKey);
+          rs485ApiState = mergeRs485CommandPayload(payload);
+          patchRs485Live({ devices: [payload.device] });
+        } else {
+          paintRs485(mergeRs485CommandPayload(payload));
+        }
       } catch (error) {
         document.getElementById('rs485-status').textContent = 'RS-485: capability update failed';
+        renderRs485Mock();
+      } finally {
+        rs485PendingCapabilityCommands.delete(commandKey);
+        if (toggle && toggle.isConnected) toggle.disabled = toggle.dataset.rs485Writable === 'false';
       }
     }
     function setRs485PendingSetting(deviceId, capabilityId, value) {
@@ -3865,6 +3975,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       paintRs485ScanLog();
       paintRs485Detail();
       syncRs485LivePolling(payload);
+      if (payload.scan_state && payload.scan_state.running) startRs485ScanPolling();
     }
     function patchRs485Live(payload) {
       if (!payload) return;
@@ -3941,6 +4052,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       const values = device.values || {};
       detail.querySelectorAll('[data-rs485-live-value]').forEach((row) => {
         const capabilityId = row.dataset.rs485LiveValue;
+        if (rs485PendingCapabilityCommands.has(`${device.id}:${capabilityId}`)) return;
         if (!Object.prototype.hasOwnProperty.call(values, capabilityId)) return;
         const value = values[capabilityId];
         const error = values[`${capabilityId}__error`];
@@ -3956,6 +4068,11 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           const label = toggle.querySelector('span');
           if (label) label.textContent = active ? 'ON' : 'OFF';
           if (row.dataset.rs485LiveType === 'binary_input') toggle.setAttribute('aria-label', `${toggle.closest('.relay-row')?.querySelector('span')?.textContent || 'Input'} ${active ? 'ON' : 'OFF'}`);
+          if (row.dataset.rs485LiveType === 'switch') {
+            toggle.removeAttribute('onclick');
+            toggle.onclick = () => setRs485Capability(device.id, capabilityId, !active);
+            toggle.disabled = toggle.dataset.rs485Writable === 'false';
+          }
         }
         row.classList.toggle('rs485-stale', Boolean(error));
         row.title = error || '';
@@ -4063,7 +4180,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       const rows = (rs485ApiState.scanned || []).filter((item) => !item.configured && item.serial_port === currentPort);
       const errors = (rs485ApiState.scan_errors || []).filter((item) => item.serial_port === currentPort);
       const running = Boolean(rs485ApiState.scan_state && rs485ApiState.scan_state.running && rs485ApiState.scan_state.serial_port === currentPort);
-      scanResults.innerHTML = rows.length
+      const markup = rows.length
         ? rows.map((item) => `
             <div class="rs485-table-row scan">
               <span><span class="rs485-label">Slave</span> <span class="rs485-primary">${item.slave_address}</span></span>
@@ -4078,6 +4195,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
             : errors.length && !(rs485ApiState.devices || []).some((device) => device.serial_port === currentPort)
             ? `<div class="rs485-empty">No devices found on the selected bus. ${errors.length} address(es) did not respond. See Scan Log for details.</div>`
             : '<div class="rs485-empty">No scan results. Press Scan to search the Modbus slave address range on the selected RS-485 bus.</div>');
+      if (scanResults.innerHTML !== markup) scanResults.innerHTML = markup;
     }
     function rs485ScanResultLabel(item) {
       const confidence = String(item.confidence || '').toLowerCase();
@@ -4098,11 +4216,13 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       const currentPort = rs485CurrentSerialPort();
       const state = rs485ApiState.scan_state || {};
       const running = Boolean(state.running && state.serial_port === currentPort);
+      const busyElsewhere = Boolean(state.running && state.serial_port !== currentPort);
+      const stopping = running && Boolean(state.stop_requested);
       if (scanButton) {
-        scanButton.disabled = false;
-        scanButton.textContent = running ? 'Stop' : 'Scan devices';
+        scanButton.disabled = busyElsewhere || stopping;
+        scanButton.textContent = stopping ? 'Stopping...' : busyElsewhere ? 'Scan busy' : running ? 'Stop' : 'Scan devices';
         scanButton.onclick = running ? stopRs485Scan : scanRs485Mock;
-        scanButton.setAttribute('aria-label', running ? 'Stop RS-485 scan' : 'Start RS-485 scan');
+        scanButton.setAttribute('aria-label', stopping ? 'Stopping RS-485 scan' : busyElsewhere ? `Scanning ${state.serial_port}` : running ? 'Stop RS-485 scan' : 'Start RS-485 scan');
       }
       const scanned = Number(state.scanned || 0);
       const total = Math.max(1, Number(state.total || 255));
@@ -4112,14 +4232,19 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       const progressText = running
         ? `Scanning ${state.serial_port}: slave ${state.current_address || '--'} / ${total} | scanned ${scanned} | found ${found}${state.last_error ? ` | ${state.last_error}` : ''}`
         : 'Scan is idle.';
-      if (progress) progress.innerHTML = progressText;
+      if (progress) progress.textContent = progressText;
       if (scanButton) {
         scanButton.classList.toggle('scanning', running);
         scanButton.classList.toggle('stop', running);
-        scanButton.innerHTML = running ? '<span class="rs485-stop-square"></span>Stop' : 'Scan devices';
+        const buttonMarkup = stopping ? 'Stopping...' : busyElsewhere ? 'Scan busy' : running ? '<span class="rs485-stop-square"></span>Stop' : 'Scan devices';
+        if (scanButton.innerHTML !== buttonMarkup) scanButton.innerHTML = buttonMarkup;
       }
-      if (logTarget) logTarget.textContent = rows.length ? rows.map(rs485ScanLogLine).join('\\n') : 'No scan log yet.';
-      if (detailLogTarget) detailLogTarget.innerHTML = rows.length ? rows.map(rs485ScanLogEntry).join('') : '<div class="rs485-empty">No scan log yet.</div>';
+      const logSignature = currentPort + ':' + rows.length + ':' + (rows[0]?.seq ?? rows[0]?.ts ?? '');
+      if (logSignature !== rs485ScanLogSignature) {
+        if (logTarget) logTarget.textContent = rows.length ? rows.map(rs485ScanLogLine).join('\\n') : 'No scan log yet.';
+        if (detailLogTarget) detailLogTarget.innerHTML = rows.length ? rows.map(rs485ScanLogEntry).join('') : '<div class="rs485-empty">No scan log yet.</div>';
+        rs485ScanLogSignature = logSignature;
+      }
       if (detailLogSummary) detailLogSummary.textContent = running ? `(Scanning addresses 1 - ${state.total || 255})` : `Last scan: ${rs485LogTime(rows[0] && rows[0].ts)}`;
       if (detailLogFooter) {
         const total = Math.max(1, Number(state.total || 255));
@@ -4941,7 +5066,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           <div class="relay-row${staleClass}" data-rs485-live-value="${capability.id}" data-rs485-live-type="switch" title="${error || ''}">
             <span>${displayName}</span>
             <span class="state-text ${on ? 'on' : ''}">${on ? 'ON' : 'OFF'}</span>
-            <button class="toggle ${on ? 'on' : ''}" type="button" onclick="setRs485Capability('${device.id}', '${capability.id}', ${!on})" ${writable ? '' : 'disabled'}><span>${on ? 'ON' : 'OFF'}</span></button>
+            <button class="toggle ${on ? 'on' : ''}" type="button" data-rs485-writable="${writable}" onclick="setRs485Capability('${device.id}', '${capability.id}', ${!on})" ${writable ? '' : 'disabled'}><span>${on ? 'ON' : 'OFF'}</span></button>
           </div>`;
       }
       const on = Boolean(value);
@@ -5434,22 +5559,28 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     @app.put("/api/v1/rs485/bus")
     async def put_rs485_bus(payload: Rs485BusPayload) -> dict:
         result = await rs485_or_404().save_bus(payload.model_dump())
-        await app.state.runtime.broadcast({"type": "rs485_changed", "rs485": result})
+        app.state.runtime.broadcast_nowait({"type": "rs485_changed", "rs485": result})
         return result
 
     @app.patch("/api/v1/rs485/bus")
     async def patch_rs485_bus(payload: Rs485BusPatchPayload) -> dict:
         result = await rs485_or_404().patch_bus(payload.model_dump(exclude_none=True))
-        await app.state.runtime.broadcast({"type": "rs485_changed", "rs485": result})
+        app.state.runtime.broadcast_nowait({"type": "rs485_changed", "rs485": result})
         return result
 
     @app.post("/api/v1/rs485/scan")
-    async def post_rs485_scan(payload: Rs485BusPayload) -> dict:
-        return await rs485_or_404().scan(payload.model_dump())
+    async def post_rs485_scan(payload: Rs485BusPayload, compact: bool = False) -> dict:
+        manager = rs485_or_404()
+        return await manager.scan(payload.model_dump(), compact=compact)
 
     @app.post("/api/v1/rs485/scan/stop")
-    async def post_rs485_scan_stop() -> dict:
-        return await rs485_or_404().stop_scan()
+    async def post_rs485_scan_stop(compact: bool = False) -> dict:
+        manager = rs485_or_404()
+        return await manager.stop_scan(compact=compact)
+
+    @app.get("/api/v1/rs485/scan/progress")
+    async def get_rs485_scan_progress() -> dict:
+        return rs485_or_404().scan_progress_snapshot()
 
     @app.post("/api/v1/rs485/scan/clear")
     async def post_rs485_scan_clear() -> dict:

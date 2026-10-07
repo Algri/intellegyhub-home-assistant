@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 import re
 
 from homeassistant.helpers.entity import DeviceInfo, Entity
@@ -35,7 +36,23 @@ class IntellegyHubGpioEntity(Entity):
         )
 
     async def async_added_to_hass(self) -> None:
-        self._remove_listener = self.manager.async_add_listener(self.async_write_ha_state)
+        last_state = object()
+        last_available = object()
+        last_attributes = object()
+
+        def write_if_changed() -> None:
+            nonlocal last_state, last_available, last_attributes
+            state = self.state
+            available = self.available
+            attributes = self.extra_state_attributes
+            if state == last_state and available == last_available and attributes == last_attributes:
+                return
+            last_state = state
+            last_available = available
+            last_attributes = deepcopy(attributes)
+            self.async_write_ha_state()
+
+        self._remove_listener = self.manager.async_add_listener(write_if_changed)
 
     async def async_will_remove_from_hass(self) -> None:
         if self._remove_listener:
