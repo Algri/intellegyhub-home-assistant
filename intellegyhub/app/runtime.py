@@ -352,3 +352,7 @@ class AppRuntime:
                 stale.append(websocket)
         for websocket in stale:
             self.remove_client(websocket)
+
+    def broadcast_nowait(self, message: dict[str, Any]) -> None:
+        """Publish an event without making the hardware command wait for clients."""
+        asyncio.create_task(self.broadcast(message))

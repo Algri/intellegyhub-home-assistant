@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.202
+
+- Keep XDO-8 relay commands independent from WebSocket delivery latency.
+- Return RS-485 relay write responses without waiting for full WebSocket snapshots.
+
 ## 0.5.201
 
 - Stop RS-485 live UI refresh when the selected bus is disabled, even if devices remain saved.

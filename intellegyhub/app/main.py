@@ -256,7 +256,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.201 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.202 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -311,7 +311,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.201", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.202", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -5454,7 +5454,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     async def delete_rs485_device(device_id: str) -> dict:
         try:
             result = await rs485_or_404().remove_device(device_id)
-            await app.state.runtime.broadcast({"type": "rs485_changed", "rs485": result})
+            app.state.runtime.broadcast_nowait({"type": "rs485_changed", "rs485": result})
             return result
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -5490,7 +5490,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     async def put_rs485_capability(device_id: str, capability_id: str, payload: Rs485CapabilityPayload) -> dict:
         try:
             result = await rs485_or_404().set_capability(device_id, capability_id, payload.value)
-            await app.state.runtime.broadcast({"type": "rs485_changed", "rs485": result})
+            app.state.runtime.broadcast_nowait({"type": "rs485_changed", "rs485": result})
             return result
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc

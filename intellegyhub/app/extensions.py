@@ -653,9 +653,13 @@ class ExtensionManager:
             updated = await self.hardware.set_xdo8_relay(module.address, channel, on)
             self.modules[module_id] = updated
             await self.store.save_modules(list(self.modules.values()))
-            await self._publish({"type": "extension_module_changed", "module": asdict(updated)})
-            await self._publish({"type": "extensions_changed", "extensions": self.snapshot()})
-            return {"module": asdict(updated), "channel": channel, "on": on}
+            result = {"module": asdict(updated), "channel": channel, "on": on}
+            # The relay command must not wait for a slow WebSocket client or
+            # a full extensions snapshot to finish sending.
+            asyncio.create_task(
+                self._publish({"type": "extension_module_changed", "module": result["module"]})
+            )
+            return result
 
     async def delete_module(self, module_id: str) -> dict[str, Any]:
         async with self._lock:
