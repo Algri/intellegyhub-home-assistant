@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.200
+
+- Replace the heavy RS-485 live snapshot polling with a compact live-state endpoint.
+- Keep templates, diagnostics, scan logs and full device metadata out of the high-frequency UI refresh path.
+
+## 0.5.199
+
+- Stop RS-485 UI live-refresh when no devices are configured.
+- Resume live-refresh automatically when an RS-485 device becomes available.
+
+## 0.5.198
+
+- Reduce RS-485 live UI refresh frequency from 200 ms to 1 second.
+- Avoid rebuilding device and scan lists on every live state update to keep the add-on UI responsive.
+
 ## 0.5.197
 
 - Publish the separate public GitHub README from `docs/public/README.md`.

@@ -2132,6 +2132,19 @@ class Rs485Manager:
             "serial_ports": serial_port_options(),
         }
 
+    def live_snapshot(self) -> dict[str, Any]:
+        """Return only the small mutable state needed by the live UI refresh."""
+        devices = []
+        for device in sorted(self.devices.values(), key=lambda item: (item.serial_port, item.slave_address)):
+            devices.append({
+                "id": device.id,
+                "serial_port": device.serial_port,
+                "enabled": device.enabled,
+                "values": dict(device.values),
+                "runtime": copy.deepcopy(device.runtime or {}),
+            })
+        return {"devices": devices}
+
     def _bus_is_mock(self, bus: dict[str, Any]) -> bool:
         if str(bus.get("mode") or "mock") == "usb_real":
             return False

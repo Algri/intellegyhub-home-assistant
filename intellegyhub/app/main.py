@@ -256,7 +256,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.197 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.200 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -311,7 +311,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.197", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.200", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -3438,7 +3438,6 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       renderRs485Select('rs485-template', templates, templates[0] ? templates[0].value : '', renderRs485Mock);
     }
     function loadRs485Mock() {
-      startRs485LivePolling();
       return renderRs485Mock();
     }
     async function saveRs485BusSettings() {
@@ -3495,9 +3494,24 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         }
       }, 500);
     }
+    function stopRs485LivePolling() {
+      if (rs485LivePollTimer) {
+        window.clearInterval(rs485LivePollTimer);
+        rs485LivePollTimer = null;
+      }
+    }
+    function syncRs485LivePolling(payload = rs485ApiState) {
+      const hasDevices = Boolean(payload && Array.isArray(payload.devices) && payload.devices.length);
+      if (hasDevices) startRs485LivePolling();
+      else stopRs485LivePolling();
+    }
     function startRs485LivePolling() {
       if (rs485LivePollTimer) return;
       rs485LivePollTimer = window.setInterval(async () => {
+        if (!rs485ApiState || !Array.isArray(rs485ApiState.devices) || !rs485ApiState.devices.length) {
+          stopRs485LivePolling();
+          return;
+        }
         if (document.hidden) return;
         if (rs485LivePollInFlight) return;
         if (rs485CommandDepth) return;
@@ -3507,7 +3521,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         rs485LivePollInFlight = true;
         const requestVersion = rs485LiveRequestVersion;
         try {
-          const payload = await requestJson('api/v1/rs485');
+          const payload = await requestJson('api/v1/rs485/live');
           if (requestVersion === rs485LiveRequestVersion) {
             patchRs485Live(payload);
           }
@@ -3516,7 +3530,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         } finally {
           rs485LivePollInFlight = false;
         }
-      }, 200);
+      }, 1000);
     }
     function rs485UserEditing() {
       const section = document.getElementById('rs485-section');
@@ -3831,22 +3845,29 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       paintRs485ScanResults();
       paintRs485ScanLog();
       paintRs485Detail();
+      syncRs485LivePolling(payload);
     }
     function patchRs485Live(payload) {
       if (!payload) return;
-      rs485ApiState = payload;
+      const liveDevices = Array.isArray(payload.devices) ? payload.devices : [];
+      const byId = new Map(liveDevices.map((device) => [device.id, device]));
+      rs485ApiState = {
+        ...(rs485ApiState || {}),
+        devices: (rs485ApiState && rs485ApiState.devices || []).map((device) => ({
+          ...device,
+          ...(byId.get(device.id) || {}),
+        })),
+      };
       const currentPort = rs485CurrentSerialPort();
-      const devices = (payload.devices || []).filter((device) => device.serial_port === currentPort);
+      const devices = (rs485ApiState.devices || []).filter((device) => device.serial_port === currentPort);
       if (!rs485SelectedId || !devices.some((device) => device.id === rs485SelectedId)) {
         const selectedOnPort = devices.find((device) => device.id === payload.selected_id);
         rs485SelectedId = (selectedOnPort && selectedOnPort.id) || (devices[0] && devices[0].id) || null;
       }
       patchRs485LiveStatus(devices);
-      paintRs485ConfiguredDevices();
-      paintRs485ScanResults();
-      paintRs485ScanLog();
       if (rs485DetailTab === 'logs') patchRs485LogsTable();
       if (rs485DetailTab === 'diagnostics') patchRs485DiagnosticsLog();
+      syncRs485LivePolling(rs485ApiState);
     }
     function patchRs485LiveStatus(devices) {
       const byId = new Map(devices.map((device) => [device.id, device]));
@@ -5361,6 +5382,10 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     @app.get("/api/v1/rs485")
     async def get_rs485() -> dict:
         return rs485_or_404().snapshot()
+
+    @app.get("/api/v1/rs485/live")
+    async def get_rs485_live() -> dict:
+        return rs485_or_404().live_snapshot()
 
     @app.put("/api/v1/rs485/bus")
     async def put_rs485_bus(payload: Rs485BusPayload) -> dict:
