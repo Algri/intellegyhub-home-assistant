@@ -109,6 +109,9 @@ class IntellegyHubOneWirePowerEntity(IntellegyHubGpioEntity):
 
 class IntellegyHubRs485Entity(IntellegyHubGpioEntity):
     _attr_has_entity_name = True
+    # RS-485 state is delivered by the add-on WebSocket stream. HA must not
+    # run its own entity polling loop alongside the Modbus polling scheduler.
+    _attr_should_poll = False
 
     def __init__(self, manager: IntellegyHubGpioManager, device_id: str, capability_id: str) -> None:
         super().__init__(manager)

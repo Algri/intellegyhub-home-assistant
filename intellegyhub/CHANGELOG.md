@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.193
+
+- Ensure relay FC05 commands enter the per-port priority queue without waiting behind mode updates.
+- Keep mode writes ahead of polling while preserving one uninterrupted Modbus transaction at a time.
+- Maintain independent RS-485 port scheduling and automatic polling recovery after queued work is canceled.
+
 ## 0.5.192
 
 - Add explicit per-port priority queues so relay commands always run before pending polling jobs.

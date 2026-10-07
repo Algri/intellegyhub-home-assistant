@@ -134,6 +134,21 @@ class Rs485PollPreempted(Exception):
     pass
 
 
+class _NoopAsyncLock:
+    """Async context-manager used when the bus queue is the serializer.
+
+    Holding an application lock across a queued Modbus operation would defeat
+    priority: a mode request could keep a later FC05 request out of the heap.
+    The per-port bus worker is the physical transaction serializer.
+    """
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+
 @dataclass
 class Rs485Template:
     template_id: str
@@ -928,11 +943,16 @@ class Rs485Manager:
         self._poll_tick_seconds = 0.05
         self._poll_due: dict[tuple[str, str], float] = {}
         self._command_lock = asyncio.Lock()
+        self._command_locks: dict[str, asyncio.Lock] = {}
+        self._command_pending_by_port: dict[str, int] = {}
         self._command_pending = 0
         self._publisher: Callable[[dict[str, Any]], Awaitable[None]] | None = None
 
     def set_publisher(self, publisher: Callable[[dict[str, Any]], Awaitable[None]]) -> None:
         self._publisher = publisher
+
+    def _command_lock_for_port(self, serial_port: str) -> asyncio.Lock:
+        return self._command_locks.setdefault(serial_port, asyncio.Lock())
 
     async def _publish(self, event: dict[str, Any]) -> None:
         if self._publisher is not None:
@@ -1189,13 +1209,14 @@ class Rs485Manager:
         self._ensure_bus_worker(serial_port)
         loop = asyncio.get_running_loop()
         future = loop.create_future()
+        priority_value = {"command": 0, "mode": 1, "poll": 2, "scan": 3}.get(priority, 2)
         job = Rs485BusJob(
-            priority=0 if priority == "command" else 1,
+            priority=priority_value,
             sequence=next(self._bus_sequence),
             operation=operation,
             future=future,
         )
-        if priority == "command":
+        if priority in {"command", "mode"}:
             self._drop_pending_poll_jobs(serial_port)
         heapq.heappush(self._bus_queues[serial_port], (job.priority, job.sequence, job))
         self._bus_queue_events[serial_port].set()
@@ -1207,13 +1228,26 @@ class Rs485Manager:
             queue = self._bus_queues[port]
             retained = []
             for item in queue:
-                if item[2].priority == 1:
+                if item[2].priority >= 2:
                     if not item[2].future.done():
                         item[2].future.cancel()
                 else:
                     retained.append(item)
             queue[:] = retained
             heapq.heapify(queue)
+
+    def _reset_poll_schedule_for_serial_port(self, serial_port: str) -> None:
+        """Resume every device on this bus from the command completion window."""
+        now = time.monotonic()
+        port_device_ids = {
+            device.id
+            for device in self.devices.values()
+            if str(device.serial_port) == serial_port
+        }
+        self._poll_due = {
+            key: now if key[0] in port_device_ids else due
+            for key, due in self._poll_due.items()
+        }
 
     async def _read_point(self, bus: dict[str, Any], point: dict[str, Any], slave_address: int, priority: str) -> Any:
         return await self._run_bus_job(priority, lambda: self.transport.read_point(bus, point, slave_address), str(bus["serial_port"]))
@@ -1272,10 +1306,25 @@ class Rs485Manager:
         self._command_pending += 1
         try:
             async with self._command_lock:
-                self._drop_pending_poll_jobs()
-                self._poll_due = {}
                 previous_bus = dict(self.bus)
                 self.bus = normalize_bus_settings(settings)
+                affected_ports = {
+                    str(previous_bus.get("serial_port") or ""),
+                    str(self.bus.get("serial_port") or ""),
+                }
+                for port in affected_ports:
+                    if port:
+                        self._drop_pending_poll_jobs(port)
+                affected_device_ids = {
+                    device.id
+                    for device in self.devices.values()
+                    if str(device.serial_port) in affected_ports
+                }
+                self._poll_due = {
+                    key: due
+                    for key, due in self._poll_due.items()
+                    if key[0] not in affected_device_ids
+                }
                 if previous_bus != self.bus:
                     if hasattr(self.transport, "close_port"):
                         await self.transport.close_port(str(previous_bus.get("serial_port") or ""))
@@ -1305,8 +1354,9 @@ class Rs485Manager:
         self._command_pending += 1
         stop_event = self._scan_stop_event
         try:
-            self._drop_pending_poll_jobs()
             self.bus = normalize_bus_settings(settings)
+            current_port = str(self.bus["serial_port"])
+            self._drop_pending_poll_jobs(current_port)
             await self.store.save_bus(self.bus)
             requested_template = str(settings.get("template_id") or "")
             default_template = requested_template if requested_template in self.registry.templates else next(iter(self.registry.templates), "mio-8")
@@ -1314,7 +1364,6 @@ class Rs485Manager:
             mock_bus = self._bus_is_mock(self.bus)
             addresses = [1, 2] if mock_bus else template_slave_addresses(template)
             scanned_count = len(addresses)
-            current_port = self.bus["serial_port"]
             self.scanned = [item for item in self.scanned if item.get("serial_port") != current_port]
             self.scan_errors = [item for item in self.scan_errors if item.get("serial_port") != current_port]
             self.scan_log = [item for item in self.scan_log if item.get("serial_port") != current_port]
@@ -1351,7 +1400,7 @@ class Rs485Manager:
                     confidence = "Mock match"
                     if not mock_bus:
                         matched = await self._run_bus_job(
-                            "command",
+                            "scan",
                             lambda: self.transport.probe(self.bus, template, found),
                             current_port,
                         )
@@ -1473,18 +1522,18 @@ class Rs485Manager:
         LOGGER.info("RS-485 add requested: scan_id=%s running=%s scanned=%s devices=%s", scan_id, bool(self._scan_task and not self._scan_task.done()), len(self.scanned), len(self.devices))
         self._command_pending += 1
         try:
-            self._drop_pending_poll_jobs()
             scan = next((item for item in self.scanned if item["id"] == scan_id), None)
             if scan is None:
                 LOGGER.warning("RS-485 add rejected: scan result not found: %s", scan_id)
                 raise ValueError("scan result not found")
             if self._scan_task and not self._scan_task.done():
                 self.scan_state["stop_requested"] = True
+            if scan.get("status") == "No response":
+                raise ValueError("device did not respond")
+            self._drop_pending_poll_jobs(str(scan["serial_port"]))
             async with self._command_lock:
                 if scan_id in self.devices:
                     raise ValueError("device already configured")
-                if scan.get("status") == "No response":
-                    raise ValueError("device did not respond")
                 template = self.registry.get(scan["template_id"])
                 values = default_values_for_template(template)
                 if "device_address" in values:
@@ -1553,20 +1602,26 @@ class Rs485Manager:
         return self.snapshot(selected_id=device.id, status=f"RS-485: renamed {device.name}")
 
     async def set_capability(self, device_id: str, capability_id: str, value: Any) -> dict[str, Any]:
-        self._command_pending += 1
+        device = self._device(device_id)
+        serial_port = str(device.serial_port)
+        self._command_pending_by_port[serial_port] = self._command_pending_by_port.get(serial_port, 0) + 1
         try:
-            async with self._command_lock:
+            # The per-port worker serializes transactions and applies
+            # FC05 > mode > polling > scan priority before each transaction.
+            command_lock = _NoopAsyncLock()
+            async with command_lock:
                 communication_setting = capability_id in {"device_baudrate", "device_parity", "device_address"}
-                self._drop_pending_poll_jobs()
-                self._poll_due = {}
-                device = self._device(device_id)
                 template = self.registry.get(device.template_id)
                 capability = normalized_capabilities(template).get(capability_id)
                 if capability is None:
                     raise ValueError("capability not found")
                 if capability.get("type") == "binary_input" or capability.get("type") == "sensor":
                     raise ValueError("capability is read-only")
+                serial_port = str(device.serial_port)
+                self._drop_pending_poll_jobs(serial_port)
+                self._reset_poll_schedule_for_serial_port(serial_port)
                 normalized = normalize_capability_value(capability, value)
+                write_priority = "command" if capability.get("type") == "switch" else "mode"
                 if not self._device_is_mock(device):
                     point = template.points.get(str(capability.get("source")))
                     if point is None:
@@ -1577,11 +1632,11 @@ class Rs485Manager:
                     write_transaction_id = f"{device.id}:{int(write_started * 1000)}"
                     self._record_diagnostic(device, "scan", f"Write FC{write_function:02d} {capability_id}", write_started, write_transaction_id)
                     try:
-                        await self._write_point(bus, point, device.slave_address, normalized, "command")
+                        await self._write_point(bus, point, device.slave_address, normalized, write_priority)
                         self._record_diagnostic(device, "response", f"Write FC{write_function:02d} {capability_id}", write_started, write_transaction_id)
                         self._append_transport_log(device, "write", f"{capability_id}={normalized}")
                         if capability.get("type") != "switch" and not communication_setting:
-                            normalized = await self._read_point(bus, point, device.slave_address, "command")
+                            normalized = await self._read_point(bus, point, device.slave_address, write_priority)
                             self._append_transport_log(device, "readback", f"{capability_id}={normalized}")
                     except Exception as exc:
                         error = str(exc)
@@ -1645,7 +1700,11 @@ class Rs485Manager:
                     return self.snapshot(selected_id=device.id, status=f"RS-485: {name} {state}")
                 return self.snapshot(selected_id=device.id, status=f"RS-485: updated {name}")
         finally:
-            self._command_pending = max(0, self._command_pending - 1)
+            remaining = self._command_pending_by_port.get(serial_port, 1) - 1
+            if remaining > 0:
+                self._command_pending_by_port[serial_port] = remaining
+            else:
+                self._command_pending_by_port.pop(serial_port, None)
 
     async def read_device(self, device_id: str, poll_group: str | None = None) -> dict[str, Any]:
         self._command_pending += 1
@@ -1751,9 +1810,9 @@ class Rs485Manager:
 
     async def _poll_due_groups(self, serial_port: str | None = None) -> None:
         now = time.monotonic()
-        if self._command_lock.locked() or self._command_pending:
-            return
         target_serial_port = serial_port or str(self.bus.get("serial_port") or "")
+        if self._command_pending_by_port.get(target_serial_port, 0):
+            return
         for device in list(self.devices.values()):
             if not device.enabled:
                 continue
@@ -1768,7 +1827,7 @@ class Rs485Manager:
                 previous_values = dict(device.values)
                 previous_polling = device.runtime.get("polling")
                 try:
-                    if self._command_pending:
+                    if self._command_pending_by_port.get(target_serial_port, 0):
                         return
                     if not self._device_is_mock(device):
                         # Live state polling updates device values/runtime only. It must
@@ -1777,6 +1836,10 @@ class Rs485Manager:
                     if not device.enabled:
                         continue
                     mark_device_runtime(device, template, None, success=True, group_id=group_id)
+                except asyncio.CancelledError:
+                    # A queued poll can be deliberately evicted when a command
+                    # arrives. Keep the per-port polling task alive.
+                    return
                 except Rs485PollPreempted:
                     return
                 except Exception as exc:
@@ -1934,7 +1997,7 @@ class Rs485Manager:
             # template uses separate fast input and output groups.
             if poll_group is not None and not (poll_group == "state" and resolved_poll_group in {"inputs", "outputs"}) and resolved_poll_group != poll_group:
                 continue
-            if log_result == "poll" and self._command_pending:
+            if log_result == "poll" and self._command_pending_by_port.get(str(device.serial_port), 0):
                 self._append_scan_log(device.serial_port, device.slave_address, "poll-preempt", "command pending")
                 raise Rs485PollPreempted()
             items.append((capability_id, {**point, "poll_group": resolved_poll_group}))
