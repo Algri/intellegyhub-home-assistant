@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.197
+
+- Publish the separate public GitHub README from `docs/public/README.md`.
+- Keep the internal root README outside the public repository package.
+
 ## 0.5.196
 
 - Refresh the public add-on description with the full IntellegyHUB platform capabilities.
