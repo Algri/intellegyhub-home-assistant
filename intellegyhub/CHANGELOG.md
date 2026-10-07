@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.203
+
+- Give XDO-8 relay commands a dedicated lock so XDI-16 interrupt reads cannot delay output switching.
+- Keep hardware I2C serialization while removing unrelated manager-level contention.
+
 ## 0.5.202
 
 - Keep XDO-8 relay commands independent from WebSocket delivery latency.

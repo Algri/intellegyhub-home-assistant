@@ -557,6 +557,7 @@ class ExtensionManager:
         self.modules: dict[str, ExtensionModule] = {}
         self.error: str | None = "startup pending"
         self._lock = asyncio.Lock()
+        self._relay_command_lock = asyncio.Lock()
         self._publisher: Callable[[dict[str, Any]], Any] | None = None
         self._xdi16_task: asyncio.Task | None = None
         self._xdi16_wake = asyncio.Event()
@@ -642,7 +643,9 @@ class ExtensionManager:
             return self.snapshot()
 
     async def set_relay(self, module_id: str, channel: int, on: bool) -> dict[str, Any]:
-        async with self._lock:
+        # XDI interrupt reads use the manager lock. Keep relay commands on a
+        # separate lane so an input interrupt cannot delay an output command.
+        async with self._relay_command_lock:
             if not self.power_on:
                 raise RuntimeError("Extension bus power is off")
             module = self.modules.get(module_id)
