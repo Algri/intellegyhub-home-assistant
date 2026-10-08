@@ -5,7 +5,9 @@ import contextlib
 import io
 import math
 import os
+import socket
 import sqlite3
+import subprocess
 import sys
 import time
 from dataclasses import dataclass
@@ -23,7 +25,6 @@ MIN_BUZZER_DURATION_MS = 10
 MAX_BUZZER_DURATION_MS = 1000
 MAX_PHYSICAL_DUTY = 0.132
 VOLUME_CONTROL_RANGE_DB = 10.0
-HARDWARE_FREQUENCY_DIVISOR = 10
 DEFAULT_FREQUENCY = 2000
 DEFAULT_DURATION_MS = 300
 DEFAULT_VOLUME_PERCENT = 50
@@ -136,6 +137,7 @@ class BuzzerManager:
         self.last_volume_percent = DEFAULT_VOLUME_PERCENT
         self._pigpio_connected: bool | None = None
         self._pigpio_error: str | None = None
+        self._pigpiod_process: subprocess.Popen | None = None
 
     def status(self) -> dict[str, Any]:
         pwm_path = self._pwm_path()
@@ -329,18 +331,23 @@ class BuzzerManager:
             raise
 
     def _start_hardware_pwm(self, frequency: int, duty: float) -> str:
-        self._start_pigpio_pwm(self._hardware_frequency(frequency), duty)
+        try:
+            self._start_pigpio_pwm(frequency, duty)
+        except Exception:
+            self._stop_pigpiod()
+            raise
         return "pigpio_hardware_pwm"
 
     def _run_hardware_pwm_once(self, frequency: int, duration_ms: int, duty: float) -> str:
-        self._run_pigpio_pwm_once(self._hardware_frequency(frequency), duration_ms, duty)
+        try:
+            self._run_pigpio_pwm_once(frequency, duration_ms, duty)
+        except Exception:
+            self._stop_pigpiod()
+            raise
         return "pigpio_hardware_pwm"
 
-    @staticmethod
-    def _hardware_frequency(frequency: int) -> int:
-        return max(1, round(frequency / HARDWARE_FREQUENCY_DIVISOR))
-
     def _start_pigpio_pwm(self, frequency: int, duty: float) -> None:
+        self._ensure_pigpiod()
         pigpio = self._import_pigpio()
         with contextlib.redirect_stderr(io.StringIO()):
             pi = pigpio.pi(PIGPIO_HOST, PIGPIO_PORT)
@@ -362,6 +369,7 @@ class BuzzerManager:
                 pass
 
     def _run_pigpio_pwm_once(self, frequency: int, duration_ms: int, duty: float) -> None:
+        self._ensure_pigpiod()
         pigpio = self._import_pigpio()
         with contextlib.redirect_stderr(io.StringIO()):
             pi = pigpio.pi(PIGPIO_HOST, PIGPIO_PORT)
@@ -386,6 +394,42 @@ class BuzzerManager:
                     pi.stop()
                 except Exception:
                     pass
+
+    def _ensure_pigpiod(self) -> None:
+        try:
+            with socket.create_connection((PIGPIO_HOST, PIGPIO_PORT), timeout=0.1):
+                return
+        except OSError:
+            pass
+        if self._pigpiod_process is not None:
+            self._stop_pigpiod()
+        self._pigpiod_process = subprocess.Popen(
+            ["pigpiod", "-g", "-f", "-n", PIGPIO_HOST, "-x", "262144", "-s", "10"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        for _ in range(20):
+            if self._pigpiod_process.poll() is not None:
+                break
+            try:
+                with socket.create_connection((PIGPIO_HOST, PIGPIO_PORT), timeout=0.1):
+                    return
+            except OSError:
+                time.sleep(0.05)
+        self._stop_pigpiod()
+        raise RuntimeError("pigpio daemon did not start")
+
+    def _stop_pigpiod(self) -> None:
+        process = self._pigpiod_process
+        self._pigpiod_process = None
+        if process is None or process.poll() is not None:
+            return
+        process.terminate()
+        try:
+            process.wait(timeout=1)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=1)
 
     def _run_pwm_test(self, frequency: int, duration_ms: int, duty: float) -> None:
         if not self.pwmchip.exists():
@@ -467,6 +511,8 @@ class BuzzerManager:
                 pi.stop()
         except Exception:
             pass
+        finally:
+            self._stop_pigpiod()
 
     def _pwm_path(self) -> Path:
         return self.pwmchip / f"pwm{self.pwm_channel}"

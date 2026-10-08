@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.217
+
+- Remove unsupported Russian and Ukrainian add-on localization files.
+- Start `pigpiod` on demand for buzzer playback and stop it after the signal to reduce idle CPU usage.
+
 ## 0.5.216
 
 - Map the user-facing buzzer frequency to the measured hardware PWM frequency by dividing it by 10 before output.
