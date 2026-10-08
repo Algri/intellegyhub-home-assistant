@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import io
+import math
 import os
 import sqlite3
 import sys
@@ -18,7 +19,8 @@ MIN_BUZZER_FREQUENCY_HZ = 300
 MAX_BUZZER_FREQUENCY_HZ = 2800
 MIN_BUZZER_DURATION_MS = 10
 MAX_BUZZER_DURATION_MS = 1000
-MAX_PHYSICAL_DUTY = 0.22
+MAX_PHYSICAL_DUTY = 0.132
+VOLUME_CONTROL_RANGE_DB = 10.0
 DEFAULT_FREQUENCY = 2000
 DEFAULT_DURATION_MS = 300
 DEFAULT_VOLUME_PERCENT = 50
@@ -28,7 +30,10 @@ def volume_percent_to_duty(volume_percent: float) -> float:
     volume = max(0.0, min(100.0, float(volume_percent)))
     if volume <= 0:
         return 0.0
-    return MAX_PHYSICAL_DUTY * (volume / 100.0)
+    log_range = math.log(10.0) * VOLUME_CONTROL_RANGE_DB / 20.0
+    amplitude_fraction = math.expm1(log_range * volume / 100.0) / math.expm1(log_range)
+    max_fundamental = math.sin(math.pi * MAX_PHYSICAL_DUTY)
+    return math.asin(amplitude_fraction * max_fundamental) / math.pi
 
 
 @dataclass

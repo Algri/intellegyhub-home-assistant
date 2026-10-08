@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.212
+
+- Map buzzer volume through a bounded acoustic-amplitude curve instead of linear PWM duty.
+- Set the new 100% buzzer output to the former approximately 60% duty setting, pending hardware calibration.
+
 ## 0.5.211
 
 - Remove temporary command timing traces and suppress routine HTTP access logs.
