@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.216
+
+- Map the user-facing buzzer frequency to the measured hardware PWM frequency by dividing it by 10 before output.
+
+## 0.5.215
+
+- Reduce idle `pigpiod` CPU usage by using a 10-microsecond sample rate for the GPIO18 hardware PWM buzzer.
+
 ## 0.5.214
 
 - Use Raspberry Pi hardware PWM through `pigpio.hardware_PWM` for the buzzer and remove the unreliable sysfs PWM fallback.

@@ -23,6 +23,7 @@ MIN_BUZZER_DURATION_MS = 10
 MAX_BUZZER_DURATION_MS = 1000
 MAX_PHYSICAL_DUTY = 0.132
 VOLUME_CONTROL_RANGE_DB = 10.0
+HARDWARE_FREQUENCY_DIVISOR = 10
 DEFAULT_FREQUENCY = 2000
 DEFAULT_DURATION_MS = 300
 DEFAULT_VOLUME_PERCENT = 50
@@ -328,12 +329,16 @@ class BuzzerManager:
             raise
 
     def _start_hardware_pwm(self, frequency: int, duty: float) -> str:
-        self._start_pigpio_pwm(frequency, duty)
+        self._start_pigpio_pwm(self._hardware_frequency(frequency), duty)
         return "pigpio_hardware_pwm"
 
     def _run_hardware_pwm_once(self, frequency: int, duration_ms: int, duty: float) -> str:
-        self._run_pigpio_pwm_once(frequency, duration_ms, duty)
+        self._run_pigpio_pwm_once(self._hardware_frequency(frequency), duration_ms, duty)
         return "pigpio_hardware_pwm"
+
+    @staticmethod
+    def _hardware_frequency(frequency: int) -> int:
+        return max(1, round(frequency / HARDWARE_FREQUENCY_DIVISOR))
 
     def _start_pigpio_pwm(self, frequency: int, duty: float) -> None:
         pigpio = self._import_pigpio()
