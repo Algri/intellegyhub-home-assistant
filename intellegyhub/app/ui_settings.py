@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import sqlite3
-import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Literal
+
+from .paths import default_data_path
 
 UiTheme = Literal["auto", "light", "dark"]
 VALID_THEMES: set[str] = {"auto", "light", "dark"}
@@ -69,6 +70,4 @@ class UiSettingsStore:
 
 
 def _default_store_path() -> Path:
-    if sys.platform == "win32":
-        return Path(".data/intellegyhub.sqlite3")
-    return Path("/data/intellegyhub.sqlite3")
+    return default_data_path("intellegyhub.sqlite3")

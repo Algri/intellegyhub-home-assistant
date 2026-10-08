@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .carrier import CarrierManager
+from .paths import default_data_path
 
 I2C_SLAVE = 0x0703
 POWER_SETTLE_SECONDS = 0.35
@@ -899,6 +900,4 @@ def _is_mock_platform() -> bool:
 
 
 def _default_store_path() -> Path:
-    if sys.platform == "win32":
-        return Path(".data/intellegyhub.sqlite3")
-    return Path("/data/intellegyhub.sqlite3")
+    return default_data_path("intellegyhub.sqlite3")

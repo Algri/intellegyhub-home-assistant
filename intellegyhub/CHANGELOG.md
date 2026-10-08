@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.213
+
+- Add Russian and Ukrainian configuration translations and complete localized add-on descriptions and runtime notes.
+- Use local data paths for macOS mock runs across SQLite stores and RS-485 template uploads.
+- Document macOS mock startup from the development workspace.
+
 ## 0.5.212
 
 - Map buzzer volume through a bounded acoustic-amplitude curve instead of linear PWM duty.

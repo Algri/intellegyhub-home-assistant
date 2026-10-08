@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .paths import default_data_path
+
 
 PIGPIO_HOST = "127.0.0.1"
 PIGPIO_PORT = 8888
@@ -414,7 +416,7 @@ class BuzzerManager:
         self._write_text(pwm_path / "enable", "1")
 
     def _run_gpio_test(self, frequency: int, duration_ms: int, duty: float) -> None:
-        if sys.platform == "win32":
+        if sys.platform == "win32" or (sys.platform == "darwin" and _is_mock_platform()):
             time.sleep(duration_ms / 1000)
             return
         import gpiod
@@ -552,9 +554,7 @@ def _int_from_store(value: str | None, default: int) -> int:
 
 
 def _default_store_path() -> Path:
-    if sys.platform == "win32":
-        return Path(".data/intellegyhub.sqlite3")
-    return Path("/data/intellegyhub.sqlite3")
+    return default_data_path("intellegyhub.sqlite3")
 
 
 def _is_mock_platform() -> bool:

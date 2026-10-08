@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Awaitable, Callable
 
+from .paths import default_data_path
+
 
 DEFAULT_STE_HEARTBEAT_ON_SECONDS = 0.2
 DEFAULT_STE_HEARTBEAT_OFF_SECONDS = 1.8
@@ -331,6 +333,7 @@ def _float(value: str | None, default: float) -> float:
 
 
 def _default_db_path() -> Path:
-    if Path("/data").exists():
-        return Path("/data/intellegyhub.sqlite3")
-    return Path(".data/intellegyhub.sqlite3")
+    path = default_data_path("intellegyhub.sqlite3")
+    if path.is_absolute() and not path.parent.exists():
+        return Path(".data/intellegyhub.sqlite3")
+    return path

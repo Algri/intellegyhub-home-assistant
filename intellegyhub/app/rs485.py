@@ -18,6 +18,8 @@ from typing import Any
 
 import yaml
 
+from .paths import default_data_path
+
 try:
     from pymodbus.client import ModbusSerialClient
 except ImportError:  # pragma: no cover - exercised only when optional runtime dependency is missing.
@@ -2957,15 +2959,11 @@ def _device_id(serial_port: str, slave_address: int) -> str:
 
 
 def _default_store_path() -> Path:
-    if sys.platform == "win32":
-        return Path(".data/intellegyhub.sqlite3")
-    return Path("/data/intellegyhub.sqlite3")
+    return default_data_path("intellegyhub.sqlite3")
 
 
 def _default_template_upload_dir() -> Path:
     override = os.environ.get("INTELLEGY_RS485_TEMPLATE_DIR")
     if override:
         return Path(override)
-    if sys.platform == "win32":
-        return Path(".data/rs485_templates")
-    return Path("/data/rs485_templates")
+    return default_data_path("rs485_templates")

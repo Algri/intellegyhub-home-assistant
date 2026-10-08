@@ -13,6 +13,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Callable
 
+from .paths import default_data_path
+
 I2C_SLAVE = 0x0703
 
 
@@ -565,9 +567,7 @@ def _is_mock_platform() -> bool:
 
 
 def _default_store_path() -> Path:
-    if sys.platform == "win32":
-        return Path(".data/intellegyhub.sqlite3")
-    return Path("/data/intellegyhub.sqlite3")
+    return default_data_path("intellegyhub.sqlite3")
 
 
 def brightness_to_pwm(brightness: float) -> int:
