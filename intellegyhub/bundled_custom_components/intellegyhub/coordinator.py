@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import copy
 import logging
 import time
 from collections.abc import Callable
@@ -117,40 +116,27 @@ class IntellegyHubGpioManager:
         self._notify()
 
     async def async_set_rs485_capability(self, device_id: str, capability_id: str, value) -> dict:
-        # Switch commands must feel immediate in HA while the Modbus transaction
-        # is in flight. The add-on remains authoritative: a failed command
-        # restores the previous snapshot, and a successful response replaces
-        # this optimistic value with the confirmed device state.
-        previous_rs485 = copy.deepcopy(self.rs485)
-        device_template_id = next(
-            (device.get("template_id") for device in self.rs485.get("devices", []) if device.get("id") == device_id),
-            None,
-        )
-        template = next(
-            (item for item in self.rs485.get("template_details", []) if item.get("template_id") == device_template_id),
-            {},
-        )
-        capability = (template.get("capabilities") or {}).get(capability_id)
-        optimistic = capability is not None and capability.get("type") == "switch"
-        if optimistic:
-            for device in self.rs485.get("devices", []):
-                if device.get("id") == device_id:
-                    device.setdefault("values", {})[capability_id] = bool(value)
-                    break
-            self._notify()
-        try:
-            result = await self.client.set_rs485_capability(device_id, capability_id, value)
-        except Exception:
-            if optimistic:
-                self.rs485 = previous_rs485
-                self._notify()
-            raise
+        started = time.perf_counter()
+        result = await self.client.set_rs485_capability(device_id, capability_id, value)
+        response_at = time.perf_counter()
         if isinstance(result.get("devices"), list):
+            changed = self.rs485 != result
             self.rs485 = result
         else:
-            self._apply_rs485_device(result.get("device"))
+            changed = self._apply_rs485_device(result.get("device"))
+        was_connected = self.connected
         self.connected = True
-        self._notify()
+        if changed or not was_connected:
+            self._notify()
+        completed = time.perf_counter()
+        LOGGER.info(
+            "RS485_HA_TRACE id=%s device=%s capability=%s value=%s ha_http_ms=%.2f ha_notify_ms=%.2f ha_total_ms=%.2f addon_ms=%s",
+            result.get("trace_id"), device_id, capability_id, value,
+            (response_at - started) * 1000,
+            (completed - response_at) * 1000,
+            (completed - started) * 1000,
+            (result.get("timing_ms") or {}).get("total"),
+        )
         return result
 
     async def async_set_xport_profile(self, profile: str) -> None:
@@ -486,7 +472,8 @@ class IntellegyHubGpioManager:
             self.rs485 = event["rs485"]
             self._remove_stale_rs485_registry_entries()
         elif event_type == "rs485_device_changed" and isinstance(event.get("device"), dict):
-            self._apply_rs485_device(event["device"])
+            if not self._apply_rs485_device(event["device"]):
+                return
         elif event_type == "rs485_device_removed" and isinstance(event.get("device_id"), str):
             self._remove_rs485_device(event["device_id"])
         else:
@@ -555,9 +542,9 @@ class IntellegyHubGpioManager:
         self.xport["channels"] = sorted(channels, key=lambda item: item.get("channel", 0))
 
     @callback
-    def _apply_rs485_device(self, device: dict | None) -> None:
+    def _apply_rs485_device(self, device: dict | None) -> bool:
         if not isinstance(device, dict) or not isinstance(device.get("id"), str):
-            return
+            return False
         devices = list(self.rs485.get("devices", []))
         for index, item in enumerate(devices):
             if item.get("id") == device["id"]:
@@ -569,11 +556,14 @@ class IntellegyHubGpioManager:
                             **device["diagnostics"],
                             "entries": item["diagnostics"].get("entries", []),
                         }
+                if merged == item:
+                    return False
                 devices[index] = merged
                 break
         else:
             devices.append(device)
         self.rs485["devices"] = devices
+        return True
 
     @callback
     def _remove_rs485_device(self, device_id: str) -> None:

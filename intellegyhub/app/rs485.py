@@ -649,7 +649,6 @@ def _device_from_store_row(row: tuple[Any, ...]) -> Rs485Device:
 
 class Rs485ModbusTransport:
     def __init__(self) -> None:
-        self._lock = asyncio.Lock()
         self._clients: dict[tuple[str, int, str, int], Any] = {}
         self.last_error: str | None = None
         self.last_tx_hex: str | None = None
@@ -711,8 +710,7 @@ class Rs485ModbusTransport:
         return False
 
     async def read_point(self, bus: dict[str, Any], point: dict[str, Any], slave_address: int) -> Any:
-        async with self._lock:
-            return await asyncio.to_thread(self._read_point_sync, bus, point, slave_address)
+        return await asyncio.to_thread(self._read_point_sync, bus, point, slave_address)
 
     async def read_points(
         self,
@@ -720,8 +718,7 @@ class Rs485ModbusTransport:
         items: list[tuple[str, dict[str, Any]]],
         slave_address: int,
     ) -> dict[str, Any]:
-        async with self._lock:
-            return await asyncio.to_thread(self._read_points_sync, bus, items, slave_address)
+        return await asyncio.to_thread(self._read_points_sync, bus, items, slave_address)
 
     async def write_point(
         self,
@@ -730,12 +727,10 @@ class Rs485ModbusTransport:
         slave_address: int,
         value: Any,
     ) -> None:
-        async with self._lock:
-            await asyncio.to_thread(self._write_point_sync, bus, point, slave_address, value)
+        await asyncio.to_thread(self._write_point_sync, bus, point, slave_address, value)
 
     async def manual_command(self, bus: dict[str, Any], slave_address: int, function: int, address: int, count: int = 1, value: int | None = None) -> dict[str, Any]:
-        async with self._lock:
-            return await asyncio.to_thread(self._manual_command_sync, bus, slave_address, function, address, count, value)
+        return await asyncio.to_thread(self._manual_command_sync, bus, slave_address, function, address, count, value)
 
     def _manual_command_sync(self, bus: dict[str, Any], slave_address: int, function: int, address: int, count: int, value: int | None) -> dict[str, Any]:
         client = self._connected_client(bus)
@@ -810,8 +805,7 @@ class Rs485ModbusTransport:
         return client
 
     async def close_all(self) -> None:
-        async with self._lock:
-            await asyncio.to_thread(self._close_all_sync)
+        await asyncio.to_thread(self._close_all_sync)
 
     def _close_all_sync(self) -> None:
         clients = list(self._clients.values())
@@ -823,8 +817,7 @@ class Rs485ModbusTransport:
                 pass
 
     async def close_bus(self, bus: dict[str, Any]) -> None:
-        async with self._lock:
-            await asyncio.to_thread(self._close_bus_sync, bus)
+        await asyncio.to_thread(self._close_bus_sync, bus)
 
     def _close_bus_sync(self, bus: dict[str, Any]) -> None:
         client = self._clients.pop(self._client_key(bus), None)
@@ -835,8 +828,7 @@ class Rs485ModbusTransport:
                 pass
 
     async def close_port(self, serial_port: str) -> None:
-        async with self._lock:
-            await asyncio.to_thread(self._close_port_sync, serial_port)
+        await asyncio.to_thread(self._close_port_sync, serial_port)
 
     def _close_port_sync(self, serial_port: str) -> None:
         target = str(serial_port)
@@ -1016,7 +1008,6 @@ class Rs485Manager:
         self._poll_tick_seconds = 0.05
         self._poll_due: dict[tuple[str, str], float] = {}
         self._command_lock = asyncio.Lock()
-        self._command_locks: dict[str, asyncio.Lock] = {}
         self._command_pending_by_port: dict[str, int] = {}
         self._command_pending = 0
         self._publisher: Callable[[dict[str, Any]], Any] | None = None
@@ -1024,9 +1015,6 @@ class Rs485Manager:
 
     def set_publisher(self, publisher: Callable[[dict[str, Any]], Any]) -> None:
         self._publisher = publisher
-
-    def _command_lock_for_port(self, serial_port: str) -> asyncio.Lock:
-        return self._command_locks.setdefault(serial_port, asyncio.Lock())
 
     async def _publish(self, event: dict[str, Any]) -> None:
         if self._publisher is not None:
@@ -1111,6 +1099,13 @@ class Rs485Manager:
             except asyncio.CancelledError:
                 pass
         workers = list(self._bus_worker_tasks.values())
+        async def drained() -> None:
+            return None
+
+        await asyncio.gather(*(
+            self._run_bus_job("shutdown", drained, port)
+            for port in self._bus_worker_tasks
+        ))
         self._bus_worker_tasks.clear()
         for task in workers:
             task.cancel()
@@ -1329,7 +1324,7 @@ class Rs485Manager:
         self._ensure_bus_worker(serial_port)
         loop = asyncio.get_running_loop()
         future = loop.create_future()
-        priority_value = {"command": 0, "mode": 1, "read_command": 1, "poll": 2, "scan": 3}.get(priority, 2)
+        priority_value = {"command": 0, "mode": 1, "read_command": 1, "poll": 2, "scan": 3, "shutdown": 99}.get(priority, 2)
         job = Rs485BusJob(
             priority=priority_value,
             sequence=next(self._bus_sequence),
@@ -1392,6 +1387,12 @@ class Rs485Manager:
 
     async def _write_point(self, bus: dict[str, Any], point: dict[str, Any], slave_address: int, value: Any, priority: str) -> None:
         await self._run_bus_job(priority, lambda: self.transport.write_point(bus, point, slave_address, value), str(bus["serial_port"]))
+
+    async def _close_port(self, serial_port: str, bus: dict[str, Any]) -> None:
+        if hasattr(self.transport, "close_port"):
+            await self._run_bus_job("command", lambda: self.transport.close_port(serial_port), serial_port)
+        elif hasattr(self.transport, "close_bus"):
+            await self._run_bus_job("command", lambda: self.transport.close_bus(bus), serial_port)
 
     def templates_snapshot(self) -> dict[str, Any]:
         return self.registry.snapshot()
@@ -1462,12 +1463,9 @@ class Rs485Manager:
                         if port:
                             self._drop_pending_poll_jobs(port)
                 if transport_changed or master_disabled:
-                    if hasattr(self.transport, "close_port"):
-                        await self.transport.close_port(str(previous_bus.get("serial_port") or ""))
-                        if transport_changed and previous_bus.get("serial_port") != self.bus.get("serial_port"):
-                            await self.transport.close_port(str(self.bus.get("serial_port") or ""))
-                    elif hasattr(self.transport, "close_bus"):
-                        await self.transport.close_bus(previous_bus)
+                    await self._close_port(str(previous_bus.get("serial_port") or ""), previous_bus)
+                    if transport_changed and previous_bus.get("serial_port") != self.bus.get("serial_port"):
+                        await self._close_port(str(self.bus.get("serial_port") or ""), self.bus)
                 await self.store.save_selected_bus(self.bus)
                 for device in self.devices.values():
                     if device.enabled and str(device.serial_port) in affected_ports:
@@ -1782,6 +1780,10 @@ class Rs485Manager:
         return self.snapshot(selected_id=device.id, status=f"RS-485: renamed {device.name}")
 
     async def set_capability(self, device_id: str, capability_id: str, value: Any) -> dict[str, Any]:
+        command_started = time.monotonic()
+        trace_id = f"{time.monotonic_ns():x}"
+        transport_started: float | None = None
+        transport_done: float | None = None
         device = self._device(device_id)
         device_bus_settings = self._bus_for_port(str(device.serial_port))
         if not bool(device_bus_settings.get("enabled", True)):
@@ -1817,7 +1819,9 @@ class Rs485Manager:
                     write_transaction_id = f"{device.id}:{int(write_started * 1000)}"
                     self._record_diagnostic(device, "scan", f"Write FC{write_function:02d} {capability_id}", write_started, write_transaction_id, "settings" if write_priority == "mode" else "outputs", "WRITE")
                     try:
+                        transport_started = time.monotonic()
                         await self._write_point(bus, point, device.slave_address, normalized, write_priority)
+                        transport_done = time.monotonic()
                         self._record_diagnostic(device, "response", f"Write FC{write_function:02d} {capability_id}", write_started, write_transaction_id, "settings" if write_priority == "mode" else "outputs", "WRITE")
                         self._append_transport_log(device, "write", f"{capability_id}={normalized}")
                         if capability.get("type") != "switch" and not communication_setting:
@@ -1829,19 +1833,13 @@ class Rs485Manager:
                         self._append_transport_log(device, "error", f"{capability_id}: {error}")
                         if communication_setting:
                             self._append_transport_log(device, "write-pending", f"{capability_id}={normalized}; device may have switched communication settings")
-                            if hasattr(self.transport, "close_port"):
-                                await self.transport.close_port(device.serial_port)
-                            elif hasattr(self.transport, "close_bus"):
-                                await self.transport.close_bus(bus)
+                            await self._close_port(device.serial_port, bus)
                         else:
                             device.values[f"{capability_id}__error"] = error
                             mark_device_runtime(device, template, capability, success=False, error=error)
                             device.runtime["online"] = False
                             device.runtime["communication_status"] = "OFFLINE"
-                            if hasattr(self.transport, "close_port"):
-                                await self.transport.close_port(device.serial_port)
-                            elif hasattr(self.transport, "close_bus"):
-                                await self.transport.close_bus(bus)
+                            await self._close_port(device.serial_port, bus)
                             await self.store.save_device(device)
                             return self.command_snapshot(device, f"RS-485: {capability.get('name', capability_id)} failed: {error}")
                 device.values[capability_id] = normalized
@@ -1860,29 +1858,35 @@ class Rs485Manager:
                     device.baudrate = int(normalized)
                     normalized = device.baudrate
                     device.values[capability_id] = normalized
-                    if hasattr(self.transport, "close_port"):
-                        await self.transport.close_port(device.serial_port)
-                    elif hasattr(self.transport, "close_bus"):
-                        await self.transport.close_bus(old_bus)
+                    await self._close_port(device.serial_port, old_bus)
                     await asyncio.sleep(0.2)
                 elif capability_id == "device_parity":
                     device.parity = str(normalized)
-                    if hasattr(self.transport, "close_port"):
-                        await self.transport.close_port(device.serial_port)
-                    elif hasattr(self.transport, "close_bus"):
-                        await self.transport.close_bus(old_bus)
+                    await self._close_port(device.serial_port, old_bus)
                     await asyncio.sleep(0.2)
                 self.devices.pop(device_id, None)
                 if old_device_id != device_id:
                     self.devices.pop(old_device_id, None)
                 self.devices[device.id] = device
+                persist_started = time.monotonic()
                 await self.store.save_device(device)
+                persist_done = time.monotonic()
                 if device.id != device_id:
                     await self.store.delete_device(device_id)
                 name = capability.get("name", capability_id)
                 if capability.get("type") == "switch":
                     state = "ON" if bool(normalized) else "OFF"
-                    return self.command_snapshot(device, f"RS-485: {name} {state}")
+                    result = self.command_snapshot(device, f"RS-485: {name} {state}")
+                    timing = {
+                        "before_transport": round(((transport_started or persist_started) - command_started) * 1000, 2),
+                        "transport": round(((transport_done or persist_started) - (transport_started or persist_started)) * 1000, 2),
+                        "persistence": round((persist_done - persist_started) * 1000, 2),
+                        "total": round((time.monotonic() - command_started) * 1000, 2),
+                    }
+                    result["trace_id"] = trace_id
+                    result["timing_ms"] = timing
+                    LOGGER.info("RS485_TRACE id=%s device=%s capability=%s value=%s timing_ms=%s", trace_id, device.id, capability_id, normalized, timing)
+                    return result
                 return self.command_snapshot(device, f"RS-485: updated {name}")
         finally:
             remaining = self._command_pending_by_port.get(serial_port, 1) - 1
@@ -1893,7 +1897,7 @@ class Rs485Manager:
 
     async def read_device(self, device_id: str, poll_group: str | None = None) -> dict[str, Any]:
         self._command_pending += 1
-        async with self._command_lock:
+        async with _NoopAsyncLock():
             self._command_pending -= 1
             try:
                 device = self._device(device_id)
@@ -1922,7 +1926,7 @@ class Rs485Manager:
 
     async def manual_command(self, device_id: str, function: int, address: int, count: int = 1, value: int | None = None, slave_address: int | None = None) -> dict[str, Any]:
         self._command_pending += 1
-        async with self._command_lock:
+        async with _NoopAsyncLock():
             self._command_pending -= 1
             device = self._device(device_id)
             if not bool(self._bus_for_port(str(device.serial_port)).get("enabled", True)):

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.209
+
+- Route RS-485 reads, writes, scans, and port closure through independent per-interface workers.
+- Remove cross-port transport contention and drain active transactions before shutdown.
+- Reduce MIO-8 command latency in the Home Assistant integration and add end-to-end timing traces.
+
 ## 0.5.208
 
 - Disable Home Assistant polling for WebSocket-backed entities, including XDO-8 and XDI-16.
