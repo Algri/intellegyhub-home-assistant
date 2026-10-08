@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.210
+
+- Keep Home Assistant brightness and color controls in sync for X-Port dimmers and Buzzer Volume.
+- Derive RGB dimmer state from confirmed X-Port channels instead of stale cached values.
+
 ## 0.5.209
 
 - Route RS-485 reads, writes, scans, and port closure through independent per-interface workers.

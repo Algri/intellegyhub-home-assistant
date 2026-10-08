@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 import re
 
+from homeassistant.components.light import LightEntity
 from homeassistant.helpers.entity import DeviceInfo, Entity
 from homeassistant.helpers import device_registry as dr
 from homeassistant.exceptions import HomeAssistantError
@@ -40,17 +41,25 @@ class IntellegyHubGpioEntity(Entity):
         last_state = object()
         last_available = object()
         last_attributes = object()
+        last_light_values = object()
 
         def write_if_changed() -> None:
-            nonlocal last_state, last_available, last_attributes
+            nonlocal last_state, last_available, last_attributes, last_light_values
             state = self.state
             available = self.available
             attributes = self.extra_state_attributes
-            if state == last_state and available == last_available and attributes == last_attributes:
+            light_values = (
+                (getattr(self, "brightness", None), getattr(self, "rgb_color", None), getattr(self, "rgbw_color", None))
+                if isinstance(self, LightEntity)
+                else None
+            )
+            if (state == last_state and available == last_available
+                    and attributes == last_attributes and light_values == last_light_values):
                 return
             last_state = state
             last_available = available
             last_attributes = deepcopy(attributes)
+            last_light_values = light_values
             self.async_write_ha_state()
 
         self._remove_listener = self.manager.async_add_listener(write_if_changed)
