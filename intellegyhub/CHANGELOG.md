@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.211
+
+- Remove temporary command timing traces and suppress routine HTTP access logs.
+- Rely on WebSocket updates for live UI state, using HTTP polling only after a disconnect.
+- Stop redundant Home Assistant snapshots and refresh diagnostics only while their tabs are open.
+
 ## 0.5.210
 
 - Keep Home Assistant brightness and color controls in sync for X-Port dimmers and Buzzer Volume.

@@ -256,7 +256,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.210 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.211 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -311,7 +311,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.210", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.211", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -2013,6 +2013,15 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if (!seen.has(card.dataset.xportChannel)) { card.remove(); }
       });
     }
+    function patchXPortChannel(channel) {
+      if (!latestXPort || !channel || !Array.isArray(latestXPort.channels)) {
+        renderXPort();
+        return;
+      }
+      const channels = latestXPort.channels.map((item) => item.channel === channel.channel ? channel : item);
+      if (!channels.some((item) => item.channel === channel.channel)) channels.push(channel);
+      paintXPort({ ...latestXPort, channels });
+    }
     function formatXPortStatus(payload) {
       if (payload.topology === 'NotInstalled' && payload.availability === 'OptionalMissing') {
         return 'X-PORT: Module not installed';
@@ -2634,6 +2643,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       try {
         const payload = await requestJson('api/v1/state');
         paintCarrier(payload.carrier, payload.app);
+        paintCarrierIO(payload.carrier, payload.outputs || {}, payload.buttons || {});
       } catch (error) {
         const health = document.getElementById('carrier-health-state');
         if (health) health.textContent = 'Unavailable';
@@ -2986,13 +2996,11 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       paintExtensions(payload);
     }
     async function setExtensionRelay(moduleId, channel, on) {
-      const started = performance.now();
       const payload = await requestJson(`api/v1/extensions/modules/${moduleId}/relays/${channel}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ on })
       });
-      console.info('XDO8_UI_TRACE', { trace_id: payload.trace_id, module_id: moduleId, channel, on, request_ms: Math.round((performance.now() - started) * 100) / 100, backend_ms: payload.timing_ms });
       if (payload.module) {
         applyExtensionModule(payload.module);
       } else {
@@ -3218,13 +3226,14 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         } else if (message.type === 'xport_changed') {
           paintXPort(message.xport);
         } else if (message.type === 'xport_channel_changed') {
-          renderXPort();
+          patchXPortChannel(message.channel);
         } else if (message.type === 'extensions_changed') {
           patchExtensions(message.extensions);
         } else if (message.type === 'extension_module_changed') {
           applyExtensionModule(message.module);
         } else if (message.type === 'rs485_device_changed') {
           if (message.device) {
+            rs485LiveRequestVersion += 1;
             rs485ApiState = mergeRs485CommandPayload({ device: message.device, selected_id: message.device.id });
             patchRs485Live({ devices: [message.device] });
           }
@@ -3247,10 +3256,23 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         }
         });
       };
-      socket.onopen = () => console.info('IntellegyHUB WebSocket connected', url.href);
+      socket.onopen = () => {
+        console.info('IntellegyHUB WebSocket connected', url.href);
+        rs485WebSocketConnected = true;
+        const requestVersion = ++rs485LiveRequestVersion;
+        syncRs485LivePolling();
+        if (window.RS485_ENABLED && rs485ApiState && rs485ApiState.devices?.length) {
+          requestJson('api/v1/rs485/live').then((payload) => {
+            if (rs485WebSocketConnected && requestVersion === rs485LiveRequestVersion) patchRs485Live(payload);
+          }).catch(() => {});
+        }
+      };
       socket.onerror = (event) => console.warn('IntellegyHUB WebSocket error', url.href, event);
       socket.onclose = () => {
         console.warn('IntellegyHUB WebSocket closed; reconnecting', url.href);
+        rs485WebSocketConnected = false;
+        rs485LiveRequestVersion += 1;
+        syncRs485LivePolling();
         window.setTimeout(connectEvents, 2000);
       };
     }
@@ -3356,6 +3378,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     let rs485ScanLogSignature = '';
     let rs485ScanStartedAt = 0;
     let rs485LivePollTimer = null;
+    let rs485WebSocketConnected = false;
+    let rs485DiagnosticsPollTimer = null;
     let rs485DiagnosticsLiveInFlight = false;
     let rs485LivePollInFlight = false;
     let rs485LiveRequestVersion = 0;
@@ -3602,7 +3626,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     function syncRs485LivePolling(payload = rs485ApiState) {
       const busEnabled = payload && (!payload.bus || payload.bus.enabled !== false);
       const hasDevices = Boolean(payload && Array.isArray(payload.devices) && payload.devices.length);
-      if (busEnabled && hasDevices) startRs485LivePolling();
+      if (busEnabled && hasDevices && !rs485WebSocketConnected) startRs485LivePolling();
       else stopRs485LivePolling();
     }
     function startRs485LivePolling() {
@@ -3630,7 +3654,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         } finally {
           rs485LivePollInFlight = false;
         }
-      }, 100);
+      }, 500);
     }
     function rs485UserEditing() {
       const section = document.getElementById('rs485-section');
@@ -3785,6 +3809,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     function setRs485DetailTab(tab) {
       rs485DetailTab = ['settings', 'diagnostics', 'logs'].includes(tab) ? tab : 'io';
+      syncRs485DiagnosticsPolling();
       const detail = document.getElementById('rs485-device-detail');
       if (!detail || !detail.querySelector('.rs485-detail-stack')) {
         rs485DetailSignature = '';
@@ -3872,7 +3897,6 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       }
     }
     async function setRs485Capability(deviceId, capabilityId, value) {
-      const started = performance.now();
       const commandKey = `${deviceId}:${capabilityId}`;
       if (rs485PendingCapabilityCommands.has(commandKey)) return;
       rs485PendingCapabilityCommands.add(commandKey);
@@ -3885,7 +3909,6 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ value })
         }));
-        if (typeof value === 'boolean') console.info('RS485_UI_TRACE', { trace_id: payload.trace_id, device_id: deviceId, capability_id: capabilityId, value, request_ms: Math.round((performance.now() - started) * 100) / 100, backend_ms: payload.timing_ms });
         if (typeof value === 'boolean' && payload.device) {
           rs485PendingCapabilityCommands.delete(commandKey);
           rs485ApiState = mergeRs485CommandPayload(payload);
@@ -3979,6 +4002,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       paintRs485ScanLog();
       paintRs485Detail();
       syncRs485LivePolling(payload);
+      syncRs485DiagnosticsPolling();
       if (payload.scan_state && payload.scan_state.running) startRs485ScanPolling();
     }
     function patchRs485Live(payload) {
@@ -4001,8 +4025,19 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       patchRs485LiveStatus(devices);
       if (rs485DetailTab === 'logs') patchRs485LogsTable();
       if (rs485DetailTab === 'diagnostics') patchRs485DiagnosticsLog();
-      refreshRs485DiagnosticsLive();
       syncRs485LivePolling(rs485ApiState);
+    }
+    function syncRs485DiagnosticsPolling() {
+      const active = ['diagnostics', 'logs'].includes(rs485DetailTab) && Boolean(rs485SelectedId);
+      if (!active && rs485DiagnosticsPollTimer) {
+        window.clearInterval(rs485DiagnosticsPollTimer);
+        rs485DiagnosticsPollTimer = null;
+      } else if (active && !rs485DiagnosticsPollTimer) {
+        refreshRs485DiagnosticsLive();
+        rs485DiagnosticsPollTimer = window.setInterval(() => {
+          if (!document.hidden) refreshRs485DiagnosticsLive();
+        }, 1000);
+      }
     }
     async function refreshRs485DiagnosticsLive() {
       if (!['diagnostics', 'logs'].includes(rs485DetailTab) || rs485DiagnosticsLiveInFlight || !rs485SelectedId) return;
@@ -5433,7 +5468,6 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     initGlobalNavigation();
     renderCarrier();
     renderXPort();
-    renderCarrierIO();
     renderExtensions();
     if (window.RS485_ENABLED) {
       loadRs485Mock();

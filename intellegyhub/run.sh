@@ -21,4 +21,4 @@ else
   echo "[intellegyhub] pigpiod binary is missing" >&2
 fi
 
-exec uvicorn app.main:app --host 0.0.0.0 --port 8098
+exec uvicorn app.main:app --host 0.0.0.0 --port 8098 --no-access-log

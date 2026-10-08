@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import time
 from collections.abc import Callable
 
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
@@ -50,7 +49,6 @@ class IntellegyHubGpioManager:
         self.rs485: dict = {"devices": []}
         self._listeners: list[Callable[[], None]] = []
         self._task: asyncio.Task | None = None
-        self._resync_task: asyncio.Task | None = None
         self._rs485_state_task: asyncio.Task | None = None
         self._stopped = asyncio.Event()
         self._remove_stop_listener: Callable[[], None] | None = None
@@ -68,7 +66,6 @@ class IntellegyHubGpioManager:
             lambda event: self.hass.async_create_task(self.async_stop(), "intellegyhub_stop"),
         )
         self._task = self._create_background_task(self._run(), "intellegyhub_listener")
-        self._resync_task = self._create_background_task(self._run_periodic_resync(), "intellegyhub_resync")
 
     async def async_stop(self) -> None:
         self._stopped.set()
@@ -82,13 +79,6 @@ class IntellegyHubGpioManager:
             except asyncio.CancelledError:
                 pass
             self._task = None
-        if self._resync_task:
-            self._resync_task.cancel()
-            try:
-                await self._resync_task
-            except asyncio.CancelledError:
-                pass
-            self._resync_task = None
 
     async def async_set_led(self, on: bool) -> None:
         await self.async_set_output("user_led", on)
@@ -114,9 +104,7 @@ class IntellegyHubGpioManager:
         self._notify()
 
     async def async_set_rs485_capability(self, device_id: str, capability_id: str, value) -> dict:
-        started = time.perf_counter()
         result = await self.client.set_rs485_capability(device_id, capability_id, value)
-        response_at = time.perf_counter()
         if isinstance(result.get("devices"), list):
             changed = self.rs485 != result
             self.rs485 = result
@@ -126,15 +114,6 @@ class IntellegyHubGpioManager:
         self.connected = True
         if changed or not was_connected:
             self._notify()
-        completed = time.perf_counter()
-        LOGGER.info(
-            "RS485_HA_TRACE id=%s device=%s capability=%s value=%s ha_http_ms=%.2f ha_notify_ms=%.2f ha_total_ms=%.2f addon_ms=%s",
-            result.get("trace_id"), device_id, capability_id, value,
-            (response_at - started) * 1000,
-            (completed - response_at) * 1000,
-            (completed - started) * 1000,
-            (result.get("timing_ms") or {}).get("total"),
-        )
         return result
 
     async def async_set_xport_profile(self, profile: str) -> None:
@@ -240,23 +219,12 @@ class IntellegyHubGpioManager:
         self._notify()
 
     async def async_set_extension_relay(self, module_id: str, channel: int, on: bool) -> None:
-        started = time.perf_counter()
         result = await self.client.set_extension_relay(module_id, channel, on)
-        response_at = time.perf_counter()
         changed = self._apply_extension_module(result.get("module"))
         was_connected = self.connected
         self.connected = True
         if changed or not was_connected:
             self._notify()
-        completed = time.perf_counter()
-        LOGGER.info(
-            "XDO8_HA_TRACE id=%s module=%s channel=%s on=%s ha_http_ms=%.2f ha_notify_ms=%.2f ha_total_ms=%.2f addon_ms=%s",
-            result.get("trace_id"), module_id, channel, on,
-            (response_at - started) * 1000,
-            (completed - response_at) * 1000,
-            (completed - started) * 1000,
-            (result.get("timing_ms") or {}).get("total"),
-        )
 
     async def async_delete_extension_module(self, module_id: str) -> None:
         result = await self.client.delete_extension_module(module_id)
@@ -341,20 +309,6 @@ class IntellegyHubGpioManager:
         self._remove_stale_extension_registry_entries()
         self._remove_stale_onewire_registry_entries()
         self._remove_stale_xport_registry_entries()
-
-    async def _run_periodic_resync(self) -> None:
-        while not self._stopped.is_set():
-            try:
-                await asyncio.wait_for(self._stopped.wait(), timeout=10)
-                return
-            except asyncio.TimeoutError:
-                pass
-            try:
-                await self._sync_snapshot()
-                self.connected = True
-                self._notify()
-            except Exception as exc:
-                LOGGER.debug("Periodic IntellegyHUB resync failed: %s", exc)
 
     async def _run(self) -> None:
         backoffs = [1, 2, 5, 10]

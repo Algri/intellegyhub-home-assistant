@@ -267,7 +267,6 @@ class ExtensionHardware:
         self._relay_shadows: dict[int, int] = {}
         self._input_shadows: dict[int, int] = {}
         self._xdi_initialized: set[int] = set()
-        self.last_relay_timing: dict[str, float] = {}
         self._xdi_chip: Any = None
         self._xdi_interrupt_request: Any = None
         self._xdi_interrupt_thread: threading.Thread | None = None
@@ -368,7 +367,6 @@ class ExtensionHardware:
         return modules
 
     async def set_xdo8_relay(self, address_text: str, channel: int, on: bool) -> XDo8Module:
-        started = time.perf_counter()
         if channel < 1 or channel > 8:
             raise ValueError("xDO-8 relay channel must be in range 1-8")
         address = int(address_text, 16)
@@ -378,28 +376,18 @@ class ExtensionHardware:
             shadow = self._relay_shadows.get(address, 0)
             bit = 1 << (channel - 1)
             self._relay_shadows[address] = (shadow | bit) if on else (shadow & ~bit)
-            self.last_relay_timing = {"i2c_lock_wait": 0.0, "executor_wait": 0.0, "i2c_io": 0.0}
             return self._xdo8_module(address, True, None)
         async with self._lock.acquire(priority=0):
-            lock_acquired = time.perf_counter()
             shadow = self._relay_shadows.get(address, 0)
             bit = 1 << (channel - 1)
             shadow = (shadow | bit) if on else (shadow & ~bit)
-            submitted = time.perf_counter()
 
-            def write_relay() -> tuple[int, float]:
-                thread_started = time.perf_counter()
+            def write_relay() -> int:
                 confirmed = self._write_xdo8_outputs(address, shadow)
                 self._relay_shadows[address] = confirmed
-                return confirmed, thread_started
+                return confirmed
 
-            confirmed, thread_started = await self._run_i2c(write_relay)
-            completed = time.perf_counter()
-            self.last_relay_timing = {
-                "i2c_lock_wait": round((lock_acquired - started) * 1000, 2),
-                "executor_wait": round((thread_started - submitted) * 1000, 2),
-                "i2c_io": round((completed - thread_started) * 1000, 2),
-            }
+            confirmed = await self._run_i2c(write_relay)
             self._relay_shadows[address] = confirmed
             return self._xdo8_module(address, True, None)
 
@@ -754,12 +742,9 @@ class ExtensionManager:
             return self.snapshot()
 
     async def set_relay(self, module_id: str, channel: int, on: bool) -> dict[str, Any]:
-        started = time.perf_counter()
-        trace_id = f"{time.monotonic_ns():x}"
         # XDI interrupt reads use the manager lock. Keep relay commands on a
         # separate lane so an input interrupt cannot delay an output command.
         async with self._relay_command_lock:
-            queue_acquired = time.perf_counter()
             if not self.power_on:
                 raise RuntimeError("Extension bus power is off")
             module = self.modules.get(module_id)
@@ -768,7 +753,6 @@ class ExtensionManager:
             if module.kind != "relay_output":
                 raise ValueError("Extension module is not a relay output module")
             updated = await self.hardware.set_xdo8_relay(module.address, channel, on)
-            hardware_done = time.perf_counter()
             self.modules[module_id] = updated
             self._persist_modules_nowait()
             result = {"module": asdict(updated), "channel": channel, "on": on}
@@ -777,16 +761,6 @@ class ExtensionManager:
             asyncio.create_task(
                 self._publish({"type": "extension_module_changed", "module": result["module"]})
             )
-            timing = {
-                "command_queue_wait": round((queue_acquired - started) * 1000, 2),
-                "hardware_total": round((hardware_done - queue_acquired) * 1000, 2),
-                "after_hardware": round((time.perf_counter() - hardware_done) * 1000, 2),
-                **getattr(self.hardware, "last_relay_timing", {}),
-            }
-            timing["total"] = round((time.perf_counter() - started) * 1000, 2)
-            result["trace_id"] = trace_id
-            result["timing_ms"] = timing
-            LOGGER.info("XDO8_TRACE id=%s module=%s channel=%s on=%s timing_ms=%s", trace_id, module_id, channel, on, timing)
             return result
 
     async def delete_module(self, module_id: str) -> dict[str, Any]:

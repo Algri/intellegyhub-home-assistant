@@ -1780,10 +1780,6 @@ class Rs485Manager:
         return self.snapshot(selected_id=device.id, status=f"RS-485: renamed {device.name}")
 
     async def set_capability(self, device_id: str, capability_id: str, value: Any) -> dict[str, Any]:
-        command_started = time.monotonic()
-        trace_id = f"{time.monotonic_ns():x}"
-        transport_started: float | None = None
-        transport_done: float | None = None
         device = self._device(device_id)
         device_bus_settings = self._bus_for_port(str(device.serial_port))
         if not bool(device_bus_settings.get("enabled", True)):
@@ -1819,9 +1815,7 @@ class Rs485Manager:
                     write_transaction_id = f"{device.id}:{int(write_started * 1000)}"
                     self._record_diagnostic(device, "scan", f"Write FC{write_function:02d} {capability_id}", write_started, write_transaction_id, "settings" if write_priority == "mode" else "outputs", "WRITE")
                     try:
-                        transport_started = time.monotonic()
                         await self._write_point(bus, point, device.slave_address, normalized, write_priority)
-                        transport_done = time.monotonic()
                         self._record_diagnostic(device, "response", f"Write FC{write_function:02d} {capability_id}", write_started, write_transaction_id, "settings" if write_priority == "mode" else "outputs", "WRITE")
                         self._append_transport_log(device, "write", f"{capability_id}={normalized}")
                         if capability.get("type") != "switch" and not communication_setting:
@@ -1868,25 +1862,13 @@ class Rs485Manager:
                 if old_device_id != device_id:
                     self.devices.pop(old_device_id, None)
                 self.devices[device.id] = device
-                persist_started = time.monotonic()
                 await self.store.save_device(device)
-                persist_done = time.monotonic()
                 if device.id != device_id:
                     await self.store.delete_device(device_id)
                 name = capability.get("name", capability_id)
                 if capability.get("type") == "switch":
                     state = "ON" if bool(normalized) else "OFF"
-                    result = self.command_snapshot(device, f"RS-485: {name} {state}")
-                    timing = {
-                        "before_transport": round(((transport_started or persist_started) - command_started) * 1000, 2),
-                        "transport": round(((transport_done or persist_started) - (transport_started or persist_started)) * 1000, 2),
-                        "persistence": round((persist_done - persist_started) * 1000, 2),
-                        "total": round((time.monotonic() - command_started) * 1000, 2),
-                    }
-                    result["trace_id"] = trace_id
-                    result["timing_ms"] = timing
-                    LOGGER.info("RS485_TRACE id=%s device=%s capability=%s value=%s timing_ms=%s", trace_id, device.id, capability_id, normalized, timing)
-                    return result
+                    return self.command_snapshot(device, f"RS-485: {name} {state}")
                 return self.command_snapshot(device, f"RS-485: updated {name}")
         finally:
             remaining = self._command_pending_by_port.get(serial_port, 1) - 1
