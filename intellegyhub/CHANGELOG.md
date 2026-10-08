@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.214
+
+- Use Raspberry Pi hardware PWM through `pigpio.hardware_PWM` for the buzzer and remove the unreliable sysfs PWM fallback.
+
 ## 0.5.213
 
 - Add Russian and Ukrainian configuration translations and complete localized add-on descriptions and runtime notes.

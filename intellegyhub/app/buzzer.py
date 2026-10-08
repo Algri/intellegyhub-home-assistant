@@ -328,26 +328,12 @@ class BuzzerManager:
             raise
 
     def _start_hardware_pwm(self, frequency: int, duty: float) -> str:
-        try:
-            self._start_pigpio_pwm(frequency, duty)
-            return "pigpio_hardware_pwm"
-        except Exception as pigpio_exc:
-            try:
-                self._start_sysfs_pwm(frequency, duty)
-                return "sysfs_pwm"
-            except Exception as sysfs_exc:
-                raise RuntimeError(f"pigpio failed: {pigpio_exc}; sysfs pwm failed: {sysfs_exc}") from sysfs_exc
+        self._start_pigpio_pwm(frequency, duty)
+        return "pigpio_hardware_pwm"
 
     def _run_hardware_pwm_once(self, frequency: int, duration_ms: int, duty: float) -> str:
-        try:
-            self._run_pigpio_pwm_once(frequency, duration_ms, duty)
-            return "pigpio_hardware_pwm"
-        except Exception as pigpio_exc:
-            try:
-                self._run_pwm_test(frequency, duration_ms, duty)
-                return "sysfs_pwm"
-            except Exception as sysfs_exc:
-                raise RuntimeError(f"pigpio failed: {pigpio_exc}; sysfs pwm failed: {sysfs_exc}") from sysfs_exc
+        self._run_pigpio_pwm_once(frequency, duration_ms, duty)
+        return "pigpio_hardware_pwm"
 
     def _start_pigpio_pwm(self, frequency: int, duty: float) -> None:
         pigpio = self._import_pigpio()
