@@ -341,9 +341,8 @@ class BuzzerManager:
     def _run_hardware_pwm_once(self, frequency: int, duration_ms: int, duty: float) -> str:
         try:
             self._run_pigpio_pwm_once(frequency, duration_ms, duty)
-        except Exception:
+        finally:
             self._stop_pigpiod()
-            raise
         return "pigpio_hardware_pwm"
 
     def _start_pigpio_pwm(self, frequency: int, duty: float) -> None:
@@ -430,6 +429,8 @@ class BuzzerManager:
         except subprocess.TimeoutExpired:
             process.kill()
             process.wait(timeout=1)
+        finally:
+            self._pigpio_connected = False
 
     def _run_pwm_test(self, frequency: int, duration_ms: int, duty: float) -> None:
         if not self.pwmchip.exists():

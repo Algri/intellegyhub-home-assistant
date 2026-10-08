@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.218
+
+- Stop the on-demand `pigpiod` process after a successful startup or shutdown buzzer signal, returning idle CPU usage to normal.
+
 ## 0.5.217
 
 - Remove unsupported Russian and Ukrainian add-on localization files.
