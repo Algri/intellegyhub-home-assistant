@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.225
+
+- Use the official `mdiChip` glyph for X-Mod controls and document the Material icon sourcing rule.
+
 ## 0.5.224
 
 - Refine diagnostic LED cards to match the mockup layout and keep mock WebSocket startup failures isolated.

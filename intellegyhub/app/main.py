@@ -256,7 +256,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.224 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.225 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -314,7 +314,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.224", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.225", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -1390,11 +1390,26 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .carrier-io-card.xmod1-group { order: 1; }
     .carrier-io-card.xmod2-group { order: 2; }
     .carrier-io-card.usb-group { order: 5; }
-    .carrier-io-title { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-height: 22px; margin-bottom: 12px; color: var(--ha-text); font-size: 16px; font-weight: 800; }
+    .carrier-io-title { display: grid; grid-template-columns: 26px minmax(0, 1fr) 1px auto; align-items: center; column-gap: 12px; min-height: 22px; margin-bottom: 12px; color: var(--ha-text); font-size: 16px; font-weight: 800; }
     .carrier-io-title small { color: var(--ha-secondary); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
-    .carrier-io-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 42px; border: 1px solid var(--ha-row-border); border-radius: 8px; padding: 8px 10px; background: var(--ha-row); }
-    .carrier-io-row + .carrier-io-row { margin-top: 10px; }
-    .carrier-io-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .carrier-io-title-main { display: contents; }
+    .carrier-io-title-icon { display: inline-flex; width: 20px; height: 20px; align-items: center; justify-content: center; color: var(--ha-primary); }
+    .carrier-io-title-icon svg { display: block; width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .carrier-io-title-icon svg .carrier-usb-mark { fill: currentColor; stroke: none; }
+    .carrier-io-title-icon svg .carrier-serial-mark { fill: currentColor; stroke: none; }
+    .carrier-io-title-icon svg .carrier-chip-mark { fill: currentColor; stroke: none; fill-rule: evenodd; }
+    .carrier-io-title-main > .carrier-io-title-icon { grid-column: 1; grid-row: 1; }
+    .carrier-io-title-main > span:not(.carrier-io-title-icon) { grid-column: 2; grid-row: 1; }
+    .carrier-io-title > small { grid-column: 4; grid-row: 1; }
+    .carrier-io-row { display: grid; grid-template-columns: 26px minmax(0, 1fr) 1px auto; align-items: center; gap: 12px; min-height: 58px; padding: 8px 10px; }
+    .carrier-io-row + .carrier-io-row { margin-top: 4px; }
+    .carrier-io-row > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .carrier-io-row::after { content: ''; grid-column: 3; grid-row: 1; width: 1px; height: 24px; background: var(--ha-row-border); }
+    .carrier-io-row > .toggle { grid-column: 4; grid-row: 1; }
+    .carrier-io-icon { display: inline-flex; width: 26px; height: 26px; align-items: center; justify-content: center; color: var(--ha-primary); }
+    .carrier-io-icon svg { display: block; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .carrier-io-icon svg .carrier-usb-mark { fill: currentColor; stroke: none; }
+    .carrier-io-state { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
     .buzzer-panel {
       display: grid;
       grid-template-columns: minmax(0, 1.15fr) minmax(360px, .85fr);
@@ -1449,11 +1464,25 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .diagnostic-led-icon.err { color: #ff3b3b; }
     .diagnostic-led-state { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
     .diagnostic-led-note { margin: 2px 10px 0; color: var(--ha-secondary); font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
-    .diagnostic-rtc-card { margin-top: 18px; }
-    .diagnostic-rtc-grid { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 12px 16px; }
-    .diagnostic-rtc-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 42px; border: 1px solid var(--ha-row-border); border-radius: 8px; padding: 8px 10px; background: var(--ha-row); }
-    .diagnostic-rtc-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .diagnostic-rtc-card { margin-top: 18px; padding: 14px 16px; }
+    .diagnostic-rtc-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px 16px; }
+    .diagnostic-rtc-row { display: grid; grid-template-columns: 26px minmax(0, 1fr) 1px auto; align-items: center; gap: 12px; min-height: 54px; padding: 6px 8px; border: 0; border-radius: 0; background: transparent; }
+    .diagnostic-rtc-row::after { content: ''; grid-column: 3; grid-row: 1; width: 1px; height: 24px; background: var(--ha-row-border); }
+    .diagnostic-rtc-row > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .diagnostic-rtc-icon { display: inline-flex; width: 26px; height: 26px; align-items: center; justify-content: center; color: var(--ha-primary); }
+    .diagnostic-rtc-icon svg { display: block; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .diagnostic-rtc-row strong { grid-column: 4; min-width: 0; padding-left: 4px; color: var(--ha-text); font-size: 13px; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+    .diagnostic-rtc-row .state-text.on { color: var(--ha-primary); }
+    .diagnostic-rtc-actions { display: flex; gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--ha-card-border); }
+    .diagnostic-rtc-actions button { min-width: 132px; }
+    .diagnostic-rtc-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+    .diagnostic-rtc-actions button::before { font-size: 18px; line-height: 1; color: var(--ha-primary); }
+    .diagnostic-rtc-actions #rtc-sync-button::before { content: '↻'; }
+    .diagnostic-rtc-actions button:not(#rtc-sync-button)::before { content: '⟳'; }
     .diagnostic-rtc-error { min-height: 18px; margin-top: 10px; color: var(--ha-secondary); font-size: 13px; overflow-wrap: anywhere; }
+    .diagnostic-rtc-error:empty { display: none; }
+    .diagnostic-rtc-note { display: flex; align-items: flex-start; gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--ha-card-border); color: var(--ha-secondary); font-size: 13px; line-height: 1.45; }
+    .diagnostic-rtc-note svg { width: 20px; height: 20px; flex: 0 0 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     .buzzer-settings { display: grid; gap: 12px; }
     .buzzer-row { display: grid; grid-template-columns: minmax(100px, 150px) minmax(0, 1fr); align-items: center; gap: 14px; min-height: 40px; }
     .buzzer-row label,
@@ -1544,8 +1573,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     @media (max-width: 1300px) { .overview-panel { grid-template-columns: 1fr; } .overview-identity { border-right: 0; border-bottom: 1px solid var(--ha-card-border); min-height: 260px; } }
     @media (max-width: 1100px) { .ports, .carrier-io-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .xport-group-toolbar, .xport-group-toolbar.config-hidden { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .xport-group-toolbar .bus-note, .xport-group-toolbar.config-hidden .bus-note { grid-column: 1 / -1; } .relay-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); } .rs485-layout { grid-template-columns: 1fr; } .rs485-capability-grid, .rs485-device-settings { grid-template-columns: repeat(2, minmax(130px, 1fr)); } .rs485-polling-strip { grid-template-columns: 1fr auto; } .rs485-io-head, .rs485-io-row { grid-template-columns: 52px minmax(150px, 1fr) minmax(150px, 1fr) minmax(180px, .9fr); } }
-    @media (max-width: 900px) { .diagnostic-led-grid, .diagnostic-rtc-grid, .buzzer-panel { grid-template-columns: 1fr; } .buzzer-actions { grid-template-columns: repeat(2, minmax(120px, 1fr)); grid-template-rows: auto; } .buzzer-actions .buzzer-group-title { grid-column: 1 / -1; } }
-    @media (max-width: 620px) { body { padding: 10px; } .app-toolbar { justify-content: stretch; } .theme-switcher { width: 100%; justify-content: space-between; } .theme-choice { flex: 1; } .overview-identity { min-height: 260px; padding: 22px 18px; } .overview-wordmark { font-size: 22px; letter-spacing: .12em; } .overview-title-row { align-items: flex-start; flex-direction: column; gap: 14px; } .overview-title h1 { font-size: 34px; } .overview-title .subtitle { font-size: 16px; } .overview-facts { grid-template-columns: 88px minmax(0, 1fr); } .overview-facts dt, .overview-facts dd { font-size: 14px; } .overview-health { grid-template-columns: 1fr; gap: 18px; } .overview-health-item + .overview-health-item { border-left: 0; padding-left: 0; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+3) { border-right: 0; border-bottom: 1px solid var(--ha-card-border); } .overview-metric:nth-of-type(4) { border-bottom: 0; } .xport-panel { padding: 18px 14px; border-radius: 12px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .xport-group-toolbar, .xport-group-toolbar.config-hidden { grid-template-columns: 1fr; } .xport-group-toolbar .bus-note, .xport-group-toolbar.config-hidden .bus-note { grid-column: 1; } .ports, .carrier-io-grid, .relay-grid, .rs485-toolbar { grid-template-columns: 1fr; } .rs485-table-row, .rs485-table-row.scan, .rs485-table-row.configured { grid-template-columns: 1fr; align-items: stretch; } .rs485-device-summary { align-items: flex-start; flex-wrap: wrap; gap: 4px 10px; } .rs485-device-meta { flex-wrap: wrap; } .rs485-device-filters, .rs485-device-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } .rs485-row-actions { justify-content: flex-start; } .rs485-detail-head { flex-direction: column; } .rs485-device-identity { align-items: flex-start; } .rs485-detail-meta { position: static; flex-wrap: wrap; } .rs485-detail-last-seen { position: static; } .rs485-detail-actions { justify-content: flex-start; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-row { grid-template-columns: 1fr; gap: 6px; } }
+    @media (max-width: 1100px) { .diagnostic-rtc-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } }
+    @media (max-width: 900px) { .diagnostic-led-grid, .buzzer-panel { grid-template-columns: 1fr; } .buzzer-actions { grid-template-columns: repeat(2, minmax(120px, 1fr)); grid-template-rows: auto; } .buzzer-actions .buzzer-group-title { grid-column: 1 / -1; } }
+    @media (max-width: 620px) { body { padding: 10px; } .app-toolbar { justify-content: stretch; } .theme-switcher { width: 100%; justify-content: space-between; } .theme-choice { flex: 1; } .overview-identity { min-height: 260px; padding: 22px 18px; } .overview-wordmark { font-size: 22px; letter-spacing: .12em; } .overview-title-row { align-items: flex-start; flex-direction: column; gap: 14px; } .overview-title h1 { font-size: 34px; } .overview-title .subtitle { font-size: 16px; } .overview-facts { grid-template-columns: 88px minmax(0, 1fr); } .overview-facts dt, .overview-facts dd { font-size: 14px; } .overview-health { grid-template-columns: 1fr; gap: 18px; } .overview-health-item + .overview-health-item { border-left: 0; padding-left: 0; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+3) { border-right: 0; border-bottom: 1px solid var(--ha-card-border); } .overview-metric:nth-of-type(4) { border-bottom: 0; } .xport-panel { padding: 18px 14px; border-radius: 12px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .xport-group-toolbar, .xport-group-toolbar.config-hidden { grid-template-columns: 1fr; } .xport-group-toolbar .bus-note, .xport-group-toolbar.config-hidden .bus-note { grid-column: 1; } .ports, .carrier-io-grid, .relay-grid, .rs485-toolbar { grid-template-columns: 1fr; } .rs485-table-row, .rs485-table-row.scan, .rs485-table-row.configured { grid-template-columns: 1fr; align-items: stretch; } .rs485-device-summary { align-items: flex-start; flex-wrap: wrap; gap: 4px 10px; } .rs485-device-meta { flex-wrap: wrap; } .rs485-device-filters, .rs485-device-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } .rs485-row-actions { justify-content: flex-start; } .rs485-detail-head { flex-direction: column; } .rs485-device-identity { align-items: flex-start; } .rs485-detail-meta { position: static; flex-wrap: wrap; } .rs485-device-list-head, .rs485-table-row.configured, .rs485-table-row.configured.discovered { min-width: 390px; grid-template-columns: var(--device-columns); align-items: center; } .rs485-detail-last-seen { position: static; } .rs485-detail-actions { justify-content: flex-start; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-row { grid-template-columns: 1fr; gap: 6px; } .diagnostic-rtc-grid { grid-template-columns: 1fr; } }
     @media (max-width: 620px) { .global-nav .theme-switcher { width: auto; justify-content: initial; } .global-nav .theme-switcher span { display: none; } .global-nav .theme-choice { flex: 0 0 auto; } }
     @media (max-width: 620px) { .rs485-device-list-scroll { overflow-x: auto; } .rs485-device-list-head, .rs485-table-row.configured, .rs485-table-row.configured.discovered { min-width: 390px; grid-template-columns: var(--device-columns); align-items: center; } }
     @media (max-width: 620px) { .rs485-pagination button { min-width: 34px; width: 34px; padding: 0; font-size: 0; } .rs485-pagination button span { font-size: 20px; } }
@@ -1938,28 +1968,32 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         <div class="buzzer-group-title">RTC Clock</div>
         <div class="diagnostic-rtc-grid">
           <div class="diagnostic-rtc-row">
+            <span class="diagnostic-rtc-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
             <span>RTC time</span>
             <strong id="rtc-time">Not available</strong>
           </div>
           <div class="diagnostic-rtc-row">
+            <span class="diagnostic-rtc-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="1"/><path d="M8 21h8M12 17v4"/></svg></span>
             <span>System time</span>
             <strong id="rtc-system-time">Loading</strong>
           </div>
           <div class="diagnostic-rtc-row">
+            <span class="diagnostic-rtc-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 20V4M5 7l3-3 3 3M16 4v16M13 17l3 3 3-3"/></svg></span>
             <span>Difference</span>
             <strong id="rtc-difference">Unknown</strong>
           </div>
           <div class="diagnostic-rtc-row">
+            <span class="diagnostic-rtc-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg></span>
             <span>Status</span>
             <strong id="rtc-status" class="state-text">PENDING</strong>
           </div>
         </div>
-        <div class="toolbar">
+        <div class="diagnostic-rtc-actions">
           <button type="button" id="rtc-sync-button" onclick="syncRtc()">Sync RTC</button>
           <button type="button" onclick="refreshRtc()">Refresh</button>
         </div>
         <div id="rtc-error" class="diagnostic-rtc-error"></div>
-        <div class="diagnostic-led-note">RTC is handled by the host kernel driver. The add-on does not access the RTC I2C address directly.</div>
+        <div class="diagnostic-rtc-note"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 10v6M12 7h.01"/></svg><span>RTC is handled by the host kernel driver. The add-on does not access the RTC I2C address directly.</span></div>
       </div>
     </section>
     <section id="controls-section" class="extension-panel ui-nav-section">
@@ -2885,6 +2919,53 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       }
       return result;
     }
+    function carrierItemIcon(name) {
+      const value = String(name || '').toLowerCase();
+      if (value.includes('usb')) return '<svg viewBox="0 0 24 24"><path class="carrier-usb-mark" d="M15 7v4h1v2h-3V5h2l-3-4-3 4h2v8H8v-2.07c.7-.37 1.2-1.08 1.2-1.93C9.2 7.78 8.21 6.8 7 6.8S4.8 7.78 4.8 9c0 .85.5 1.56 1.2 1.93V13a2 2 0 0 0 2 2h3v3.05c-.71.36-1.2 1.1-1.2 1.95a2.2 2.2 0 0 0 4.4 0c0-.85-.49-1.59-1.2-1.95V15h3a2 2 0 0 0 2-2v-2h1V7h-4z"/></svg>';
+      if (value.includes('reset')) return '<svg viewBox="0 0 24 24"><path d="M5 8a8 8 0 1 1-1 7"/><path d="M5 8V4M5 8h4"/></svg>';
+      if (value.includes('flash') || value.includes('enable')) return '<svg viewBox="0 0 24 24"><path d="m13 2-9 12h7l-1 8 9-12h-7z"/></svg>';
+      if (value.includes('termination') || value.includes('120r')) return '<svg viewBox="0 0 24 24"><path d="M2 12h3l2-4 2 8 2-8 2 8 2-8 2 4h3"/></svg>';
+      if (value.includes('led')) return '<svg viewBox="0 0 24 24"><path d="M9 18h6M10 22h4M8 14a6 6 0 1 1 8 0c-1 1-1 2-1 4H9c0-2 0-3-1-4z"/></svg>';
+      if (value.includes('power')) return '<svg viewBox="0 0 24 24"><path d="M12 2v10M6.2 5.8a8 8 0 1 0 11.6 0"/></svg>';
+      return '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M8 12h8"/></svg>';
+    }
+    function carrierIconSpan(name) {
+      const icon = document.createElement('span');
+      icon.className = 'carrier-io-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.innerHTML = carrierItemIcon(name);
+      return icon;
+    }
+    const mdiChip = 'M6,4H18V5H21V7H18V9H21V11H18V13H21V15H18V17H21V19H18V20H6V19H3V17H6V15H3V13H6V11H3V9H6V7H3V5H6V4M11,15V18H12V15H11M13,15V18H14V15H13M15,15V18H16V15H15Z';
+    function carrierGroupIcon(name) {
+      const value = String(name || '').toLowerCase();
+      if (value.includes('x-mod')) return `<svg viewBox="0 0 24 24"><path class="carrier-chip-mark" d="${mdiChip}"/></svg>`;
+      if (value.includes('rs-485')) return '<svg viewBox="0 0 24 24"><path class="carrier-serial-mark" d="M7 3h10v2h2v3h-3v6h-8V8H5V5h2V3m10 6h2v5h-2V9M11 15h2v7h-2v-7M5 9h2v5H5V9Z"/></svg>';
+      if (value === 'usb') return '<svg viewBox="0 0 24 24"><path class="carrier-usb-mark" d="M15 7v4h1v2h-3V5h2l-3-4-3 4h2v8H8v-2.07c.7-.37 1.2-1.08 1.2-1.93C9.2 7.78 8.21 6.8 7 6.8S4.8 7.78 4.8 9c0 .85.5 1.56 1.2 1.93V13a2 2 0 0 0 2 2h3v3.05c-.71.36-1.2 1.1-1.2 1.95a2.2 2.2 0 0 0 4.4 0c0-.85-.49-1.59-1.2-1.95V15h3a2 2 0 0 0 2-2v-2h1V7h-4z"/></svg>';
+      if (value.includes('output')) return '<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+      if (value.includes('input')) return '<svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>';
+      return '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M8 12h8"/></svg>';
+    }
+    function carrierGroupTitle(name, meta = '') {
+      const title = document.createElement('div');
+      title.className = 'carrier-io-title';
+      const main = document.createElement('span');
+      main.className = 'carrier-io-title-main';
+      const icon = document.createElement('span');
+      icon.className = 'carrier-io-title-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.innerHTML = carrierGroupIcon(name);
+      const label = document.createElement('span');
+      label.textContent = name;
+      main.append(icon, label);
+      title.appendChild(main);
+      if (meta) {
+        const detail = document.createElement('small');
+        detail.textContent = meta;
+        title.appendChild(detail);
+      }
+      return title;
+    }
     async function renderCarrierIO() {
       const output = document.getElementById('output');
       try {
@@ -2904,10 +2985,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       root.innerHTML = '';
     const hostOutputCard = document.createElement('article');
       hostOutputCard.className = 'carrier-io-card carrier-io-host-outputs host-outputs';
-      const hostOutputTitle = document.createElement('div');
-      hostOutputTitle.className = 'carrier-io-title';
-      hostOutputTitle.textContent = 'Host Outputs';
-      hostOutputCard.appendChild(hostOutputTitle);
+      hostOutputCard.appendChild(carrierGroupTitle('Host Outputs'));
       for (const outputId of hostOutputOrder) {
         const item = hostOutputs[outputId] || { id: outputId, name: outputId, on: false };
         hostOutputCard.appendChild(hostOutputRow(item));
@@ -2915,10 +2993,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       root.appendChild(hostOutputCard);
       const hostInputCard = document.createElement('article');
       hostInputCard.className = 'carrier-io-card host-inputs';
-      const hostInputTitle = document.createElement('div');
-      hostInputTitle.className = 'carrier-io-title';
-      hostInputTitle.innerHTML = '<span>Host Inputs</span><small>Digital inputs</small>';
-      hostInputCard.appendChild(hostInputTitle);
+      hostInputCard.appendChild(carrierGroupTitle('Host Inputs', 'Digital inputs'));
       for (const buttonId of hostButtonOrder) {
         const item = hostButtons[buttonId] || { id: buttonId, name: buttonId.toUpperCase(), pressed: false };
         hostInputCard.appendChild(hostButtonRow(item));
@@ -2927,10 +3002,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       for (const group of carrierGroups) {
         const card = document.createElement('article');
         card.className = `carrier-io-card ${group.title === 'RS-485' ? 'rs485-group' : group.title === 'X-Mod1' ? 'xmod1-group' : group.title === 'X-Mod2' ? 'xmod2-group' : group.title === 'USB' ? 'usb-group' : ''}`;
-        const title = document.createElement('div');
-        title.className = 'carrier-io-title';
-        title.textContent = group.title;
-        card.appendChild(title);
+        card.appendChild(carrierGroupTitle(group.title));
         for (const outputId of group.outputs) {
           const item = byId[outputId] || { id: outputId, name: outputId, on: false };
           const row = document.createElement('div');
@@ -2939,7 +3011,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           const label = document.createElement('span');
           label.textContent = carrierGroupItemLabel(group.title, item.name);
           const state = document.createElement('span');
-          state.className = `state-text ${item.on ? 'on' : ''}`;
+          state.className = `state-text carrier-io-state ${item.on ? 'on' : ''}`;
           state.textContent = item.on ? 'ON' : 'OFF';
           const toggle = document.createElement('button');
           toggle.className = `toggle ${item.on ? 'on' : ''}`;
@@ -2947,7 +3019,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           toggle.disabled = !online;
           toggle.innerHTML = `<span>${item.on ? 'ON' : 'OFF'}</span>`;
           toggle.onclick = () => setCarrierOutput(item.id, !item.on);
-          row.append(label, state, toggle);
+          row.append(carrierIconSpan(item.name), label, state, toggle);
           card.appendChild(row);
         }
         root.appendChild(card);
@@ -2964,14 +3036,14 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       const label = document.createElement('span');
       label.textContent = item.name;
       const state = document.createElement('span');
-      state.className = `state-text ${item.on ? 'on' : ''}`;
+      state.className = `state-text carrier-io-state ${item.on ? 'on' : ''}`;
       state.textContent = item.on ? 'ON' : 'OFF';
       const toggle = document.createElement('button');
       toggle.className = `toggle ${item.on ? 'on' : ''}`;
       toggle.type = 'button';
       toggle.innerHTML = `<span>${item.on ? 'ON' : 'OFF'}</span>`;
       toggle.onclick = () => setHostOutput(item.id, !item.on);
-      row.append(label, state, toggle);
+      row.append(carrierIconSpan(item.name), label, state, toggle);
       return row;
     }
     function hostButtonRow(item) {
@@ -2981,14 +3053,14 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       const label = document.createElement('span');
       label.textContent = item.name;
       const state = document.createElement('span');
-      state.className = `state-text ${item.pressed ? 'on' : ''}`;
+      state.className = `state-text carrier-io-state ${item.pressed ? 'on' : ''}`;
       state.textContent = item.pressed ? 'PRESSED' : 'OPEN';
       const indicator = document.createElement('button');
       indicator.className = `toggle readonly ${item.pressed ? 'on' : ''}`;
       indicator.type = 'button';
       indicator.disabled = true;
       indicator.innerHTML = `<span>${item.pressed ? 'ON' : 'OFF'}</span>`;
-      row.append(label, state, indicator);
+      row.append(carrierIconSpan(item.name), label, state, indicator);
       return row;
     }
     function patchControlRow(attribute, id, active, action) {
@@ -5387,7 +5459,16 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       if (!value) return 'Not available';
       const date = new Date(value);
       if (Number.isNaN(date.getTime())) return value;
-      return date.toLocaleString();
+      const formatted = date.toLocaleString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+      return formatted.replace(',', ' ·');
     }
     function paintRtcStatus(payload) {
       const systemTime = document.getElementById('rtc-system-time');
@@ -5404,7 +5485,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       rtcTime.textContent = payload.rtc_local_time ? formatRtcTime(payload.rtc_local_time) : formatRtcTime(payload.rtc_time);
       difference.textContent = Number.isNaN(rtcDate.getTime()) || Number.isNaN(systemDate.getTime())
         ? 'Unknown'
-        : `${((rtcDate.getTime() - systemDate.getTime()) / 1000).toFixed(3)}s`;
+        : `${((rtcDate.getTime() - systemDate.getTime()) / 1000).toFixed(3)} s`;
       status.textContent = payload.status || 'UNKNOWN';
       status.className = `state-text ${payload.available ? 'on' : ''}`;
       syncButton.disabled = !payload.available;
