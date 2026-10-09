@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.229
+
+- Restored X-BUS WebSocket state updates after the UI status marker change.
+- Isolated X-BUS module status styling from RS-485 selectors.
+- Added regression coverage for the X-BUS UI WebSocket patcher.
+
 ## 0.5.228
 
 - Restored responsive X-BUS module grids.

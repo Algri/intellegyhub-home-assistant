@@ -256,7 +256,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.228 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.229 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -314,7 +314,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.228", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.229", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -1022,6 +1022,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .rs485-detail-status::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 16%, transparent); }
     .rs485-detail-status.offline { color: var(--ha-danger-text); }
     .rs485-detail-status.unknown { color: #ffc107; }
+    .xbus-module-status { display: inline-flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 4px; border: 0; border-radius: 0; background: transparent; color: var(--ha-success-text); font-size: 12px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; }
+    .xbus-module-status::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 16%, transparent); }
+    .xbus-module-status.offline { color: var(--ha-danger-text); }
     .rs485-device-menu { width: 42px; height: 42px; min-width: 42px; padding: 0; font-size: 24px; }
     .rs485-detail-action-menu { position: relative; }
     .rs485-detail-action-menu > summary,
@@ -3260,7 +3263,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         const text = document.createElement('div');
         text.append(title, meta);
         const status = document.createElement('div');
-        status.className = `rs485-detail-status ${module.available && powerOn ? '' : 'offline'}`;
+        status.className = `xbus-module-status ${module.available && powerOn ? '' : 'offline'}`;
         status.textContent = module.available && powerOn ? 'ONLINE' : 'OFFLINE';
         const remove = document.createElement('button');
         remove.className = 'danger-button';
@@ -3377,7 +3380,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       for (const module of payload.modules) {
         const card = cards.get(module.id);
         const online = Boolean(module.available && payload.power.on);
-        const status = card.querySelector('.status-pill');
+        const status = card.querySelector('.xbus-module-status');
         status.classList.toggle('offline', !online);
         status.textContent = online ? 'ONLINE' : 'OFFLINE';
         const values = module.kind === 'relay_output' ? module.relays : module.inputs;
