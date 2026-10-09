@@ -256,7 +256,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.222 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.223 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -311,7 +311,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.222", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.223", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -1430,6 +1430,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .buzzer-preview-play::before, .buzzer-preview-stop::before { content: ''; display: inline-block; width: 12px; height: 12px; flex: 0 0 12px; background-color: currentColor; }
     .buzzer-preview-play::before { clip-path: polygon(18% 8%, 92% 50%, 18% 92%); }
     .buzzer-preview-stop::before { clip-path: inset(18%); }
+    .buzzer-preview-play:disabled { opacity: .48; cursor: default; }
     .buzzer-preview-stop:disabled { opacity: .48; cursor: default; }
     @media (max-width: 1100px) { .buzzer-preview-bottom { grid-template-columns: repeat(3, minmax(60px, 1fr)); } .buzzer-preview-play, .buzzer-preview-stop { grid-row: 2; } }
     @media (max-width: 620px) { .buzzer-panel { grid-template-columns: minmax(0, 1fr); } .buzzer-row { grid-template-columns: minmax(80px, 1fr); gap: 2px; } .buzzer-preview-bottom { grid-template-columns: repeat(2, minmax(0, 1fr)); } .buzzer-preview-metric { min-height: 38px; } .buzzer-preview-play, .buzzer-preview-stop { width: 100%; } .buzzer-wave-wrap { grid-template-rows: 110px 14px; min-height: 128px; } .buzzer-wave, .buzzer-wave-plot { height: 110px; } }
@@ -1875,7 +1876,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
             <div class="buzzer-preview-metric"><span>Freq</span><strong id="buzzer-preview-frequency">2000 Hz</strong></div>
             <div class="buzzer-preview-metric"><span>Duration</span><strong id="buzzer-preview-duration">300 ms</strong></div>
             <div class="buzzer-preview-metric"><span>Volume</span><strong id="buzzer-preview-volume">50%</strong></div>
-            <button class="buzzer-preview-play" type="button" onclick="playBuzzer()">Play</button>
+            <button id="buzzer-preview-play" class="buzzer-preview-play" type="button" onclick="playBuzzer()">Play</button>
             <button id="buzzer-preview-stop" class="buzzer-preview-stop" type="button" onclick="stopBuzzer()" disabled>Stop</button>
           </div>
         </div>
@@ -5478,7 +5479,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       volumeNode.textContent = `${volume}%`;
       const activeWidth = 600 * duration / 1000;
       const actualCycles = frequency * duration / 1000;
-      const cycles = Math.max(1, Math.min(18, Math.round(18 * Math.log1p(actualCycles) / Math.log1p(2800))));
+      const baseCycles = Math.max(1, Math.min(18, Math.round(18 * Math.log1p(actualCycles) / Math.log1p(2800))));
+      const frequencyRatio = Math.max(0, Math.min(1, (frequency - 300) / (2800 - 300)));
+      const cycles = Math.max(1, Math.round(baseCycles * (0.5 + frequencyRatio * 0.5)));
       const baseline = 118;
       const peakY = baseline - volume * 1.16;
       const points = [`M0 ${baseline}`];
@@ -5503,20 +5506,24 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     function setBuzzerPreviewPlaying(playing, label = playing ? 'Playing' : 'Ready') {
       const preview = document.getElementById('buzzer-preview');
       const state = document.getElementById('buzzer-preview-state');
+      const play = document.getElementById('buzzer-preview-play');
       const stop = document.getElementById('buzzer-preview-stop');
-      if (!preview || !state || !stop) return;
+      if (!preview || !state || !play || !stop) return;
       preview.classList.toggle('playing', playing);
       state.classList.toggle('playing', playing);
       state.textContent = label;
+      play.disabled = playing || clampNumber(document.getElementById('buzzer-volume')?.value, 0, 100) === 0;
       stop.disabled = !playing;
     }
     function paintBuzzerPower(volume, lastVolume) {
       const enabled = Number(volume) > 0;
       const toggle = document.getElementById('buzzer-power-toggle');
+      const play = document.getElementById('buzzer-preview-play');
       if (!toggle) return;
       toggle.className = `toggle ${enabled ? 'on' : ''}`;
       toggle.innerHTML = `<span>${enabled ? 'ON' : 'OFF'}</span>`;
       toggle.title = enabled ? 'Turn buzzer volume off' : `Restore buzzer volume to ${lastVolume || 50}%`;
+      if (play) play.disabled = !enabled;
     }
     async function renderBuzzerStatus() {
       try {

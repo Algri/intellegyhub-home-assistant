@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.223
+
+- Refine the buzzer waveform density at minimum frequency and disable Play while the buzzer is disabled.
+
 ## 0.5.222
 
 - Refine the buzzer controls and waveform preview layout, including clearer playback controls and compact GPIO labeling.
