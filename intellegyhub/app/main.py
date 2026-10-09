@@ -256,7 +256,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.226 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.227 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -314,7 +314,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.226", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.227", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -441,7 +441,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     main { width: min(100%, 1520px); margin: 0 auto; padding-bottom: 35vh; }
     .app-toolbar { display: flex; justify-content: flex-end; margin-bottom: 10px; }
-    .global-nav { position: sticky; top: 5px; z-index: 80; display: flex; gap: 2px; overflow-x: auto; margin-top: -19px; margin-bottom: 0; padding: 3px; border: 1px solid var(--ha-row-border); border-radius: 9px; background: color-mix(in srgb, var(--ha-surface) 94%, transparent); box-shadow: 0 6px 18px rgba(0, 0, 0, .18); scrollbar-width: thin; }
+    .global-nav { position: sticky; top: 5px; z-index: 80; display: flex; width: 100%; min-width: 0; box-sizing: border-box; gap: 2px; overflow-x: auto; margin: -19px 0 16px; padding: 3px 24px; border: 1px solid var(--ha-row-border); border-radius: 9px; background: color-mix(in srgb, var(--ha-surface) 94%, transparent); box-shadow: 0 6px 18px rgba(0, 0, 0, .18); scrollbar-width: thin; }
     .global-nav button { flex: 0 0 auto; min-height: 38px; padding: 7px 14px; border: 0 !important; border-radius: 6px; background: transparent !important; color: var(--ha-secondary) !important; font-size: 12px; font-weight: 800; white-space: nowrap; box-shadow: none !important; }
     .global-nav > button[data-ui-nav-target] { min-width: 86px; text-align: center; }
     .global-nav button:hover, .global-nav button:focus-visible { background: var(--ha-field) !important; color: var(--ha-text) !important; outline: none; box-shadow: none !important; }
@@ -449,20 +449,26 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .global-nav .theme-switcher { flex: 0 0 auto; margin-left: auto; }
     .global-nav .theme-switcher { border: 0; background: transparent; box-shadow: none; padding: 0; }
     .global-nav .theme-switcher .theme-choice { min-height: 38px !important; }
-    .global-nav .theme-switcher .theme-choice.active { border-color: var(--ha-primary) !important; color: var(--ha-primary) !important; background: var(--ha-field) !important; }
+    .global-nav .theme-switcher .theme-choice.active { border-color: transparent !important; color: var(--ha-primary) !important; background: transparent !important; }
     .global-nav .theme-switcher { flex: 0 0 auto; margin-left: auto; }
     .ui-nav-section { scroll-margin-top: 74px; }
     .theme-switcher { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--ha-card-border); border-radius: 999px; background: var(--ha-card); padding: 4px; }
     .theme-switcher span { color: var(--ha-secondary); font-size: 12px; font-weight: 800; padding: 0 8px; text-transform: uppercase; letter-spacing: .08em; }
-    .theme-choice { min-height: 30px !important; border-radius: 999px !important; padding: 4px 12px !important; border-color: transparent !important; color: var(--ha-secondary) !important; }
-    .theme-choice.active { border-color: var(--ha-primary) !important; color: var(--ha-primary) !important; background: rgba(3, 169, 244, .12) !important; }
+    .theme-switcher span::before { content: '◐'; display: inline-block; width: 24px; margin-right: 8px; color: var(--ha-primary); font-size: 24px; line-height: 1; text-align: center; vertical-align: -4px; }
+    html[data-theme-choice="light"] .theme-switcher span::before { content: '☀'; }
+    html[data-theme-choice="dark"] .theme-switcher span::before { content: '☾'; }
+    .theme-choice { min-height: 30px !important; display: inline-flex; align-items: center; gap: 7px; border-radius: 6px !important; padding: 4px 10px !important; border-color: transparent !important; color: var(--ha-secondary) !important; background: transparent !important; }
+    .theme-choice::before { content: ''; width: 12px; height: 12px; flex: 0 0 12px; box-sizing: border-box; border: 2px solid currentColor; border-radius: 50%; }
+    .theme-choice.active { border-color: transparent !important; color: var(--ha-primary) !important; background: transparent !important; }
+    .theme-choice.active::before { box-shadow: inset 0 0 0 3px var(--ha-surface); background: var(--ha-primary); }
     .overview-panel { position: relative; display: grid; grid-template-columns: minmax(420px, .9fr) minmax(520px, 1.5fr); gap: 0; margin-top: 0; margin-bottom: 18px; padding: 0; overflow: hidden; }
+    .extension-panel.overview-panel { padding: 0; }
     .overview-identity { display: flex; flex-direction: column; min-height: 0; padding: 24px 42px; border-right: 0; }
     .overview-badge-row { display: flex; align-items: center; justify-content: flex-start; gap: 18px; margin-bottom: 16px; }
     .overview-wordmark { display: inline-flex; align-items: baseline; min-width: 0; color: var(--wordmark-main); font-size: 40px; line-height: 1; font-weight: 640; letter-spacing: .16em; white-space: nowrap; }
     .overview-wordmark span { color: var(--wordmark-accent); }
     .overview-logo-mark { order: -1; width: 64px; height: 64px; object-fit: contain; flex: 0 0 auto; }
-    .overview-title-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 14px; }
+    .overview-title-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-top: 40px; margin-bottom: 14px; }
     .overview-title { width: max-content; max-width: 100%; min-width: 0; }
     .overview-title h1 { font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-size: 48px; line-height: 1; margin-bottom: 8px; font-weight: 800; }
     .overview-title .subtitle { color: var(--ha-secondary); font-size: 19px; line-height: 1.25; margin-bottom: 0; font-weight: 700; }
@@ -470,7 +476,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .overview-facts { display: grid; grid-template-columns: 142px minmax(0, 1fr); gap: 10px 24px; margin: 0; font-size: 18px; line-height: 1.2; }
     .overview-facts dt { color: var(--ha-secondary); font-size: 18px; font-weight: 800; letter-spacing: 0; }
     .overview-facts dd { margin: 0; color: var(--ha-text); font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-size: 18px; font-weight: 800; min-width: 0; overflow-wrap: anywhere; }
-    .overview-divider { width: calc(100% - 44px); height: 1px; background: var(--ha-card-border); margin: 20px 0; }
+    .overview-divider { width: calc(100% - 44px); height: 1px; background: var(--ha-card-border); margin: 20px 0 20px; }
     .overview-health { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin: 0; font-size: 22px; line-height: 1.25; }
     .overview-health-item { min-width: 0; }
     .overview-health-item + .overview-health-item { border-left: 0; padding-left: 0; }
@@ -482,14 +488,15 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .overview-sync-dot.online { background: var(--ha-success); }
     .overview-sync-dot.offline { background: #ff6b6b; }
     .overview-metrics { position: relative; display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); padding-bottom: 0; }
-    .overview-metric { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto auto; align-content: start; align-items: center; column-gap: 16px; row-gap: 6px; min-width: 0; min-height: 135px; padding: 24px; border: 0; border-radius: 0; background: transparent; }
-    .overview-metric-label { grid-column: 1; grid-row: 1; display: inline-flex; align-items: center; gap: 8px; min-width: 0; color: var(--ha-text); font-family: inherit; font-size: 18px; line-height: 1.3; font-weight: 600; letter-spacing: 0; text-transform: none; margin: 0; }
+    .overview-metric { display: block; min-width: 0; min-height: 135px; box-sizing: border-box; padding: 24px; border: 0; border-radius: 0; background: transparent; overflow: hidden; }
+    .overview-metric-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; min-width: 0; padding-right: 14px; box-sizing: border-box; }
+    .overview-metric-label { display: inline-flex; align-items: center; gap: 8px; min-width: 0; color: var(--ha-text); font-family: inherit; font-size: 18px; line-height: 1.3; font-weight: 600; letter-spacing: 0; text-transform: none; margin: 0; }
     .overview-fact-label, .overview-health-label { display: inline-flex; align-items: center; gap: 8px; }
     .overview-metric-label .overview-inline-icon { width: 20px; height: 20px; }
     .overview-inline-icon { display: block; width: 20px; height: 20px; flex: 0 0 20px; color: var(--ha-primary); fill: currentColor; stroke: none; }
-    .overview-metric-value { grid-column: 2; grid-row: 1; justify-self: end; color: var(--ha-text); font-family: inherit; font-size: 18px; line-height: 1.3; font-weight: 600; letter-spacing: 0; font-variant-numeric: tabular-nums; white-space: nowrap; margin: 0; }
-    .overview-metric-meta { grid-column: 2; grid-row: 2; justify-self: end; text-align: right; color: var(--ha-secondary); font-family: inherit; font-size: 12px; line-height: 1.3; overflow-wrap: anywhere; }
-    .overview-metric-chart { grid-column: 1 / -1; grid-row: 3; display: block; width: 100%; height: auto; aspect-ratio: 400 / 140; margin-top: 8px; overflow: hidden; }
+    .overview-metric-value { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; color: var(--ha-text); font-family: inherit; font-size: 18px; line-height: 1.3; font-weight: 600; letter-spacing: 0; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .overview-metric-meta { box-sizing: border-box; padding-right: 14px; text-align: right; color: var(--ha-secondary); font-size: 12px; line-height: 1.3; overflow-wrap: anywhere; }
+    .overview-metric-chart { display: block; width: 100%; max-width: 100%; box-sizing: border-box; height: auto; aspect-ratio: 400 / 140; margin-top: 8px; overflow: hidden; }
     .overview-metric-chart text { fill: var(--ha-secondary); font-size: 12px; font-weight: 400; font-family: inherit; letter-spacing: 0; font-variant-numeric: tabular-nums; }
     .overview-metric-chart path { vector-effect: non-scaling-stroke; }
     .overview-metric-chart .chart-grid { fill: none; stroke: var(--ha-row-border); stroke-width: 1; opacity: .65; }
@@ -504,14 +511,16 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .overview-metric-chart .chart-tooltip rect { fill: var(--ha-field); stroke: var(--ha-card-border); }
     .overview-metric-chart .chart-tooltip text { fill: var(--ha-text); font-size: 11px; font-weight: 700; }
     .overview-updated { position: absolute; top: 12px; right: 20px; z-index: 2; color: var(--ha-secondary); font-size: 11px; }
-    .xport-panel {
+    .extension-panel.xport-panel {
       border: 1px solid var(--ha-card-border);
       border-radius: 12px;
       background: var(--ha-card);
       box-shadow: 0 2px 4px rgba(0, 0, 0, .22);
-      padding: 24px;
+      padding: 24px 42px;
     }
     .module-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 22px; }
+    .extension-panel.xport-panel .module-row h1 { font-size: 28px; line-height: 1.1; font-weight: 700; }
+    .extension-panel.xport-panel .module-row .subtitle { font-size: 14px; line-height: 1.35; }
     .eyebrow { color: var(--ha-primary); font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; }
     h1 { font-size: 28px; line-height: 1; margin: 0 0 7px; letter-spacing: 0; font-weight: 500; }
     .subtitle { color: var(--ha-secondary); font-size: 14px; margin-bottom: 8px; }
@@ -536,12 +545,13 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       color: var(--ha-text);
       margin-bottom: 6px;
     }
-    .port-card { border: 1px solid var(--ha-card-border); border-radius: 12px; background: var(--ha-surface); padding: 20px; min-height: 228px; }
+    .port-card { border: 1px solid var(--ha-card-border); border-radius: 8px; background: var(--ha-surface); padding: 18px; min-height: 244px; }
     .port-card.locked { opacity: .92; }
     .port-card.locked .active-row { grid-template-columns: minmax(0, 1fr); }
     .port-card.locked .xport-action-slot { display: none; }
     .port-card.locked .active-mode strong { overflow: visible; text-overflow: clip; }
-    .port-title { font-size: 17px; font-weight: 800; margin-bottom: 20px; }
+    .port-title { display: flex; align-items: center; gap: 8px; color: var(--ha-text); font-size: 15px; line-height: 1.2; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 18px; }
+    .port-title .port-icon { width: 20px; height: 20px; flex: 0 0 20px; color: var(--ha-primary); fill: currentColor; }
     label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 8px; }
     .mode-select { position: relative; }
     .mode-trigger {
@@ -627,7 +637,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       margin-top: 10px;
       height: 24px;
       min-width: 0;
-      font-size: 15px;
+      color: var(--ha-secondary);
+      font-size: 14px;
       line-height: 24px;
       white-space: nowrap;
     }
@@ -638,6 +649,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       text-overflow: ellipsis;
       white-space: nowrap;
       vertical-align: bottom;
+      color: var(--ha-text);
     }
     .active-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; margin-top: 14px; }
     .active-row .active-mode { margin-top: 0; min-width: 0; }
@@ -648,9 +660,21 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .mode-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
     .switch-row { justify-content: space-between; flex-wrap: nowrap; width: 100%; }
     .control-cluster { display: inline-flex; align-items: center; gap: 10px; margin-left: auto; }
-    .xport-control-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; min-height: 42px; border: 1px solid var(--ha-row-border); border-radius: 8px; padding: 8px 10px; background: var(--ha-row); color: var(--ha-text); }
-    .xport-control-row.readout { grid-template-columns: minmax(0, 1fr) auto; }
-    .xport-control-row.pwm { grid-template-columns: auto minmax(120px, 1fr) 5ch; padding-right: 12px; }
+    .xport-control-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 10px; min-height: 42px; border: 0; border-radius: 0; padding: 0; background: transparent; color: var(--ha-text); }
+    .xport-control-row.readout { grid-template-columns: auto minmax(0, 1fr) auto; }
+    .xport-control-row.pwm { grid-template-columns: auto minmax(0, 1fr) minmax(120px, 1fr) 5ch; padding-right: 0; }
+    .xport-control-row:has(> .toggle) { position: relative; grid-template-columns: auto minmax(0, 1fr) auto; }
+    .xport-control-row:has(> .toggle) > .toggle { grid-column: 3; }
+    .xport-control-row:has(> .toggle)::after { content: ''; position: absolute; top: 0; right: 68px; width: 1px; height: 100%; background: var(--ha-card-border); pointer-events: none; }
+    .xport-control-row:has(> .toggle.readonly)::after { right: 68px; }
+    .xport-control-icon { display: block; grid-column: 1; width: 18px; height: 18px; flex: 0 0 18px; color: var(--ha-primary); fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .xport-control-icon.output { fill: currentColor; stroke: none; }
+    .xport-control-icon.pwm { fill: currentColor; stroke: none; }
+    .xport-control-icon.input { fill: currentColor; stroke: none; }
+    .xport-control-icon.do { fill: currentColor; stroke: none; }
+    .xport-control-icon.state { fill: currentColor; stroke: none; }
+    .xport-control-row > strong { border-left: 1px solid var(--ha-card-border); padding-left: 16px; }
+    .xport-control-row.pwm > input[type="range"] { border-left: 1px solid var(--ha-card-border); padding-left: 16px; }
     .xport-control-row.pwm strong { text-align: right; padding-right: 2px; }
     .xport-control-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .toggle {
@@ -685,30 +709,11 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .toggle.on { background: var(--ha-primary); }
     .toggle:focus, .toggle:focus-visible { outline: none; box-shadow: none; }
     .toggle.on::before { transform: translateX(32px); }
-    .toggle span { position: relative; z-index: 1; display: block; padding-left: 7px; color: #fff; font-size: 9px; font-weight: 900; line-height: 26px; text-align: left; pointer-events: none; }
-    .toggle:not(.on) span { padding-left: 28px; color: #202124; }
+    .toggle span { position: absolute; z-index: 1; top: 0; left: 0 !important; width: 50%; padding: 0 !important; color: #fff; font-size: 9px; font-weight: 900; line-height: 26px; text-align: center; pointer-events: none; }
+    .toggle:not(.on) span { left: 50% !important; color: #202124; }
     .toggle.readonly {
       cursor: default;
       pointer-events: none;
-    }
-    .toggle.readonly,
-    .toggle.readonly:hover,
-    .toggle.readonly:focus-visible,
-    .toggle:disabled,
-    .toggle:disabled:hover,
-    .toggle:disabled:focus-visible {
-      background: #5f6368;
-      outline: none;
-      cursor: default;
-      opacity: .55;
-    }
-    .toggle.readonly.on,
-    .toggle.readonly.on:hover,
-    .toggle.readonly.on:focus-visible,
-    .toggle.on:disabled,
-    .toggle.on:disabled:hover,
-    .toggle.on:disabled:focus-visible {
-      background: var(--ha-primary);
     }
     .slider-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
     input[type="range"] { width: 100%; accent-color: var(--ha-primary); }
@@ -728,8 +733,13 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       color: var(--ha-primary);
       outline: none;
     }
+    .reset-button.icon-only { width: 28px; min-width: 28px; height: 28px; min-height: 28px; padding: 0; border: 0 !important; background: transparent; color: var(--ha-primary) !important; display: inline-flex; align-items: center; justify-content: center; }
+    .reset-button.icon-only:hover, .reset-button.icon-only:focus-visible { border: 0 !important; background: transparent; color: var(--ha-primary); }
+    .reset-button.icon-only svg { display: block !important; width: 22px !important; height: 22px !important; color: var(--ha-primary) !important; fill: currentColor !important; stroke: none !important; }
+    .reset-button.icon-only svg path { fill: var(--ha-primary) !important; stroke: none !important; }
     .diagnostics-output { margin-top: 16px; }
     .extension-panel { margin-top: 18px; border: 1px solid var(--ha-card-border); border-radius: 12px; background: var(--ha-card); box-shadow: 0 2px 4px rgba(0, 0, 0, .22); padding: 24px; }
+    .extension-panel:not(.overview-panel) { padding-left: 42px; padding-right: 42px; }
     .extension-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 18px; }
     .bus-toolbar { align-items: stretch; border: 1px solid var(--ha-card-border); border-radius: 10px; background: var(--ha-surface); padding: 12px; }
     .bus-power-control { display: flex; align-items: center; gap: 10px; min-height: 42px; padding-right: 6px; }
@@ -759,7 +769,24 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .xport-group-toolbar.config-hidden .bus-note { grid-column: 2 / -1; }
     .xport-group-toolbar.hidden { display: none; }
     .bus-note { color: var(--ha-secondary); font-size: 13px; line-height: 1.4; flex: 1 1 360px; align-self: center; }
-    .bus-action { min-width: 142px; }
+    .bus-action { min-width: 142px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+    .bus-action svg { width: 18px; height: 18px; fill: currentColor; }
+    .xport-title { display: inline-flex; align-items: center; gap: 12px; }
+    .xport-title-icon { width: 34px; height: 34px; color: var(--ha-primary); fill: currentColor; flex: 0 0 34px; }
+    .xbus-title { display: inline-flex; align-items: center; gap: 12px; }
+    .xbus-title-icon { width: 34px; height: 34px; color: var(--ha-primary); fill: currentColor; flex: 0 0 34px; }
+    .rs485-title { display: inline-flex; align-items: center; gap: 12px; }
+    .rs485-title-icon { width: 34px; height: 34px; color: var(--ha-primary); fill: currentColor; flex: 0 0 34px; }
+    .onewire-title { display: inline-flex; align-items: center; gap: 12px; }
+    .onewire-title-icon { width: 34px; height: 34px; color: var(--ha-primary); fill: currentColor; flex: 0 0 34px; }
+    .rtc-title { display: inline-flex; align-items: center; gap: 12px; }
+    .rtc-title-icon { width: 34px; height: 34px; color: var(--ha-primary); fill: currentColor; flex: 0 0 34px; }
+    .controls-title { display: inline-flex; align-items: center; gap: 12px; }
+    .controls-title-icon { width: 34px; height: 34px; color: var(--ha-primary); fill: currentColor; flex: 0 0 34px; }
+    .tools-title { display: inline-flex; align-items: center; gap: 12px; }
+    .tools-title-icon { width: 34px; height: 34px; color: var(--ha-primary); fill: currentColor; flex: 0 0 34px; }
+    .functions-title { display: inline-flex; align-items: center; gap: 12px; }
+    .functions-title-icon { width: 34px; height: 34px; color: var(--ha-primary); fill: currentColor; flex: 0 0 34px; }
     .rs485-toolbar {
       --rs485-label-height: 16px;
       --rs485-control-height: 42px;
@@ -774,8 +801,6 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .rs485-toolbar + .rs485-layout { margin-top: 18px; }
     .rs485-port-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; padding: 10px 12px; border: 1px solid var(--ha-card-border); border-radius: 8px; background: var(--ha-surface); }
     .rs485-port-controls-title { margin-right: auto; color: var(--ha-secondary); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
-    .rs485-port-controls .toggle { min-height: 32px; padding: 5px 10px; border: 1px solid var(--ha-row-border); border-radius: 7px; background: transparent; color: var(--ha-secondary); }
-    .rs485-port-controls .toggle.on { border-color: var(--ha-primary); color: var(--ha-primary); background: rgba(3,169,244,.12); }
     .rs485-settings-polling-controls { display: grid; grid-template-columns: auto repeat(3, minmax(140px, 1fr)); align-items: center; gap: 8px; margin: 0 0 16px; padding: 10px 12px; border: 1px solid var(--ha-row-border); border-radius: 8px; background: var(--ha-row); }
     .rs485-device-access-controls { grid-template-columns: repeat(3, minmax(170px, 1fr)); grid-template-rows: auto auto; padding: 9px 14px 10px; column-gap: 22px; row-gap: 7px; }
     .rs485-device-access-controls > .polling-control-label { grid-column: 1 / -1; }
@@ -1367,13 +1392,15 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       .onewire-device-meta { width: 100%; }
       .onewire-device-row { grid-template-columns: minmax(0, 1fr) auto; }
     }
-    .module-card { border: 1px solid var(--ha-card-border); border-radius: 12px; background: var(--ha-surface); padding: 18px; }
-    .module-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; margin-bottom: 18px; }
+    .module-card { border: 1px solid var(--ha-card-border); border-radius: 12px; background: var(--ha-surface); padding: 14px 18px; }
+    .module-head { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin-bottom: 10px; }
+    .module-card .module-head { padding-bottom: 0; border-bottom: 0; }
+    .module-card .module-head > div:first-child { display: flex; align-items: baseline; gap: 12px; min-width: 0; flex-wrap: wrap; }
     .module-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
     .status-pill { min-height: 30px; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--ha-success-border); color: var(--ha-success-text); background: var(--ha-success-bg); font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
     .status-pill.offline { border-color: var(--ha-danger-border); color: var(--ha-danger-text); background: var(--ha-danger-bg); }
-    .module-title { font-size: 17px; font-weight: 800; margin-bottom: 6px; }
-    .module-meta { color: var(--ha-secondary); font-size: 13px; }
+    .module-title { font-size: 17px; font-weight: 800; margin-bottom: 0; }
+    .module-meta { color: var(--ha-secondary); font-size: 12px; }
     .danger-button { border-color: #5f3434; color: #ffb4ab; background: transparent; min-height: 34px; padding: 6px 12px; }
     #rs485-section .danger-button:hover,
     #rs485-section .danger-button:focus-visible {
@@ -1383,9 +1410,22 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       box-shadow: inset 0 0 0 1px #ff8a80 !important;
     }
     .danger-button:hover, .danger-button:focus-visible { border-color: #ff8a80; background: rgba(244, 67, 54, .14); color: #ffd4cf; outline: none; }
-    .relay-grid { display: grid; grid-template-columns: repeat(8, minmax(120px, 1fr)); gap: 10px 14px; align-items: stretch; }
-    .relay-row { display: grid; grid-template-columns: minmax(58px, 1fr) auto auto; align-items: center; gap: 10px; color: var(--ha-text); min-height: 42px; border: 0; border-radius: 0; padding: 0; background: transparent; }
-    .module-card .relay-row, .module-card .relay-row:hover, .module-card .relay-row:focus-within { border: 1px solid var(--ha-row-border) !important; border-radius: 8px !important; padding: 8px 10px !important; background: transparent !important; box-shadow: none !important; }
+    .module-card .danger-button { width: 32px; min-width: 32px; height: 32px; padding: 3px; display: inline-flex; align-items: center; justify-content: center; border: 0 !important; background: transparent !important; color: var(--ha-secondary); }
+    .module-card .danger-button:hover, .module-card .danger-button:focus-visible { border: 0 !important; background: transparent !important; color: var(--ha-danger-text); box-shadow: none !important; }
+    .module-card .danger-button svg { display: block !important; width: 24px !important; height: 24px !important; flex: 0 0 24px; fill: currentColor; }
+    .relay-grid { display: grid; grid-template-columns: repeat(4, minmax(180px, 1fr)) !important; gap: 10px 14px; align-items: stretch; }
+    .module-card[data-module-kind="digital_input"] .relay-grid { grid-template-columns: repeat(8, minmax(120px, 1fr)) !important; }
+    .module-card[data-module-kind="relay_output"] .relay-grid { grid-template-columns: repeat(8, minmax(120px, 1fr)) !important; }
+    .relay-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 12px; color: var(--ha-text); min-height: 42px; border: 0; border-radius: 0; padding: 8px 0; background: transparent; }
+    .module-card .relay-row, .module-card .relay-row:hover, .module-card .relay-row:focus-within { border: 0 !important; border-radius: 0 !important; padding: 10px 12px !important; background: transparent !important; box-shadow: none !important; }
+    .module-card .relay-row:nth-child(4n + 2), .module-card .relay-row:nth-child(4n + 3), .module-card .relay-row:nth-child(4n + 4) { border-left: 1px solid var(--ha-row-border) !important; padding-left: 18px !important; }
+    .module-card:not([data-module-kind="digital_input"]) .relay-row:nth-child(4n + 5) { border-left: 1px solid var(--ha-row-border) !important; padding-left: 18px !important; }
+    .module-card[data-module-kind="digital_input"] .relay-row:nth-child(5),
+    .module-card[data-module-kind="digital_input"] .relay-row:nth-child(13) { border-left: 1px solid var(--ha-row-border) !important; padding-left: 18px !important; }
+    .module-card .relay-row:hover, .module-card .relay-row:focus-within { background: transparent !important; }
+    .module-card .relay-row .toggle { position: relative; margin-left: 0; }
+    .relay-row .control-divider { display: none; }
+    .module-card .relay-row .state-text { display: none; }
     .relay-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .state-text { min-width: 30px; text-align: right; color: var(--ha-secondary); font-size: 12px; font-weight: 800; letter-spacing: .04em; }
     .state-text.on { color: var(--ha-primary); }
@@ -1398,18 +1438,32 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       width: 7px;
       height: 7px;
     }
-    .carrier-io-grid { display: grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 16px; margin-top: 18px; align-items: start; }
-    .carrier-io-card { align-self: start; border: 1px solid var(--ha-card-border); border-radius: 12px; background: var(--ha-surface); padding: 16px; min-width: 0; }
+    .carrier-io-grid { display: grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 18px; margin-top: 18px; align-items: start; }
+    #controls-section { width: auto; margin-left: 0; padding: 32px 48px; }
+    .carrier-io-card { align-self: start; border: 1px solid var(--ha-card-border); border-radius: 12px; background: var(--ha-surface); padding: 20px; min-width: 0; }
     .carrier-io-card.host-outputs { order: 4; }
     .carrier-io-card.host-inputs { order: 6; }
     .carrier-io-card.rs485-group { order: 3; }
     .carrier-io-card.xmod1-group { order: 1; }
     .carrier-io-card.xmod2-group { order: 2; }
     .carrier-io-card.usb-group { order: 5; }
-    .carrier-io-title { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-height: 22px; margin-bottom: 12px; color: var(--ha-text); font-size: 16px; font-weight: 800; }
+    .carrier-io-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 22px; margin-bottom: 16px; color: var(--ha-text); font-size: 16px; font-weight: 800; }
+    .carrier-io-title .carrier-control-icon { width: 20px !important; height: 20px !important; flex: 0 0 20px; color: var(--ha-primary); fill: currentColor; stroke: none; }
+    .carrier-io-title .carrier-title-text { margin-right: auto; }
     .carrier-io-title small { color: var(--ha-secondary); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
-    .carrier-io-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 42px; border: 1px solid var(--ha-row-border); border-radius: 8px; padding: 8px 10px; background: var(--ha-row); }
-    .carrier-io-row + .carrier-io-row { margin-top: 10px; }
+    .carrier-io-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 12px; min-height: 48px; border: 0; border-radius: 0; padding: 8px 0; background: transparent; }
+    .carrier-io-row + .carrier-io-row { margin-top: 8px; }
+    .carrier-io-row .carrier-control-icon { width: 22px; height: 22px; color: var(--ha-primary); fill: none; stroke: currentColor; stroke-width: 1.8; }
+    .carrier-io-row .carrier-control-icon.usb { fill: currentColor; stroke: none; }
+    .carrier-io-row .carrier-control-icon.resistor { fill: currentColor; stroke: none; }
+    .carrier-io-row .carrier-control-icon.power { fill: currentColor; stroke: none; }
+    .carrier-io-row .carrier-control-icon.reset { fill: currentColor; stroke: none; }
+    .carrier-io-row .carrier-control-icon.button-pointer { fill: currentColor; stroke: none; }
+    .carrier-io-row .carrier-control-icon.lightbulb { fill: currentColor; stroke: none; }
+    .carrier-io-row .carrier-control-icon.fill { fill: currentColor; stroke: none; }
+    .carrier-io-row .carrier-control-divider { width: 1px; height: 28px; background: var(--ha-row-border); }
+    .carrier-io-row .toggle { grid-column: 4; }
+    .carrier-io-row .state-text { display: none; }
     .carrier-io-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .buzzer-panel {
       display: grid;
@@ -1466,10 +1520,20 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .diagnostic-led-state { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
     .diagnostic-led-note { margin: 2px 10px 0; color: var(--ha-secondary); font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
     .diagnostic-rtc-card { margin-top: 18px; }
-    .diagnostic-rtc-grid { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 12px 16px; }
-    .diagnostic-rtc-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 42px; border: 1px solid var(--ha-row-border); border-radius: 8px; padding: 8px 10px; background: var(--ha-row); }
-    .diagnostic-rtc-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .diagnostic-rtc-error { min-height: 18px; margin-top: 10px; color: var(--ha-secondary); font-size: 13px; overflow-wrap: anywhere; }
+    .diagnostic-rtc-card { position: relative; border: 1px solid var(--ha-card-border); border-radius: 12px; padding: 20px 24px 22px; background: var(--ha-surface); }
+    .diagnostic-rtc-title { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .diagnostic-rtc-title::before { content: ''; width: 22px; height: 22px; flex: 0 0 22px; display: block; background: var(--ha-primary); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2M12 4C16.42 4 20 7.58 20 12C20 16.42 16.42 20 12 20C7.58 20 4 16.42 4 12C4 7.58 7.58 4 12 4M11 7V13L16.2 16.2L17.2 14.5L13 12V7H11Z'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2M12 4C16.42 4 20 7.58 20 12C20 16.42 16.42 20 12 20C7.58 20 4 16.42 4 12C4 7.58 7.58 4 12 4M11 7V13L16.2 16.2L17.2 14.5L13 12V7H11Z'/%3E%3C/svg%3E") center / contain no-repeat; }
+    .diagnostic-rtc-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 136px; }
+    .diagnostic-rtc-actions svg { width: 18px; height: 18px; fill: currentColor; }
+    .diagnostic-rtc-footer { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 18px; margin-top: 0; }
+    .diagnostic-rtc-card .diagnostic-led-note { margin: 0; text-align: right; }
+    .diagnostic-rtc-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
+    .diagnostic-rtc-row { display: grid; grid-template-columns: 22px minmax(90px, 1fr) minmax(138px, auto); align-items: center; gap: 10px; min-height: 48px; border: 0; border-radius: 0; padding: 8px 0; background: transparent; }
+    .diagnostic-rtc-icon { width: 22px; height: 22px; color: var(--ha-primary); fill: currentColor; }
+    .diagnostic-rtc-row:not(:last-child) { border-right: 1px solid var(--ha-row-border); padding-right: 18px; }
+    .diagnostic-rtc-row strong { min-width: 0; text-align: right; white-space: nowrap; }
+    .diagnostic-rtc-row span { display: block; min-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .diagnostic-rtc-error { min-height: 0; margin: 0; color: var(--ha-secondary); font-size: 13px; overflow-wrap: anywhere; }
     .buzzer-settings { display: grid; gap: 12px; }
     .buzzer-row { display: grid; grid-template-columns: minmax(100px, 150px) minmax(0, 1fr); align-items: center; gap: 14px; min-height: 40px; }
     .buzzer-row label,
@@ -1561,8 +1625,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     @media (max-width: 1300px) { .overview-panel { grid-template-columns: 1fr; } .overview-identity { border: 0; min-height: 260px; } }
     @media (max-width: 1100px) { .ports, .carrier-io-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .xport-group-toolbar, .xport-group-toolbar.config-hidden { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .xport-group-toolbar .bus-note, .xport-group-toolbar.config-hidden .bus-note { grid-column: 1 / -1; } .relay-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); } .rs485-layout { grid-template-columns: 1fr; } .rs485-capability-grid, .rs485-device-settings { grid-template-columns: repeat(2, minmax(130px, 1fr)); } .rs485-polling-strip { grid-template-columns: 1fr auto; } .rs485-io-head, .rs485-io-row { grid-template-columns: 52px minmax(150px, 1fr) minmax(150px, 1fr) minmax(180px, .9fr); } }
     @media (max-width: 900px) { .diagnostic-led-grid, .diagnostic-rtc-grid, .buzzer-panel { grid-template-columns: 1fr; } .buzzer-actions { grid-template-columns: repeat(2, minmax(120px, 1fr)); grid-template-rows: auto; } .buzzer-actions .buzzer-group-title { grid-column: 1 / -1; } }
-    @media (max-width: 620px) { body { padding: 10px; } .app-toolbar { justify-content: stretch; } .theme-switcher { width: 100%; justify-content: space-between; } .theme-choice { flex: 1; } .overview-identity { min-height: 260px; padding: 22px 18px; } .overview-wordmark { font-size: 22px; letter-spacing: .12em; } .overview-title-row { align-items: flex-start; flex-direction: column; gap: 14px; } .overview-title h1 { font-size: 34px; } .overview-title .subtitle { font-size: 16px; } .overview-facts { grid-template-columns: 88px minmax(0, 1fr); } .overview-facts dt, .overview-facts dd { font-size: 14px; } .overview-health { grid-template-columns: 1fr; gap: 18px; } .overview-health-item + .overview-health-item { border-left: 0; padding-left: 0; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+3), .overview-metric:nth-of-type(4) { border: 0; } .xport-panel { padding: 18px 14px; border-radius: 12px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .xport-group-toolbar, .xport-group-toolbar.config-hidden { grid-template-columns: 1fr; } .xport-group-toolbar .bus-note, .xport-group-toolbar.config-hidden .bus-note { grid-column: 1; } .ports, .carrier-io-grid, .relay-grid, .rs485-toolbar { grid-template-columns: 1fr; } .rs485-table-row, .rs485-table-row.scan, .rs485-table-row.configured { grid-template-columns: 1fr; align-items: stretch; } .rs485-device-summary { align-items: flex-start; flex-wrap: wrap; gap: 4px 10px; } .rs485-device-meta { flex-wrap: wrap; } .rs485-device-filters, .rs485-device-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } .rs485-row-actions { justify-content: flex-start; } .rs485-detail-head { flex-direction: column; } .rs485-device-identity { align-items: flex-start; } .rs485-detail-meta { position: static; flex-wrap: wrap; } .rs485-detail-last-seen { position: static; } .rs485-detail-actions { justify-content: flex-start; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-row { grid-template-columns: 1fr; gap: 6px; } }
+    @media (max-width: 620px) { body { padding: 10px; } .app-toolbar { justify-content: stretch; } .theme-switcher { width: 100%; justify-content: space-between; } .theme-choice { flex: 1; } .overview-identity { min-height: 260px; padding: 22px 18px; } .overview-wordmark { font-size: 22px; letter-spacing: .12em; } .overview-title-row { align-items: flex-start; flex-direction: column; gap: 14px; } .overview-title h1 { font-size: 34px; } .overview-title .subtitle { font-size: 16px; } .overview-facts { grid-template-columns: 88px minmax(0, 1fr); } .overview-facts dt, .overview-facts dd { font-size: 14px; } .overview-health { grid-template-columns: 1fr; gap: 18px; } .overview-health-item + .overview-health-item { border-left: 0; padding-left: 0; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+3), .overview-metric:nth-of-type(4) { border: 0; } .extension-panel:not(.overview-panel) { padding-left: 14px; padding-right: 14px; } #controls-section { padding: 18px 14px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .xport-group-toolbar, .xport-group-toolbar.config-hidden { grid-template-columns: 1fr; } .xport-group-toolbar .bus-note, .xport-group-toolbar.config-hidden .bus-note { grid-column: 1; } .ports, .carrier-io-grid, .relay-grid, .rs485-toolbar { grid-template-columns: 1fr; } .rs485-table-row, .rs485-table-row.scan, .rs485-table-row.configured { grid-template-columns: 1fr; align-items: stretch; } .rs485-device-summary { align-items: flex-start; flex-wrap: wrap; gap: 4px 10px; } .rs485-device-meta { flex-wrap: wrap; } .rs485-device-filters, .rs485-device-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } .rs485-row-actions { justify-content: flex-start; } .rs485-detail-head { flex-direction: column; } .rs485-device-identity { align-items: flex-start; } .rs485-detail-meta { position: static; flex-wrap: wrap; } .rs485-detail-last-seen { position: static; } .rs485-detail-actions { justify-content: flex-start; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-row { grid-template-columns: 1fr; gap: 6px; } }
     @media (max-width: 620px) { .global-nav .theme-switcher { width: auto; justify-content: initial; } .global-nav .theme-switcher span { display: none; } .global-nav .theme-choice { flex: 0 0 auto; } }
+    @media (max-width: 620px) { .global-nav button { min-height: 34px; padding: 6px 10px; font-size: 11px; } .global-nav > button[data-ui-nav-target] { min-width: 72px; } }
     @media (max-width: 620px) { .rs485-device-list-scroll { overflow-x: auto; } .rs485-device-list-head, .rs485-table-row.configured, .rs485-table-row.configured.discovered { min-width: 390px; grid-template-columns: var(--device-columns); align-items: center; } }
     @media (max-width: 620px) { .rs485-pagination button { min-width: 34px; width: 34px; padding: 0; font-size: 0; } .rs485-pagination button span { font-size: 20px; } }
   </style>
@@ -1630,26 +1695,22 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       </div>
       <div class="overview-metrics">
         <article class="overview-metric">
-          <div class="overview-metric-label"><svg class="overview-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 13V5A3 3 0 0 0 9 5V13A5 5 0 1 0 15 13M12 4A1 1 0 0 1 13 5V8H11V5A1 1 0 0 1 12 4Z"/></svg>Board Temp</div>
-          <div id="metric-board-temperature" class="overview-metric-value">--</div>
+          <div class="overview-metric-head"><div class="overview-metric-label"><svg class="overview-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 13V5A3 3 0 0 0 9 5V13A5 5 0 1 0 15 13M12 4A1 1 0 0 1 13 5V8H11V5A1 1 0 0 1 12 4Z"/></svg>Board Temp</div><div id="metric-board-temperature" class="overview-metric-value">--</div></div>
           <div id="metric-board-temperature-meta" class="overview-metric-meta">Loading</div>
           <svg class="overview-metric-chart" viewBox="0 0 400 140" role="img" aria-label="Demo metric history over 30 minutes"><path class="chart-grid" d="M48 26H388M48 68H388M48 110H388"/><path class="chart-area" d="M48.00 73.60L70.67 71.92L93.33 72.76L116.00 67.72L138.67 65.20L161.33 68.56L184.00 63.52L206.67 64.36L229.33 66.88L252.00 61.84L274.67 64.36L297.33 62.68L320.00 66.04L342.67 63.52L365.33 64.36L388.00 65.20V110H48Z"/><path class="chart-line" d="M48.00 73.60L70.67 71.92L93.33 72.76L116.00 67.72L138.67 65.20L161.33 68.56L184.00 63.52L206.67 64.36L229.33 66.88L252.00 61.84L274.67 64.36L297.33 62.68L320.00 66.04L342.67 63.52L365.33 64.36L388.00 65.20"/><circle class="chart-point" cx="388" cy="65.20" r="3"/><text x="0" y="30">38.0</text><text x="0" y="72">36.5</text><text x="0" y="114">35.0</text><text x="48" y="134">-30 min</text><text x="218" y="134" text-anchor="middle">-15 min</text><text x="388" y="134" text-anchor="end">Now</text></svg>
         </article>
         <article class="overview-metric">
-          <div class="overview-metric-label"><svg class="overview-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7,2H17L13.5,9H17L10,22V14H7V2M9,4V12H12V14.66L14,11H10.24L13.76,4H9Z"/></svg>+5 V Rail</div>
-          <div id="metric-5v" class="overview-metric-value">--</div>
+          <div class="overview-metric-head"><div class="overview-metric-label"><svg class="overview-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 9V11H22V9H2M2 13V15H7V13H2M9 13V15H15V13H9M17 13V15H22V13H17Z"/></svg>+5 V Rail</div><div id="metric-5v" class="overview-metric-value">--</div></div>
           <div id="metric-5v-meta" class="overview-metric-meta">Loading</div>
           <svg class="overview-metric-chart" viewBox="0 0 400 140" role="img" aria-label="Demo metric history over 30 minutes"><path class="chart-grid" d="M48 26H388M48 68H388M48 110H388"/><path class="chart-area" d="M48.00 70.80L70.67 69.12L93.33 69.96L116.00 64.92L138.67 62.40L161.33 65.76L184.00 60.72L206.67 61.56L229.33 64.08L252.00 59.04L274.67 61.56L297.33 59.88L320.00 63.24L342.67 60.72L365.33 61.56L388.00 62.40V110H48Z"/><path class="chart-line" d="M48.00 70.80L70.67 69.12L93.33 69.96L116.00 64.92L138.67 62.40L161.33 65.76L184.00 60.72L206.67 61.56L229.33 64.08L252.00 59.04L274.67 61.56L297.33 59.88L320.00 63.24L342.67 60.72L365.33 61.56L388.00 62.40"/><circle class="chart-point" cx="388" cy="62.40" r="3"/><text x="0" y="30">5.20</text><text x="0" y="72">5.05</text><text x="0" y="114">4.90</text><text x="48" y="134">-30 min</text><text x="218" y="134" text-anchor="middle">-15 min</text><text x="388" y="134" text-anchor="end">Now</text></svg>
         </article>
         <article class="overview-metric">
-          <div class="overview-metric-label"><svg class="overview-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7,2H17L13.5,9H17L10,22V14H7V2M9,4V12H12V14.66L14,11H10.24L13.76,4H9Z"/></svg>+3.3 V Rail</div>
-          <div id="metric-3v3" class="overview-metric-value">--</div>
+          <div class="overview-metric-head"><div class="overview-metric-label"><svg class="overview-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 9V11H22V9H2M2 13V15H7V13H2M9 13V15H15V13H9M17 13V15H22V13H17Z"/></svg>+3.3 V Rail</div><div id="metric-3v3" class="overview-metric-value">--</div></div>
           <div id="metric-3v3-meta" class="overview-metric-meta">Loading</div>
           <svg class="overview-metric-chart" viewBox="0 0 400 140" role="img" aria-label="Demo metric history over 30 minutes"><path class="chart-grid" d="M48 26H388M48 68H388M48 110H388"/><path class="chart-area" d="M48.00 76.40L70.67 74.72L93.33 75.56L116.00 70.52L138.67 68.00L161.33 71.36L184.00 66.32L206.67 67.16L229.33 69.68L252.00 64.64L274.67 67.16L297.33 65.48L320.00 68.84L342.67 66.32L365.33 67.16L388.00 68.00V110H48Z"/><path class="chart-line" d="M48.00 76.40L70.67 74.72L93.33 75.56L116.00 70.52L138.67 68.00L161.33 71.36L184.00 66.32L206.67 67.16L229.33 69.68L252.00 64.64L274.67 67.16L297.33 65.48L320.00 68.84L342.67 66.32L365.33 67.16L388.00 68.00"/><circle class="chart-point" cx="388" cy="68.00" r="3"/><text x="0" y="30">3.40</text><text x="0" y="72">3.30</text><text x="0" y="114">3.20</text><text x="48" y="134">-30 min</text><text x="218" y="134" text-anchor="middle">-15 min</text><text x="388" y="134" text-anchor="end">Now</text></svg>
         </article>
         <article class="overview-metric">
-          <div class="overview-metric-label"><svg class="overview-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 7V3H14V7H10V3H8V7C7 7 6 8 6 9V14.5L9.5 18V21H14.5V18L18 14.5V9C18 8 17 7 16 7M16 13.67L13.09 16.59L12.67 17H11.33L10.92 16.59L8 13.67V9.09C8 9.06 8.06 9 8.09 9H15.92C15.95 9 16 9.06 16 9.09V13.67Z"/></svg>Input Voltage</div>
-          <div id="metric-vin" class="overview-metric-value">--</div>
+          <div class="overview-metric-head"><div class="overview-metric-label"><svg class="overview-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 7V3H14V7H10V3H8V7C7 7 6 8 6 9V14.5L9.5 18V21H14.5V18L18 14.5V9C18 8 17 7 16 7M16 13.67L13.09 16.59L12.67 17H11.33L10.92 16.59L8 13.67V9.09C8 9.06 8.06 9 8.09 9H15.92C15.95 9 16 9.06 16 9.09V13.67Z"/></svg>Input Voltage</div><div id="metric-vin" class="overview-metric-value">--</div></div>
           <div id="metric-vin-meta" class="overview-metric-meta">Loading</div>
           <svg class="overview-metric-chart" viewBox="0 0 400 140" role="img" aria-label="Demo metric history over 30 minutes"><path class="chart-grid" d="M48 26H388M48 68H388M48 110H388"/><path class="chart-area" d="M48.00 76.40L70.67 74.72L93.33 75.56L116.00 70.52L138.67 68.00L161.33 71.36L184.00 66.32L206.67 67.16L229.33 69.68L252.00 64.64L274.67 67.16L297.33 65.48L320.00 68.84L342.67 66.32L365.33 67.16L388.00 68.00V110H48Z"/><path class="chart-line" d="M48.00 76.40L70.67 74.72L93.33 75.56L116.00 70.52L138.67 68.00L161.33 71.36L184.00 66.32L206.67 67.16L229.33 69.68L252.00 64.64L274.67 67.16L297.33 65.48L320.00 68.84L342.67 66.32L365.33 67.16L388.00 68.00"/><circle class="chart-point" cx="388" cy="68.00" r="3"/><text x="0" y="30">12.00</text><text x="0" y="72">11.50</text><text x="0" y="114">11.00</text><text x="48" y="134">-30 min</text><text x="218" y="134" text-anchor="middle">-15 min</text><text x="388" y="134" text-anchor="end">Now</text></svg>
         </article>
@@ -1659,7 +1720,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       <div class="module-row">
         <div>
           <div class="eyebrow">Optional Module</div>
-          <h1>X-PORT</h1>
+          <h1 class="xport-title"><svg class="xport-title-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4H18V5H21V7H18V9H21V11H18V13H21V15H18V17H21V19H18V20H6V19H3V17H6V15H3V13H6V11H3V9H6V7H3V5H6V4M11 15V18H12V15H11M13 15V18H14V15H13M15 15V18H16V15H15Z"/></svg>X-PORT</h1>
           <div class="subtitle">Multi-function expansion ports X1-X4</div>
           <div id="xport-status" class="status">X-PORT: loading...</div>
         </div>
@@ -1684,7 +1745,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       <div class="module-row">
         <div>
           <div class="eyebrow">Hardware Bus</div>
-          <h1>X-BUS</h1>
+          <h1 class="xbus-title"><svg class="xbus-title-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.92 19.92L4 12L11.92 4.08L13.33 5.5L7.83 11H22V13H7.83L13.34 18.5L11.92 19.92M4 12V2H2V22H4V12Z"/></svg>X-BUS</h1>
           <div class="subtitle">External expansion bus for xDO-8 / xDI-16 modules</div>
           <div id="extension-status" class="status">X-BUS: loading...</div>
         </div>
@@ -1696,7 +1757,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           <span class="metric">Bus power</span>
           <button id="extension-power-toggle" class="toggle" type="button" onclick="toggleExtensionPower()"><span>OFF</span></button>
         </div>
-        <button class="bus-action" onclick="scanExtensions()">Scan modules</button>
+        <button class="bus-action" onclick="scanExtensions()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 3A6.5 6.5 0 0 0 3 9.5C3 13.09 5.91 16 9.5 16C11.11 16 12.59 15.41 13.73 14.43L19.3 20L20.7 18.6L15.13 13.03A6.47 6.47 0 0 0 16 9.5A6.5 6.5 0 0 0 9.5 3M9.5 5C12 5 14 7 14 9.5S12 14 9.5 14 5 12 5 9.5 7 5 9.5 5Z"/></svg>Scan</button>
         <div class="bus-note">Power control: MCP23017 / I2C-10 / 0x20 / GPB7</div>
       </div>
       <div id="modules" class="modules"></div>
@@ -1706,7 +1767,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       <div class="module-row">
         <div>
           <div class="eyebrow">Interface</div>
-          <h1>RS-485</h1>
+          <h1 class="rs485-title"><svg class="rs485-title-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3H17V5H19V8H16V14H8V8H5V5H7V3M17 9H19V14H17V9M11 15H13V22H11V15M5 9H7V14H5V9Z"/></svg>RS-485</h1>
           <div class="subtitle">Template-driven Modbus RTU modules</div>
           <div id="rs485-status" class="status">RS-485: loading...</div>
         </div>
@@ -1828,7 +1889,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       <div class="module-row">
         <div>
           <div class="eyebrow">Interface</div>
-          <h1>1-WIRE</h1>
+          <h1 class="onewire-title"><svg class="onewire-title-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 13V5A3 3 0 0 0 9 5V13A5 5 0 1 0 15 13M12 4A1 1 0 0 1 13 5V8H11V5A1 1 0 0 1 12 4Z"/></svg>1-WIRE</h1>
           <div class="subtitle">DS2482S-100 bridges and DS18B20 sensors</div>
           <div id="onewire-status" class="status">1-WIRE: loading...</div>
         </div>
@@ -1840,8 +1901,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           <span class="metric">Bus power</span>
           <button id="onewire-power-toggle" class="toggle" type="button" onclick="toggleOneWirePower()"><span>OFF</span></button>
         </div>
-        <button class="bus-action" onclick="scanOneWire()">Scan sensors</button>
-        <button class="bus-action" onclick="refreshOneWire()">Refresh temperatures</button>
+        <button class="bus-action" onclick="scanOneWire()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 3A6.5 6.5 0 0 0 3 9.5C3 13.09 5.91 16 9.5 16C11.11 16 12.59 15.41 13.73 14.43L19.3 20L20.7 18.6L15.13 13.03A6.47 6.47 0 0 0 16 9.5A6.5 6.5 0 0 0 9.5 3M9.5 5C12 5 14 7 14 9.5S12 14 9.5 14 5 12 5 9.5 7 5 9.5 5Z"/></svg>Scan</button>
+        <button class="bus-action" onclick="refreshOneWire()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4C7.58 4 4 7.58 4 12S7.58 20 12 20C15.73 20 18.84 17.45 19.73 14H17.65C16.84 16.33 14.61 18 12 18C8.69 18 6 15.31 6 12S8.69 6 12 6C13.66 6 15.14 6.69 16.22 7.78L13 11H20V4L17.65 6.35Z"/></svg>Refresh</button>
         <div class="bus-note">Power control: MCP23017 / I2C-10 / 0x20 / GPB6</div>
       </div>
       <div id="onewire-modules" class="modules"></div>
@@ -1850,7 +1911,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       <div class="module-row">
         <div>
           <div class="eyebrow">Board Services</div>
-          <h1>FUNCTIONS</h1>
+          <h1 class="functions-title"><svg class="functions-title-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3.23V20.77C14 21.57 13.1 22.03 12.46 21.61L7.5 18H4C2.9 18 2 17.1 2 16V8C2 6.9 2.9 6 4 6H7.5L12.46 2.39C13.1 1.97 14 2.43 14 3.23M16 7.05V9.12C17.17 9.53 18 10.65 18 12C18 13.35 17.17 14.47 16 14.88V16.95C18.28 16.5 20 14.48 20 12C20 9.52 18.28 7.5 16 7.05M16 3V5.06C19.39 5.5 22 8.42 22 12C22 15.58 19.39 18.5 16 18.94V21C20.5 20.54 24 16.72 24 12C24 7.28 20.5 3.46 16 3Z"/></svg>FUNCTIONS</h1>
           <div class="subtitle">Onboard indicators and buzzer</div>
           <div id="buzzer-status" class="status" hidden aria-live="polite">BUZZER: loading...</div>
         </div>
@@ -1952,44 +2013,45 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       <div class="module-row">
         <div>
           <div class="eyebrow">Board Services</div>
-          <h1>RTC</h1>
+          <h1 class="rtc-title"><svg class="rtc-title-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2M12 4C16.42 4 20 7.58 20 12C20 16.42 16.42 20 12 20C7.58 20 4 16.42 4 12C4 7.58 7.58 4 12 4M11 7V13L16.2 16.2L17.2 14.5L13 12V7H11Z"/></svg>RTC</h1>
           <div class="subtitle">Real-time clock status and synchronization</div>
         </div>
         <div class="transport">HOST RTC</div>
       </div>
-      <div class="buzzer-group diagnostic-rtc-card">
-        <div class="buzzer-group-title">RTC Clock</div>
+      <div class="diagnostic-rtc-card">
         <div class="diagnostic-rtc-grid">
           <div class="diagnostic-rtc-row">
-            <span>RTC time</span>
+            <svg class="diagnostic-rtc-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2M12 4C16.42 4 20 7.58 20 12S16.42 20 12 20 4 16.42 4 12 7.58 4 12 4M11 7V13L16.2 16.2L17.2 14.5L13 12V7H11Z"/></svg><span>RTC time</span>
             <strong id="rtc-time">Not available</strong>
           </div>
           <div class="diagnostic-rtc-row">
-            <span>System time</span>
+            <svg class="diagnostic-rtc-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2M12 4C16.42 4 20 7.58 20 12S16.42 20 12 20 4 16.42 4 12 7.58 4 12 4M11 7V13L16.2 16.2L17.2 14.5L13 12V7H11Z"/></svg><span>System time</span>
             <strong id="rtc-system-time">Loading</strong>
           </div>
           <div class="diagnostic-rtc-row">
-            <span>Difference</span>
+            <svg class="diagnostic-rtc-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4V1L8 5L12 9V6C15.31 6 18 8.69 18 12C18 13.1 17.7 14.1 17.2 15L18.7 16.5C19.5 15.2 20 13.7 20 12C20 7.58 16.42 4 12 4M6 12C6 10.9 6.3 9.9 6.8 9L5.3 7.5C4.5 8.8 4 10.3 4 12C4 16.42 7.58 20 12 20V23L16 19L12 15V18C8.69 18 6 15.31 6 12Z"/></svg><span>Difference</span>
             <strong id="rtc-difference">Unknown</strong>
           </div>
           <div class="diagnostic-rtc-row">
-            <span>Status</span>
+            <svg class="diagnostic-rtc-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2M10 17L5 12L6.41 10.59L10 14.17L17.59 6.58L19 8L10 17Z"/></svg><span>Status</span>
             <strong id="rtc-status" class="state-text">PENDING</strong>
           </div>
         </div>
-        <div class="toolbar">
-          <button type="button" id="rtc-sync-button" onclick="syncRtc()">Sync RTC</button>
-          <button type="button" onclick="refreshRtc()">Refresh</button>
+        <div class="diagnostic-rtc-footer">
+          <div class="toolbar diagnostic-rtc-actions">
+          <button type="button" id="rtc-sync-button" onclick="syncRtc()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4V1L8 5L12 9V6C15.31 6 18 8.69 18 12C18 13.1 17.7 14.1 17.2 15L18.7 16.5C19.5 15.2 20 13.7 20 12C20 7.58 16.42 4 12 4M6 12C6 10.9 6.3 9.9 6.8 9L5.3 7.5C4.5 8.8 4 10.3 4 12C4 16.42 7.58 20 12 20V23L16 19L12 15V18C8.69 18 6 15.31 6 12Z"/></svg>Sync</button>
+          <button type="button" onclick="refreshRtc()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4C7.58 4 4 7.58 4 12S7.58 20 12 20C15.73 20 18.84 17.45 19.73 14H17.65C16.84 16.33 14.61 18 12 18C8.69 18 6 15.31 6 12S8.69 6 12 6C13.66 6 15.14 6.69 16.22 7.78L13 11H20V4L17.65 6.35Z"/></svg>Refresh</button>
+          </div>
+          <div class="diagnostic-led-note">RTC is handled by the host kernel driver. The add-on does not access the RTC I2C address directly.</div>
         </div>
         <div id="rtc-error" class="diagnostic-rtc-error"></div>
-        <div class="diagnostic-led-note">RTC is handled by the host kernel driver. The add-on does not access the RTC I2C address directly.</div>
       </div>
     </section>
     <section id="controls-section" class="extension-panel ui-nav-section">
       <div class="module-row">
         <div>
           <div class="eyebrow">Carrier Board I/O</div>
-          <h1>CONTROLS</h1>
+          <h1 class="controls-title"><svg class="controls-title-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7H18A5 5 0 0 1 23 12A5 5 0 0 1 18 17C16.36 17 14.91 16.21 14 15H10C9.09 16.21 7.64 17 6 17A5 5 0 0 1 1 12A5 5 0 0 1 6 7M19.75 9.5A1.25 1.25 0 0 0 18.5 10.75A1.25 1.25 0 0 0 19.75 12A1.25 1.25 0 0 0 21 10.75A1.25 1.25 0 0 0 19.75 9.5M17.25 12A1.25 1.25 0 0 0 16 13.25A1.25 1.25 0 0 0 17.25 14.5A1.25 1.25 0 0 0 18.5 13.25A1.25 1.25 0 0 0 17.25 12M5 9V11H3V13H5V15H7V13H9V11H7V9H5Z"/></svg>CONTROLS</h1>
           <div class="subtitle">MCP23017 controlled carrier outputs</div>
           <div id="carrier-io-status" class="status">CONTROLS: loading...</div>
         </div>
@@ -2001,7 +2063,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       <div class="module-row">
         <div>
           <div class="eyebrow">Service Tools</div>
-          <h1>TOOLS</h1>
+          <h1 class="tools-title"><svg class="tools-title-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M22.7 19L13.6 9.9C14.5 7.6 14 4.9 12.2 3.1C10.4 1.3 7.7 .8 5.4 1.7L9.2 5.5L5.5 9.2L1.7 5.4C.8 7.7 1.3 10.4 3.1 12.2C4.9 14 7.6 14.5 9.9 13.6L19 22.7C19.4 23.1 20 23.1 20.4 22.7L22.7 20.4C23.1 20 23.1 19.4 22.7 19M7.5 11C5 11 3 9 3 6.5C3 6 3.1 5.6 3.2 5.2L5.5 7.5L7.5 5.5L5.2 3.2C5.6 3.1 6 3 6.5 3C9 3 11 5 11 7.5C11 8.1 10.9 8.7 10.7 9.2L8.8 11.1C8.3 11 7.9 11 7.5 11Z"/></svg>TOOLS</h1>
           <div class="subtitle">Quick access to health, state, device discovery and I2C diagnostics.</div>
         </div>
         <div class="transport">REST</div>
@@ -2299,7 +2361,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       card.dataset.xportChannel = String(channel.channel);
       const title = document.createElement('div');
       title.className = 'port-title';
-      title.textContent = `X${channel.channel}`;
+      const titleText = document.createElement('span');
+      titleText.textContent = `X${channel.channel}`;
+      title.append(titleText);
       const label = document.createElement('label');
       label.textContent = 'Mode';
       const modeSelect = renderModeSelect(channel, modes);
@@ -2341,7 +2405,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         option.classList.toggle('active', option.dataset.mode === channel.desired_mode);
       });
       const activeValue = card.querySelector('.active-mode-value');
-      const confirmedLabel = locked ? groupChannelActiveLabel(groupMode, channel.channel) : labels[channel.confirmed_mode] || channel.confirmed_mode;
+      const isCounter = channel.confirmed_mode === 'PulseCounterExternalVoltage' || channel.confirmed_mode === 'PulseCounterInternalPullUp';
+      const confirmedLabel = locked ? groupChannelActiveLabel(groupMode, channel.channel) : isCounter ? 'Counter' : labels[channel.confirmed_mode] || channel.confirmed_mode;
       if (activeValue && activeValue.textContent !== confirmedLabel) {
         activeValue.textContent = confirmedLabel;
         activeValue.title = confirmedLabel;
@@ -2399,9 +2464,16 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         reset = document.createElement('button');
         reset.className = 'reset-button';
         reset.type = 'button';
+        reset.setAttribute('aria-label', 'Reset counter');
+        reset.title = 'Reset counter';
         reset.textContent = 'Reset';
         actionSlot.replaceChildren(reset);
       }
+      reset.className = 'reset-button';
+      reset.type = 'button';
+      reset.setAttribute('aria-label', 'Reset counter');
+      reset.title = 'Reset counter';
+      reset.textContent = 'Reset';
       reset.onclick = () => resetCounter(channel.channel);
     }
     async function setMode(channel, mode) {
@@ -2462,7 +2534,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     function renderModeBody(channel) {
       if (channel.error) { return readoutRow(channel.error, ''); }
       switch (channel.confirmed_mode) {
-        case 'AnalogInput': return readoutRow('Measured voltage', `${Number(channel.value || 0).toFixed(3)} V`);
+        case 'AnalogInput': return readoutRow('Measured voltage', `${Number(channel.value || 0).toFixed(3)} V`, 'voltage');
         case 'DigitalOutput': return digitalOutput(channel);
         case 'PwmOutput': return pwmOutput(channel);
         case 'DigitalInputExternalVoltage':
@@ -2472,9 +2544,10 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         default: return readoutRow('State', 'Disabled');
       }
     }
-    function readoutRow(label, value) {
+    function readoutRow(label, value, iconKind = 'state') {
       const row = document.createElement('div');
       row.className = 'xport-control-row readout';
+      row.prepend(xportControlIcon(iconKind));
       const labelEl = document.createElement('span');
       labelEl.textContent = label;
       const valueEl = document.createElement('strong');
@@ -2482,9 +2555,30 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       row.append(labelEl, valueEl);
       return row;
     }
+    function xportControlIcon(kind = 'state') {
+      const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      icon.classList.add('xport-control-icon');
+      icon.classList.add(kind);
+      icon.setAttribute('viewBox', '0 0 24 24');
+      icon.setAttribute('aria-hidden', 'true');
+      const paths = {
+        do: 'M1 11H3.17C3.58 9.83 4.69 9 6 9C6.65 9 7.25 9.21 7.74 9.56L14.44 4.87L15.58 6.5L8.89 11.2C8.96 11.45 9 11.72 9 12A3 3 0 0 1 6 15C4.69 15 3.58 14.17 3.17 13H1V11M23 11V13H20.83C20.42 14.17 19.31 15 18 15A3 3 0 0 1 15 12A3 3 0 0 1 18 9C19.31 9 20.42 9.83 20.83 11H23M6 11A1 1 0 0 0 5 12A1 1 0 0 0 6 13A1 1 0 0 0 7 12A1 1 0 0 0 6 11M18 11A1 1 0 0 0 17 12A1 1 0 0 0 18 13A1 1 0 0 0 19 12A1 1 0 0 0 18 11Z',
+        input: 'M1,11H3.17C3.58,9.83 4.69,9 6,9C6.65,9 7.25,9.21 7.74,9.56L14.44,4.87L15.58,6.5L8.89,11.2C8.96,11.45 9,11.72 9,12A3,3 0 0,1 6,15C4.69,15 3.58,14.17 3.17,13H1V11M23,11V13H20.83C20.42,14.17 19.31,15 18,15A3,3 0 0,1 15,12A3,3 0 0,1 18,9C19.31,9 20.42,9.83 20.83,11H23M6,11A1,1 0 0,0 5,12A1,1 0 0,0 6,13A1,1 0 0,0 7,12A1,1 0 0,0 6,11M18,11A1,1 0 0,0 17,12A1,1 0 0,0 18,13A1,1 0 0,0 19,12A1,1 0 0,0 18,11Z',
+        relay: 'M4 4H20V6H4V4M4 18H20V20H4V18M6 8H8V16H6V8M16 8H18V16H16V8M10 10H14V14H10V10Z',
+        pwm: 'M2 2V12H4V4H11V22H22V12H20V20H13V2H2Z',
+        voltage: 'M3 12C3 12 6 4 9 4C12 4 12 20 15 20C18 20 21 12 21 12',
+        counter: 'M12 20a8 8 0 1 0 0-16 8 8 0 0 0 0 16M12 8v4l3 2',
+        state: 'M17 6H7C3.69 6 1 8.69 1 12S3.69 18 7 18H17C20.31 18 23 15.31 23 12S20.31 6 17 6M17 16H7C4.79 16 3 14.21 3 12S4.79 8 7 8H17C19.21 8 21 9.79 21 12S19.21 16 17 16M17 9C15.34 9 14 10.34 14 12S15.34 15 17 15 20 13.66 20 12 18.66 9 17 9Z'
+      };
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', paths[kind] || paths.state);
+      icon.append(path);
+      return icon;
+    }
     function renderLockedXPortBody(channel, groupMode) {
       const wrap = document.createElement('div');
       wrap.className = 'xport-control-row pwm';
+      wrap.prepend(xportControlIcon('pwm'));
       if (linkedWhiteChannels(groupMode, channel.channel).length > 1) {
         wrap.dataset.xportLinkedWhite = 'true';
         wrap.dataset.xportChannel = String(channel.channel);
@@ -2506,6 +2600,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     function digitalOutput(channel) {
       const row = document.createElement('div');
       row.className = 'xport-control-row';
+      row.prepend(xportControlIcon('do'));
       const value = Number(channel.value || 0) > 0;
       const label = document.createElement('span');
       label.textContent = 'Discrete output';
@@ -2523,23 +2618,25 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     function digitalInput(channel) {
       const row = document.createElement('div');
       row.className = 'xport-control-row';
+      row.prepend(xportControlIcon('input'));
       const value = Boolean(channel.value);
       const label = document.createElement('span');
       label.textContent = 'Input';
       const state = document.createElement('span');
       state.className = `state-text ${value ? 'on' : ''}`;
-      state.textContent = value ? 'CLOSED' : 'OPEN';
+      state.textContent = value ? 'ON' : 'OFF';
       const indicator = document.createElement('button');
       indicator.className = `toggle readonly ${value ? 'on' : ''}`;
       indicator.type = 'button';
       indicator.tabIndex = -1;
-      indicator.innerHTML = `<span>${value ? 'CLOSED' : 'OPEN'}</span>`;
+      indicator.innerHTML = `<span>${value ? 'ON' : 'OFF'}</span>`;
       row.append(label, state, indicator);
       return row;
     }
     function pwmOutput(channel) {
       const wrap = document.createElement('div');
       wrap.className = 'xport-control-row pwm';
+      wrap.prepend(xportControlIcon('pwm'));
       const percent = Math.round(Number(channel.value || 0) * 100);
       const label = document.createElement('span');
       label.textContent = 'PWM';
@@ -2557,6 +2654,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     function counterOutput(channel) {
       const row = document.createElement('div');
       row.className = 'xport-control-row readout';
+      row.prepend(xportControlIcon('counter'));
       const label = document.createElement('span');
       label.textContent = 'Counted pulses';
       const value = document.createElement('strong');
@@ -2910,6 +3008,54 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       }
       return result;
     }
+    function carrierControlIcon(kind = 'output') {
+      const paths = {
+        chip: 'M6 4H18V5H21V7H18V9H21V11H18V13H21V15H18V17H21V19H18V20H6V19H3V17H6V15H3V13H6V11H3V9H6V7H3V5H6V4M11 15V18H12V15H11M13 15V18H14V15H13M15 15V18H16V15H15Z',
+        flash: 'M13 2L4 13H11L10 22L20 10H13L13 2Z',
+        reset: 'M12 4C14.1 4 16.1 4.8 17.6 6.3C20.7 9.4 20.7 14.5 17.6 17.6C15.8 19.5 13.3 20.2 10.9 19.9L11.4 17.9C13.1 18.1 14.9 17.5 16.2 16.2C18.5 13.9 18.5 10.1 16.2 7.7C15.1 6.6 13.5 6 12 6V10.6L7 5.6L12 0.6V4M6.3 17.6C3.7 15 3.3 11 5.1 7.9L6.6 9.4C5.5 11.6 5.9 14.4 7.8 16.2C8.3 16.7 8.9 17.1 9.6 17.4L9 19.4C8 19 7.1 18.4 6.3 17.6Z',
+        serial: 'M4 2H20C21.1 2 22 2.9 22 4V16C22 17.1 21.1 18 20 18H13V20H15V22H9V20H11V18H4C2.9 18 2 17.1 2 16V4C2 2.9 2.9 2 4 2M4 4V16H20V4H4M6 6H8V8H6V6M10 6H12V8H10V6M14 6H16V8H14V6M6 10H8V12H6V10M10 10H12V12H10V10M14 10H16V12H14V10M6 14H8V16H6V14M10 14H12V16H10V14M14 14H16V16H14V14Z',
+        'serial-port': 'M7 3H17V5H19V8H16V14H8V8H5V5H7V3M17 9H19V14H17V9M11 15H13V22H11V15M5 9H7V14H5V9Z',
+        resistor: 'M2 11H7L10.07 15.35L13.11 4L18 11H22V13H17L13.93 8.65L10.89 20L6 13H2V11Z',
+        'arrow-right': 'M4 11V13H16L10.5 18.5L11.92 19.92L19.84 12L11.92 4.08L10.5 5.5L16 11H4Z',
+        power: 'M13 3H11V13H13V3M17.83 5.17L16.42 6.58C17.82 7.99 18.5 9.93 18.5 12C18.5 15.59 15.59 18.5 12 18.5S5.5 15.59 5.5 12C5.5 9.93 6.18 7.99 7.58 6.58L6.17 5.17C4.41 6.93 3.5 9.3 3.5 12C3.5 16.69 7.31 20.5 12 20.5S20.5 16.69 20.5 12C20.5 9.3 19.59 6.93 17.83 5.17Z',
+        'button-pointer': 'M20 20.5C20 21.3 19.3 22 18.5 22H13C12.6 22 12.3 21.9 12 21.6L8 17.4L8.7 16.6C8.9 16.4 9.2 16.3 9.5 16.3H9.7L12 18V9C12 8.4 12.4 8 13 8S14 8.4 14 9V13.5L15.2 13.6L19.1 15.8C19.6 16 20 16.6 20 17.1V20.5M20 2H4C2.9 2 2 2.9 2 4V12C2 13.1 2.9 14 4 14H8V12H4V4H20V12H18V14H20C21.1 14 22 13.1 22 12V4C22 2.9 21.1 2 20 2Z',
+        'arrow-left': 'M20 11V13H8L13.5 18.5L12.08 19.92L4.16 12L12.08 4.08L13.5 5.5L8 11H20Z',
+        lightbulb: 'M12 2A7 7 0 0 0 5 9C5 11.38 6.19 13.47 8 14.74V17A1 1 0 0 0 9 18H15A1 1 0 0 0 16 17V14.74C17.81 13.47 19 11.38 19 9A7 7 0 0 0 12 2M9 21A1 1 0 0 0 10 22H14A1 1 0 0 0 15 21V20H9V21Z',
+        usb: 'M15,7V11H16V13H13V5H15L12,1L9,5H11V13H8V10.93C8.7,10.56 9.2,9.85 9.2,9C9.2,7.78 8.21,6.8 7,6.8C5.78,6.8 4.8,7.78 4.8,9C4.8,9.85 5.3,10.56 6,10.93V13A2,2 0 0,0 8,15H11V18.05C10.29,18.41 9.8,19.15 9.8,20A2.2,2.2 0 0,0 12,22.2A2.2,2.2 0 0,0 14.2,20C14.2,19.15 13.71,18.41 13,18.05V15H16A2,2 0 0,0 18,13V11H19V7H15Z',
+        input: 'M4 4H8V6H6V18H8V20H4V4M20 4V20H16V18H18V6H16V4H20M9 11H15V8L19 12L15 16V13H9V11Z',
+        output: 'M20 4H16V6H18V18H16V20H20V4M4 4V20H8V18H6V6H8V4H4M9 11H15V8L19 12L15 16V13H9V11Z',
+        led: 'M12 2A6 6 0 0 0 6 8C6 10.2 7.2 11.5 8 13V16H16V13C16.8 11.5 18 10.2 18 8A6 6 0 0 0 12 2M8 18H16V20H8V18Z'
+      };
+      if (paths[kind]) {
+        const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        icon.setAttribute('viewBox', '0 0 24 24');
+        icon.setAttribute('aria-hidden', 'true');
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', paths[kind]);
+        icon.append(path);
+        icon.classList.add('carrier-control-icon');
+        icon.classList.add(kind);
+        return icon;
+      }
+      const icon = xportControlIcon(kind === 'reset' ? 'counter' : kind === 'input' ? 'input' : 'do');
+      icon.classList.add('carrier-control-icon');
+      return icon;
+    }
+    function carrierTitle(card, label, kind = 'output', detail = '') {
+      const title = document.createElement('div');
+      title.className = 'carrier-io-title';
+      title.append(carrierControlIcon(kind));
+      const text = document.createElement('span');
+      text.className = 'carrier-title-text';
+      text.textContent = label;
+      title.append(text);
+      if (detail) {
+        const small = document.createElement('small');
+        small.textContent = detail;
+        title.append(small);
+      }
+      card.appendChild(title);
+    }
     async function renderCarrierIO() {
       const output = document.getElementById('output');
       try {
@@ -2929,10 +3075,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       root.innerHTML = '';
     const hostOutputCard = document.createElement('article');
       hostOutputCard.className = 'carrier-io-card carrier-io-host-outputs host-outputs';
-      const hostOutputTitle = document.createElement('div');
-      hostOutputTitle.className = 'carrier-io-title';
-      hostOutputTitle.textContent = 'Host Outputs';
-      hostOutputCard.appendChild(hostOutputTitle);
+      carrierTitle(hostOutputCard, 'Host Outputs', 'arrow-left');
       for (const outputId of hostOutputOrder) {
         const item = hostOutputs[outputId] || { id: outputId, name: outputId, on: false };
         hostOutputCard.appendChild(hostOutputRow(item));
@@ -2940,10 +3083,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       root.appendChild(hostOutputCard);
       const hostInputCard = document.createElement('article');
       hostInputCard.className = 'carrier-io-card host-inputs';
-      const hostInputTitle = document.createElement('div');
-      hostInputTitle.className = 'carrier-io-title';
-      hostInputTitle.innerHTML = '<span>Host Inputs</span><small>Digital inputs</small>';
-      hostInputCard.appendChild(hostInputTitle);
+      carrierTitle(hostInputCard, 'Host Inputs', 'arrow-right', 'Digital inputs');
       for (const buttonId of hostButtonOrder) {
         const item = hostButtons[buttonId] || { id: buttonId, name: buttonId.toUpperCase(), pressed: false };
         hostInputCard.appendChild(hostButtonRow(item));
@@ -2952,14 +3092,11 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       for (const group of carrierGroups) {
         const card = document.createElement('article');
         card.className = `carrier-io-card ${group.title === 'RS-485' ? 'rs485-group' : group.title === 'X-Mod1' ? 'xmod1-group' : group.title === 'X-Mod2' ? 'xmod2-group' : group.title === 'USB' ? 'usb-group' : ''}`;
-        const title = document.createElement('div');
-        title.className = 'carrier-io-title';
-        title.textContent = group.title;
-        card.appendChild(title);
+        carrierTitle(card, group.title, group.title === 'USB' ? 'usb' : group.title === 'RS-485' ? 'serial-port' : 'chip');
         for (const outputId of group.outputs) {
           const item = byId[outputId] || { id: outputId, name: outputId, on: false };
           const row = document.createElement('div');
-          row.className = 'carrier-io-row';
+          row.className = `carrier-io-row ${String(item.name || '').toLowerCase().includes('reset') ? 'reset' : ''}`;
           row.dataset.carrierOutputId = item.id;
           const label = document.createElement('span');
           label.textContent = carrierGroupItemLabel(group.title, item.name);
@@ -2972,7 +3109,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           toggle.disabled = !online;
           toggle.innerHTML = `<span>${item.on ? 'ON' : 'OFF'}</span>`;
           toggle.onclick = () => setCarrierOutput(item.id, !item.on);
-          row.append(label, state, toggle);
+          const rowIcon = group.title === 'USB' ? 'usb' : group.title === 'RS-485' ? 'resistor' : String(item.name || '').toLowerCase().includes('reset') ? 'reset' : 'flash';
+          row.append(carrierControlIcon(rowIcon), label, state, Object.assign(document.createElement('span'), { className: 'carrier-control-divider' }), toggle);
           card.appendChild(row);
         }
         root.appendChild(card);
@@ -2984,7 +3122,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     function hostOutputRow(item) {
       const row = document.createElement('div');
-      row.className = 'carrier-io-row';
+      row.className = `carrier-io-row ${String(item.name || '').toLowerCase().includes('reset') ? 'reset' : ''}`;
       row.dataset.hostOutputId = item.id;
       const label = document.createElement('span');
       label.textContent = item.name;
@@ -2996,12 +3134,12 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       toggle.type = 'button';
       toggle.innerHTML = `<span>${item.on ? 'ON' : 'OFF'}</span>`;
       toggle.onclick = () => setHostOutput(item.id, !item.on);
-      row.append(label, state, toggle);
+      row.append(carrierControlIcon('lightbulb'), label, state, Object.assign(document.createElement('span'), { className: 'carrier-control-divider' }), toggle);
       return row;
     }
     function hostButtonRow(item) {
       const row = document.createElement('div');
-      row.className = 'carrier-io-row';
+      row.className = 'carrier-io-row input';
       row.dataset.hostButtonId = item.id;
       const label = document.createElement('span');
       label.textContent = item.name;
@@ -3013,7 +3151,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       indicator.type = 'button';
       indicator.disabled = true;
       indicator.innerHTML = `<span>${item.pressed ? 'ON' : 'OFF'}</span>`;
-      row.append(label, state, indicator);
+        const inputIcon = String(item.name || '').toLowerCase() === 'power' ? 'power' : ['fn1', 'fn2'].includes(String(item.name || '').toLowerCase()) ? 'button-pointer' : 'input';
+        row.append(carrierControlIcon(inputIcon), label, state, Object.assign(document.createElement('span'), { className: 'carrier-control-divider' }), indicator);
       return row;
     }
     function patchControlRow(attribute, id, active, action) {
@@ -3098,6 +3237,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         const card = document.createElement('article');
         card.className = 'module-card';
         card.dataset.moduleId = module.id;
+        card.dataset.moduleKind = module.kind;
         const title = document.createElement('div');
         title.className = 'module-title';
         title.textContent = module.name;
@@ -3107,16 +3247,18 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         const isRelayModule = module.kind === 'relay_output';
         const grid = document.createElement('div');
         grid.className = 'relay-grid';
-        meta.textContent = `X-BUS - I2C-${module.bus} - Address ${module.address} - ${module.chip} - ${module.channels} ${isInputModule ? 'digital inputs' : 'relays'}`;
+        meta.textContent = `X-BUS - I2C-${module.bus} - Address ${module.address} - ${module.chip} - ${module.channels} ${isInputModule ? 'digital inputs' : isRelayModule ? 'digital outputs' : 'channels'}`;
         const text = document.createElement('div');
         text.append(title, meta);
         const status = document.createElement('div');
-        status.className = `status-pill ${module.available && powerOn ? '' : 'offline'}`;
-        status.textContent = module.available && powerOn ? 'Online' : 'Offline';
+        status.className = `rs485-detail-status ${module.available && powerOn ? '' : 'offline'}`;
+        status.textContent = module.available && powerOn ? 'ONLINE' : 'OFFLINE';
         const remove = document.createElement('button');
         remove.className = 'danger-button';
         remove.type = 'button';
-        remove.textContent = 'Remove';
+        remove.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19C6 20.1 6.9 21 8 21H16C17.1 21 18 20.1 18 19V7H6V19M8 9H16V19H8V9M15.5 4L14.5 3H9.5L8.5 4H5V6H19V4H15.5Z"/></svg>';
+        remove.title = 'Remove module';
+        remove.setAttribute('aria-label', 'Remove module');
         remove.onclick = () => removeExtensionModule(module.id);
         const actions = document.createElement('div');
         actions.className = 'module-actions';
@@ -3128,8 +3270,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         (module.relays || []).forEach((on, index) => {
           const row = document.createElement('div');
           row.className = 'relay-row';
+          const icon = xportControlIcon('input');
           const label = document.createElement('span');
-          label.textContent = `Relay ${index + 1}`;
+          label.textContent = `${index + 1}`;
           const state = document.createElement('span');
           state.className = `state-text ${on ? 'on' : ''}`;
           state.textContent = on ? 'ON' : 'OFF';
@@ -3139,15 +3282,18 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           toggle.innerHTML = `<span>${on ? 'ON' : 'OFF'}</span>`;
           toggle.disabled = !powerOn || !module.available;
           toggle.onclick = () => setExtensionRelay(module.id, index + 1, !on);
-          row.append(label, state, toggle);
+          const divider = document.createElement('span');
+          divider.className = 'control-divider';
+          row.append(icon, label, state, divider, toggle);
           grid.appendChild(row);
         });
         } else if (isInputModule) {
         (module.inputs || []).forEach((active, index) => {
           const row = document.createElement('div');
           row.className = 'relay-row';
+          const icon = xportControlIcon('input');
           const label = document.createElement('span');
-          label.textContent = `DI ${index + 1}`;
+          label.textContent = `${index + 1}`;
           const state = document.createElement('span');
           state.className = `state-text ${active ? 'on' : ''}`;
           state.textContent = active ? 'ON' : 'OFF';
@@ -3156,7 +3302,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           indicator.type = 'button';
           indicator.disabled = true;
           indicator.innerHTML = `<span>${active ? 'ON' : 'OFF'}</span>`;
-          row.append(label, state, indicator);
+          const divider = document.createElement('span');
+          divider.className = 'control-divider';
+          row.append(icon, label, state, divider, indicator);
           grid.appendChild(row);
         });
         }
@@ -3222,7 +3370,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         const online = Boolean(module.available && payload.power.on);
         const status = card.querySelector('.status-pill');
         status.classList.toggle('offline', !online);
-        status.textContent = online ? 'Online' : 'Offline';
+        status.textContent = online ? 'ONLINE' : 'OFFLINE';
         const values = module.kind === 'relay_output' ? module.relays : module.inputs;
         const rows = card.querySelectorAll('.relay-row');
         if (!Array.isArray(values) || rows.length !== values.length) {
@@ -5412,7 +5560,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       if (!value) return 'Not available';
       const date = new Date(value);
       if (Number.isNaN(date.getTime())) return value;
-      return date.toLocaleString();
+      return date.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
     }
     function paintRtcStatus(payload) {
       const systemTime = document.getElementById('rtc-system-time');
@@ -5516,20 +5664,21 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       frequencyNode.textContent = `${frequency} Hz`;
       durationNode.textContent = `${duration} ms`;
       volumeNode.textContent = `${volume}%`;
-      const activeWidth = 600 * duration / 1000;
+      const signalStart = 3;
+      const activeWidth = Math.min(600 - signalStart, 600 * duration / 1000);
       const actualCycles = frequency * duration / 1000;
       const baseCycles = Math.max(1, Math.min(18, Math.round(18 * Math.log1p(actualCycles) / Math.log1p(2800))));
       const frequencyRatio = Math.max(0, Math.min(1, (frequency - 300) / (2800 - 300)));
       const cycles = Math.max(1, Math.round(baseCycles * (0.5 + frequencyRatio * 0.5)));
       const baseline = 118;
       const peakY = baseline - volume * 1.16;
-      const points = [`M0 ${baseline}`];
+      const points = [`M0 ${baseline}`, `L${signalStart} ${baseline}`];
       const cycleWidth = activeWidth / cycles;
       if (volume > 0 && activeWidth > 0) {
         for (let index = 0; index < cycles; index += 1) {
-          const start = index * cycleWidth;
+          const start = signalStart + index * cycleWidth;
           const middle = start + cycleWidth / 2;
-          const end = (index + 1) * cycleWidth;
+          const end = signalStart + (index + 1) * cycleWidth;
           points.push(`L${start.toFixed(1)} ${peakY.toFixed(1)}`);
           points.push(`L${middle.toFixed(1)} ${peakY.toFixed(1)}`);
           points.push(`L${middle.toFixed(1)} ${baseline}`);

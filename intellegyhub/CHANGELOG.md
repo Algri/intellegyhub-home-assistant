@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.227
+
+- Refined dashboard icon mapping and X-Port controls.
+- Reworked overview metric cards with block-based layout and bounded values.
+- Added exact MDI icons for service sections, rails, and counter controls.
+
 ## 0.5.226
 
 - Refine the Overview dashboard grid, spacing, branding scale, divider alignment, and metric status icons.
