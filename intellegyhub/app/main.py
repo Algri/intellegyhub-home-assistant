@@ -256,7 +256,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.221 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.222 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -311,7 +311,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.221", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.222", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -1330,6 +1330,24 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       min-width: 0;
     }
     .modules { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 18px; }
+    #onewire-modules { gap: 18px; }
+    .onewire-group { display: grid; gap: 8px; }
+    .onewire-group-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; color: var(--ha-text); font-size: 14px; font-weight: 800; }
+    .onewire-group-title small { color: var(--ha-secondary); font-size: 11px; font-weight: 700; }
+    .onewire-device-list { display: grid; gap: 8px; }
+    .onewire-device-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 14px; min-height: 48px; padding: 8px 12px; border: 1px solid var(--ha-row-border); border-radius: 8px; background: var(--ha-row); }
+    .onewire-bridge-row { grid-template-columns: minmax(0, 1fr) auto; }
+    .onewire-device-main { display: flex; min-width: 0; align-items: baseline; gap: 12px; }
+    .onewire-device-name { display: block; overflow: hidden; color: var(--ha-text); font-size: 14px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+    .onewire-device-meta { display: block; min-width: 0; margin-top: 0; overflow: hidden; color: var(--ha-secondary); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+    .onewire-device-value { color: var(--ha-text); font-size: 14px; font-variant-numeric: tabular-nums; font-weight: 800; white-space: nowrap; }
+    .onewire-device-action { display: inline-flex; align-items: center; justify-content: center; width: auto; min-width: 58px; height: 34px; min-height: 34px; padding: 6px 12px; border-radius: 7px; font-size: 12px; line-height: 1; }
+    .onewire-device-action.danger-button { min-width: 68px; color: var(--ha-danger-text); font-size: 12px; }
+    @media (max-width: 620px) {
+      .onewire-device-main { align-items: flex-start; flex-direction: column; gap: 3px; }
+      .onewire-device-meta { width: 100%; }
+      .onewire-device-row { grid-template-columns: minmax(0, 1fr) auto; }
+    }
     .module-card { border: 1px solid var(--ha-card-border); border-radius: 12px; background: var(--ha-surface); padding: 18px; }
     .module-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; margin-bottom: 18px; }
     .module-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
@@ -1376,7 +1394,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .carrier-io-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .buzzer-panel {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 260px;
+      grid-template-columns: minmax(0, 1.15fr) minmax(360px, .85fr);
       gap: 16px;
       margin-top: 18px;
       align-items: stretch;
@@ -1384,6 +1402,37 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     .buzzer-group { border: 1px solid var(--ha-card-border); border-radius: 10px; background: var(--ha-surface); padding: 16px; min-width: 0; }
     .buzzer-group-title { color: var(--ha-secondary); font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 14px; }
+    .buzzer-preview { display: grid; grid-template-rows: auto 1fr auto; gap: 12px; }
+    .buzzer-preview-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; min-width: 0; }
+    .buzzer-preview-head .buzzer-group-title { display: inline-flex; align-items: center; justify-content: flex-start; gap: 9px; min-width: 0; margin: 0; }
+    .buzzer-preview-icon { display: inline-flex; width: 18px; height: 18px; flex: 0 0 18px; align-items: center; justify-content: center; color: var(--ha-primary); }
+    .buzzer-preview-icon svg { display: block; width: 18px; height: 18px; fill: currentColor; }
+    .buzzer-preview-state { display: inline-flex; align-items: center; gap: 8px; color: var(--ha-secondary); font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .buzzer-preview-state::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--ha-secondary); }
+    .buzzer-preview-state.playing { color: var(--ha-primary); }
+    .buzzer-preview-state.playing::before { background: var(--ha-primary); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ha-primary) 18%, transparent); }
+    .buzzer-wave-wrap { display: grid; grid-template-columns: 38px minmax(0, 1fr); grid-template-rows: 132px 14px; column-gap: 8px; row-gap: 4px; align-items: stretch; min-height: 150px; }
+    .buzzer-wave-scale { grid-column: 1; grid-row: 1; display: flex; flex-direction: column; justify-content: space-between; padding: 3px 0; color: var(--ha-secondary); font-family: ui-monospace, Consolas, monospace; font-size: 10px; text-align: right; }
+    .buzzer-wave-plot { position: relative; grid-column: 2; grid-row: 1; min-width: 0; }
+    .buzzer-wave { display: block; width: 100%; height: 132px; overflow: hidden; border: 1px solid var(--ha-row-border); border-radius: 7px; background-color: var(--ha-field); background-image: linear-gradient(to right, color-mix(in srgb, var(--ha-secondary) 15%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in srgb, var(--ha-secondary) 15%, transparent) 1px, transparent 1px); background-size: 25px 100%, 100% 22px; }
+    .buzzer-wave path { fill: none; stroke: var(--ha-primary); stroke-width: 2.5; vector-effect: non-scaling-stroke; }
+    .buzzer-wave .buzzer-wave-center { stroke: color-mix(in srgb, var(--ha-secondary) 40%, transparent); stroke-width: 1; stroke-dasharray: 4 5; }
+    .buzzer-wave-playhead { position: absolute; top: 1px; bottom: 1px; left: 0; width: 2px; background: var(--ha-primary); opacity: 0; pointer-events: none; }
+    .buzzer-preview.playing .buzzer-wave-playhead { opacity: .9; animation: buzzer-playhead var(--buzzer-duration, .3s) linear 1 forwards; }
+    @keyframes buzzer-playhead { to { left: var(--buzzer-playhead-end, 100%); opacity: 0; } }
+    .buzzer-wave-time { grid-column: 2; grid-row: 2; display: flex; justify-content: space-between; color: var(--ha-secondary); font-family: ui-monospace, Consolas, monospace; font-size: 9px; }
+    .buzzer-preview-bottom { display: grid; grid-template-columns: repeat(3, minmax(60px, 1fr)) auto auto; gap: 10px; align-items: end; }
+    .buzzer-preview-metric { display: grid; gap: 4px; min-width: 0; }
+    .buzzer-preview-metric span { color: var(--ha-secondary); font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+    .buzzer-preview-metric strong { color: var(--ha-text); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .buzzer-preview-play, .buzzer-preview-stop { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 92px; min-width: 92px; min-height: 40px; padding: 8px 11px; white-space: nowrap; }
+    .buzzer-preview-play { background: var(--ha-primary) !important; color: #fff !important; }
+    .buzzer-preview-play::before, .buzzer-preview-stop::before { content: ''; display: inline-block; width: 12px; height: 12px; flex: 0 0 12px; background-color: currentColor; }
+    .buzzer-preview-play::before { clip-path: polygon(18% 8%, 92% 50%, 18% 92%); }
+    .buzzer-preview-stop::before { clip-path: inset(18%); }
+    .buzzer-preview-stop:disabled { opacity: .48; cursor: default; }
+    @media (max-width: 1100px) { .buzzer-preview-bottom { grid-template-columns: repeat(3, minmax(60px, 1fr)); } .buzzer-preview-play, .buzzer-preview-stop { grid-row: 2; } }
+    @media (max-width: 620px) { .buzzer-panel { grid-template-columns: minmax(0, 1fr); } .buzzer-row { grid-template-columns: minmax(80px, 1fr); gap: 2px; } .buzzer-preview-bottom { grid-template-columns: repeat(2, minmax(0, 1fr)); } .buzzer-preview-metric { min-height: 38px; } .buzzer-preview-play, .buzzer-preview-stop { width: 100%; } .buzzer-wave-wrap { grid-template-rows: 110px 14px; min-height: 128px; } .buzzer-wave, .buzzer-wave-plot { height: 110px; } }
     .diagnostic-led-grid { display: grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 16px; margin-top: 18px; }
     .diagnostic-led-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; min-height: 42px; border: 1px solid var(--ha-row-border); border-radius: 8px; padding: 8px 10px; background: var(--ha-row); }
     .diagnostic-led-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1396,7 +1445,11 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .buzzer-settings { display: grid; gap: 12px; }
     .buzzer-row { display: grid; grid-template-columns: minmax(100px, 150px) minmax(0, 1fr); align-items: center; gap: 14px; min-height: 40px; }
     .buzzer-row label,
-    .buzzer-volume-label { color: var(--ha-text); font-size: 13px; font-weight: 700; }
+    .buzzer-volume-label { display: inline-flex; align-items: center; gap: 10px; color: var(--ha-text); font-size: 13px; font-weight: 700; }
+    .buzzer-volume-control input[type="range"]:focus,
+    .buzzer-volume-control input[type="range"]:focus-visible { outline: none; box-shadow: none; }
+    .buzzer-row label svg,
+    .buzzer-volume-label svg { width: 22px; height: 22px; flex: 0 0 22px; color: var(--ha-primary); stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; }
     .buzzer-input-wrap { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; }
     .buzzer-input-wrap span { color: var(--ha-secondary); font-size: 12px; font-weight: 800; min-width: 26px; }
     .buzzer-field input { width: 100%; height: 38px; border: 1px solid var(--ha-row-border); border-radius: 8px; background: var(--ha-field); color: var(--ha-text); padding: 0 10px; font-weight: 600; }
@@ -1763,49 +1816,68 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         <div>
           <div class="eyebrow">Board Services</div>
           <h1>FUNCTIONS</h1>
-          <div class="subtitle">Onboard status indicators and GPIO18 hardware PWM test</div>
-          <div id="buzzer-status" class="status">BUZZER: loading...</div>
+          <div class="subtitle">Onboard indicators and buzzer</div>
+          <div id="buzzer-status" class="status" hidden aria-live="polite">BUZZER: loading...</div>
         </div>
-        <div class="transport">GPIO18 / GPIO19 / GPIO21</div>
+        <div class="transport">GPIO</div>
       </div>
-      <div id="buzzer-detail" class="buzzer-status"></div>
+      <div id="buzzer-detail" class="buzzer-status" hidden aria-live="polite"></div>
       <div class="buzzer-panel">
         <div class="buzzer-group">
           <div class="buzzer-group-title">Buzzer Parameters</div>
           <div class="buzzer-settings">
             <div class="buzzer-row">
-              <label for="buzzer-frequency">Frequency</label>
+              <label for="buzzer-frequency"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12h4l3-8 5 16 3-8h5"/></svg>Frequency</label>
               <div class="buzzer-volume-control">
                 <input id="buzzer-frequency" type="range" min="300" max="2800" step="10" value="2000" oninput="updateBuzzerSettingLabels()">
                 <strong id="buzzer-frequency-value">2000 Hz</strong>
               </div>
             </div>
             <div class="buzzer-row">
-              <label for="buzzer-duration">Duration</label>
+              <label for="buzzer-duration"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6M12 5V3"/></svg>Duration</label>
               <div class="buzzer-volume-control">
                 <input id="buzzer-duration" type="range" min="10" max="1000" step="10" value="300" oninput="updateBuzzerSettingLabels()">
                 <strong id="buzzer-duration-value">300 ms</strong>
               </div>
             </div>
             <div class="buzzer-row">
-              <span class="buzzer-volume-label">Volume</span>
+              <span class="buzzer-volume-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4zM15 9a5 5 0 0 1 0 6M18 6a9 9 0 0 1 0 12"/></svg>Volume</span>
               <div class="buzzer-volume-control">
                 <input id="buzzer-volume" type="range" min="0" max="100" step="1" value="50" oninput="updateBuzzerSettingLabels()">
                 <strong id="buzzer-volume-value">50%</strong>
               </div>
             </div>
             <div class="buzzer-row">
-              <span class="buzzer-volume-label">Enabled</span>
+              <span class="buzzer-volume-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v10M6.2 5.8a8 8 0 1 0 11.6 0"/></svg>Enabled</span>
               <div class="buzzer-toggle-control">
                 <button id="buzzer-power-toggle" class="toggle on" type="button" onclick="toggleBuzzerPower()"><span>ON</span></button>
               </div>
             </div>
           </div>
         </div>
-        <div class="buzzer-group buzzer-actions">
-          <div class="buzzer-group-title">Buzzer Command</div>
-          <button onclick="playBuzzer()">Play</button>
-          <button onclick="stopBuzzer()">Stop</button>
+        <div id="buzzer-preview" class="buzzer-group buzzer-preview">
+          <div class="buzzer-preview-head">
+            <div class="buzzer-group-title"><span class="buzzer-preview-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 4V5L7 9H3zm12.5 3a3.5 3.5 0 0 0-2-3.16v6.32a3.5 3.5 0 0 0 2-3.16zm-2-8.5v2.06a7 7 0 0 1 0 12.88v2.06a9 9 0 0 0 0-17z"/></svg></span>Sound Preview</div>
+            <span id="buzzer-preview-state" class="buzzer-preview-state">Ready</span>
+          </div>
+          <div class="buzzer-wave-wrap" aria-label="Buzzer waveform preview; amplitude from zero to one hundred percent">
+            <div class="buzzer-wave-scale" aria-hidden="true"><span>100%</span><span>50%</span><span>0%</span></div>
+            <div class="buzzer-wave-plot">
+              <svg id="buzzer-wave" class="buzzer-wave" viewBox="0 0 600 120" preserveAspectRatio="none" role="img" aria-label="Waveform preview">
+                <path class="buzzer-wave-center" d="M0 60H600"></path>
+                <path id="buzzer-wave-signal" class="buzzer-wave-signal" d="M0 118H600"></path>
+              </svg>
+              <span class="buzzer-wave-playhead" aria-hidden="true"></span>
+            </div>
+            <div class="buzzer-wave-time" aria-hidden="true"><span>0 ms</span><span>1000 ms</span></div>
+          </div>
+          <div class="buzzer-preview-bottom">
+            <div class="buzzer-preview-metric"><span>Freq</span><strong id="buzzer-preview-frequency">2000 Hz</strong></div>
+            <div class="buzzer-preview-metric"><span>Duration</span><strong id="buzzer-preview-duration">300 ms</strong></div>
+            <div class="buzzer-preview-metric"><span>Volume</span><strong id="buzzer-preview-volume">50%</strong></div>
+            <button class="buzzer-preview-play" type="button" onclick="playBuzzer()">Play</button>
+            <button id="buzzer-preview-stop" class="buzzer-preview-stop" type="button" onclick="stopBuzzer()" disabled>Stop</button>
+          </div>
         </div>
       </div>
       <div class="diagnostic-led-grid">
@@ -3162,14 +3234,21 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         modules.appendChild(empty);
         return;
       }
+      const bridgeGroup = document.createElement('section');
+      bridgeGroup.className = 'onewire-group';
+      bridgeGroup.innerHTML = `<div class="onewire-group-title"><span>Bridges</span><small>${bridges.length} detected</small></div>`;
+      const bridgeList = document.createElement('div');
+      bridgeList.className = 'onewire-device-list';
+      bridgeGroup.appendChild(bridgeList);
+      modules.appendChild(bridgeGroup);
       for (const bridge of bridges) {
         const card = document.createElement('article');
-        card.className = 'module-card';
+        card.className = 'onewire-device-row onewire-bridge-row';
         const title = document.createElement('div');
-        title.className = 'module-title';
+        title.className = 'onewire-device-name';
         title.textContent = bridge.name;
         const meta = document.createElement('div');
-        meta.className = 'module-meta';
+        meta.className = 'onewire-device-meta';
         const enabled = bridge.enabled !== false;
         meta.textContent = `Bus I2C-${bridge.bus} - Address ${bridge.address} - ${bridge.chip}${enabled ? '' : ' - polling off'}${bridge.available ? '' : ' - unavailable'}`;
         const toggle = document.createElement('button');
@@ -3179,36 +3258,43 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         toggle.innerHTML = `<span>${enabled ? 'ON' : 'OFF'}</span>`;
         toggle.disabled = !powerOn;
         toggle.onclick = () => setOneWireBridgeEnabled(bridge.id, !enabled);
-        const head = document.createElement('div');
-        head.className = 'module-head';
         const text = document.createElement('div');
+        text.className = 'onewire-device-main';
         text.append(title, meta);
-        head.append(text, toggle);
-        card.append(head);
-        modules.appendChild(card);
+        card.append(text, toggle);
+        bridgeList.appendChild(card);
       }
+      const sensorGroup = document.createElement('section');
+      sensorGroup.className = 'onewire-group';
+      sensorGroup.innerHTML = `<div class="onewire-group-title"><span>Sensors</span><small>${sensors.length} discovered</small></div>`;
+      const sensorList = document.createElement('div');
+      sensorList.className = 'onewire-device-list';
+      sensorGroup.appendChild(sensorList);
+      modules.appendChild(sensorGroup);
       for (const sensor of sensors) {
         const card = document.createElement('article');
-        card.className = 'module-card';
+        card.className = 'onewire-device-row';
         const title = document.createElement('div');
-        title.className = 'module-title';
+        title.className = 'onewire-device-name';
         title.textContent = sensor.name;
         const meta = document.createElement('div');
-        meta.className = 'module-meta';
+        meta.className = 'onewire-device-meta';
         const remove = document.createElement('button');
-        remove.className = 'danger-button';
+        remove.className = `onewire-device-action ${sensor.added ? 'danger-button' : ''}`;
         const cleanValue = sensor.temperature_c === null || sensor.temperature_c === undefined ? 'Unavailable' : `${Number(sensor.temperature_c).toFixed(3)} C`;
-        meta.textContent = `Bridge ${sensor.address} - ROM ${sensor.rom} - ${cleanValue}${sensor.available ? '' : ' - unavailable'}`;
+        meta.textContent = `Bridge ${sensor.address}${sensor.available ? '' : ' - unavailable'}`;
         remove.type = 'button';
         remove.textContent = sensor.added ? 'Remove' : 'Add';
+        remove.title = sensor.added ? 'Remove sensor' : 'Add sensor';
         remove.onclick = () => sensor.added ? removeOneWireSensor(sensor.id) : addOneWireSensor(sensor.id);
-        const head = document.createElement('div');
-        head.className = 'module-head';
+        const value = document.createElement('strong');
+        value.className = 'onewire-device-value';
+        value.textContent = cleanValue;
         const text = document.createElement('div');
+        text.className = 'onewire-device-main';
         text.append(title, meta);
-        head.append(text, remove);
-        card.append(head);
-        modules.appendChild(card);
+        card.append(text, value, remove);
+        sensorList.appendChild(card);
       }
     }
     async function toggleOneWirePower() {
@@ -5339,6 +5425,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       }
     }
     let buzzerLastVolumePercent = 50;
+    let buzzerPlaybackTimer = 0;
+    let buzzerPlaybackSequence = 0;
     function buzzerPayload() {
       const frequency = clampNumber(document.getElementById('buzzer-frequency').value, 300, 2800);
       const duration = clampNumber(document.getElementById('buzzer-duration').value, 10, 1000);
@@ -5376,6 +5464,51 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       document.getElementById('buzzer-volume-value').textContent = `${value}%`;
       if (value > 0) buzzerLastVolumePercent = value;
       paintBuzzerPower(value, buzzerLastVolumePercent);
+      updateBuzzerPreview(frequency, duration, value);
+    }
+    function updateBuzzerPreview(frequency, duration, volume) {
+      const frequencyNode = document.getElementById('buzzer-preview-frequency');
+      const durationNode = document.getElementById('buzzer-preview-duration');
+      const volumeNode = document.getElementById('buzzer-preview-volume');
+      const signal = document.getElementById('buzzer-wave-signal');
+      const preview = document.getElementById('buzzer-preview');
+      if (!frequencyNode || !durationNode || !volumeNode || !signal || !preview) return;
+      frequencyNode.textContent = `${frequency} Hz`;
+      durationNode.textContent = `${duration} ms`;
+      volumeNode.textContent = `${volume}%`;
+      const activeWidth = 600 * duration / 1000;
+      const actualCycles = frequency * duration / 1000;
+      const cycles = Math.max(1, Math.min(18, Math.round(18 * Math.log1p(actualCycles) / Math.log1p(2800))));
+      const baseline = 118;
+      const peakY = baseline - volume * 1.16;
+      const points = [`M0 ${baseline}`];
+      const cycleWidth = activeWidth / cycles;
+      if (volume > 0 && activeWidth > 0) {
+        for (let index = 0; index < cycles; index += 1) {
+          const start = index * cycleWidth;
+          const middle = start + cycleWidth / 2;
+          const end = (index + 1) * cycleWidth;
+          points.push(`L${start.toFixed(1)} ${peakY.toFixed(1)}`);
+          points.push(`L${middle.toFixed(1)} ${peakY.toFixed(1)}`);
+          points.push(`L${middle.toFixed(1)} ${baseline}`);
+          points.push(`L${end.toFixed(1)} ${baseline}`);
+        }
+      }
+      points.push(`L600 ${baseline}`);
+      signal.setAttribute('d', points.join(' '));
+      preview.style.setProperty('--buzzer-duration', `${duration}ms`);
+      preview.style.setProperty('--buzzer-playhead-end', `${duration / 10}%`);
+      signal.style.opacity = volume === 0 ? '.35' : '1';
+    }
+    function setBuzzerPreviewPlaying(playing, label = playing ? 'Playing' : 'Ready') {
+      const preview = document.getElementById('buzzer-preview');
+      const state = document.getElementById('buzzer-preview-state');
+      const stop = document.getElementById('buzzer-preview-stop');
+      if (!preview || !state || !stop) return;
+      preview.classList.toggle('playing', playing);
+      state.classList.toggle('playing', playing);
+      state.textContent = label;
+      stop.disabled = !playing;
     }
     function paintBuzzerPower(volume, lastVolume) {
       const enabled = Number(volume) > 0;
@@ -5415,7 +5548,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       document.getElementById('buzzer-volume').value = volume;
       updateBuzzerSettingLabels();
       paintBuzzerPower(volume, buzzerLastVolumePercent);
-      const state = payload.active && payload.active.running ? `running ${payload.active.backend}` : 'stopped';
+      const running = Boolean(payload.active && payload.active.running);
+      setBuzzerPreviewPlaying(running, running ? 'Playing' : 'Ready');
+      const state = running ? `running ${payload.active.backend}` : 'stopped';
       document.getElementById('buzzer-status').textContent = `BUZZER: ${state}`;
     }
     async function toggleBuzzerPower() {
@@ -5436,6 +5571,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     async function playBuzzer() {
       const detail = document.getElementById('buzzer-detail');
       const requested = buzzerPayload();
+      const sequence = ++buzzerPlaybackSequence;
+      window.clearTimeout(buzzerPlaybackTimer);
+      setBuzzerPreviewPlaying(true, 'Starting');
       detail.textContent = 'Playing buzzer...';
       try {
         const payload = await requestJson('api/v1/buzzer/play-pwm', {
@@ -5445,18 +5583,28 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         });
         document.getElementById('buzzer-status').textContent = `BUZZER: running ${payload.backend}`;
         paintBuzzerAvailability(payload);
-        window.setTimeout(renderBuzzerStatus, requested.duration_ms + 250);
+        setBuzzerPreviewPlaying(true, 'Playing');
+        buzzerPlaybackTimer = window.setTimeout(() => {
+          if (sequence !== buzzerPlaybackSequence) return;
+          setBuzzerPreviewPlaying(false, 'Ready');
+          renderBuzzerStatus();
+        }, requested.duration_ms + 150);
       } catch (error) {
+        if (sequence === buzzerPlaybackSequence) setBuzzerPreviewPlaying(false, 'Ready');
         document.getElementById('buzzer-status').textContent = 'BUZZER: Test failed';
         detail.textContent = JSON.stringify(error);
       }
     }
     async function stopBuzzer() {
+      buzzerPlaybackSequence += 1;
+      window.clearTimeout(buzzerPlaybackTimer);
       try {
         const payload = await requestJson('api/v1/buzzer/stop', { method: 'POST' });
         document.getElementById('buzzer-status').textContent = 'BUZZER: stopped';
         paintBuzzerAvailability(payload);
+        setBuzzerPreviewPlaying(false, 'Ready');
       } catch (error) {
+        setBuzzerPreviewPlaying(false, 'Ready');
         document.getElementById('buzzer-status').textContent = 'BUZZER: stop failed';
         document.getElementById('buzzer-detail').textContent = JSON.stringify(error);
       }

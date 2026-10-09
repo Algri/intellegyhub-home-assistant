@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.222
+
+- Refine the buzzer controls and waveform preview layout, including clearer playback controls and compact GPIO labeling.
+
 ## 0.5.221
 
 - Harden toggle clipping during the state transition animation.
