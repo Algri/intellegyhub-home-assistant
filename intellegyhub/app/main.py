@@ -256,7 +256,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.227 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.228 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -314,7 +314,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.227", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.228", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -662,7 +662,11 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .control-cluster { display: inline-flex; align-items: center; gap: 10px; margin-left: auto; }
     .xport-control-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 10px; min-height: 42px; border: 0; border-radius: 0; padding: 0; background: transparent; color: var(--ha-text); }
     .xport-control-row.readout { grid-template-columns: auto minmax(0, 1fr) auto; }
-    .xport-control-row.pwm { grid-template-columns: auto minmax(0, 1fr) minmax(120px, 1fr) 5ch; padding-right: 0; }
+    .xport-control-row.pwm { display: grid; grid-template-columns: 18px 40px minmax(0, 1fr) 5ch; align-items: center; gap: 10px; min-width: 0; padding-right: 0; }
+    .xport-control-row.pwm > .xport-control-icon { grid-column: 1; }
+    .xport-control-row.pwm > span { grid-column: 2; min-width: 0; }
+    .xport-control-row.pwm > input[type="range"] { grid-column: 3; min-width: 0; }
+    .xport-control-row.pwm > strong { grid-column: 4; min-width: 0; }
     .xport-control-row:has(> .toggle) { position: relative; grid-template-columns: auto minmax(0, 1fr) auto; }
     .xport-control-row:has(> .toggle) > .toggle { grid-column: 3; }
     .xport-control-row:has(> .toggle)::after { content: ''; position: absolute; top: 0; right: 68px; width: 1px; height: 100%; background: var(--ha-card-border); pointer-events: none; }
@@ -674,7 +678,12 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .xport-control-icon.do { fill: currentColor; stroke: none; }
     .xport-control-icon.state { fill: currentColor; stroke: none; }
     .xport-control-row > strong { border-left: 1px solid var(--ha-card-border); padding-left: 16px; }
-    .xport-control-row.pwm > input[type="range"] { border-left: 1px solid var(--ha-card-border); padding-left: 16px; }
+    .xport-control-row.pwm > input[type="range"] { width: 100%; min-width: 0; box-sizing: border-box; border: 0; padding: 0; outline: none; box-shadow: none; background: transparent; accent-color: var(--ha-primary); appearance: none; }
+    .xport-control-row.pwm > input[type="range"]::-webkit-slider-runnable-track { height: 4px; border: 0; border-radius: 4px; background: var(--ha-row-border); }
+    .xport-control-row.pwm > input[type="range"]::-webkit-slider-thumb { width: 16px; height: 16px; margin-top: -6px; border: 0; border-radius: 50%; background: var(--ha-primary); appearance: none; }
+    .xport-control-row.pwm > input[type="range"]::-moz-range-track { height: 4px; border: 0; border-radius: 4px; background: var(--ha-row-border); }
+    .xport-control-row.pwm > input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border: 0; border-radius: 50%; background: var(--ha-primary); }
+    .xport-control-row.pwm > input[type="range"]:focus, .xport-control-row.pwm > input[type="range"]:focus-visible { outline: none; box-shadow: none; }
     .xport-control-row.pwm strong { text-align: right; padding-right: 2px; }
     .xport-control-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .toggle {
@@ -1413,8 +1422,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .module-card .danger-button { width: 32px; min-width: 32px; height: 32px; padding: 3px; display: inline-flex; align-items: center; justify-content: center; border: 0 !important; background: transparent !important; color: var(--ha-secondary); }
     .module-card .danger-button:hover, .module-card .danger-button:focus-visible { border: 0 !important; background: transparent !important; color: var(--ha-danger-text); box-shadow: none !important; }
     .module-card .danger-button svg { display: block !important; width: 24px !important; height: 24px !important; flex: 0 0 24px; fill: currentColor; }
-    .relay-grid { display: grid; grid-template-columns: repeat(4, minmax(180px, 1fr)) !important; gap: 10px 14px; align-items: stretch; }
-    .module-card[data-module-kind="digital_input"] .relay-grid { grid-template-columns: repeat(8, minmax(120px, 1fr)) !important; }
+    .relay-grid { display: grid; grid-template-columns: repeat(4, minmax(180px, 1fr)); gap: 10px 14px; align-items: stretch; }
+    .module-card[data-module-kind="digital_input"] .relay-grid { grid-template-columns: repeat(8, minmax(120px, 1fr)); }
     .module-card[data-module-kind="relay_output"] .relay-grid { grid-template-columns: repeat(8, minmax(120px, 1fr)) !important; }
     .relay-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 12px; color: var(--ha-text); min-height: 42px; border: 0; border-radius: 0; padding: 8px 0; background: transparent; }
     .module-card .relay-row, .module-card .relay-row:hover, .module-card .relay-row:focus-within { border: 0 !important; border-radius: 0 !important; padding: 10px 12px !important; background: transparent !important; box-shadow: none !important; }

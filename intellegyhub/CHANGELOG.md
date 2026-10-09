@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.228
+
+- Restored responsive X-BUS module grids.
+- Refined X-Port PWM control columns, slider sizing, and focus styling.
+- Corrected rail and counter control icon rendering.
+
 ## 0.5.227
 
 - Refined dashboard icon mapping and X-Port controls.
