@@ -36,6 +36,7 @@ VALID_CAPABILITY_TYPES = {"switch", "binary_input", "sensor", "number", "select"
 VALID_PROTOCOLS = {"modbus_rtu"}
 LOGGER = logging.getLogger("intellegyhub.rs485")
 MOCK_SERIAL_PORTS = {"/dev/ttyAMA3", "/dev/ttyAMA5"}
+MOCK_SCAN_DELAY_SECONDS = 0.04
 RS485_DEFAULT_POLLING = {
     "inputs": {"mode": "polling", "interval_ms": 100},
     "outputs": {"mode": "polling", "interval_ms": 250},
@@ -1473,7 +1474,7 @@ class Rs485Manager:
                     if device.enabled and str(device.serial_port) in affected_ports:
                         if transport_changed or master_changed:
                             self._schedule_device_polling(device)
-                mode = "USB/Real" if self.bus.get("mode") == "usb_real" else ("mock" if self._bus_is_mock(self.bus) else "Modbus")
+                mode = f"USB to RS-485 {self.bus['serial_port']}" if self.bus.get("mode") == "usb_real" else ("mock" if self._bus_is_mock(self.bus) else "Modbus")
                 self.status = f"RS-485: {mode} on {self.bus['serial_port']} {self.bus['baudrate']} {self.bus['parity']} {self.bus['stop_bits']} stop"
                 return self.snapshot(status=self.status)
         finally:
@@ -1542,7 +1543,9 @@ class Rs485Manager:
             default_template = requested_template if requested_template in self.registry.templates else next(iter(self.registry.templates), "mio-8")
             template = self.registry.get(default_template)
             mock_bus = self._bus_is_mock(scan_bus)
-            addresses = [1, 2] if mock_bus else template_slave_addresses(template)
+            # Keep mock discovery large enough to exercise the same list, polling,
+            # and device-management paths as a populated controller bus.
+            addresses = list(range(1, 31)) if mock_bus else template_slave_addresses(template)
             scanned_count = len(addresses)
             self.scanned = [item for item in self.scanned if item.get("serial_port") != current_port]
             self.scan_errors = [item for item in self.scan_errors if item.get("serial_port") != current_port]
@@ -1624,6 +1627,7 @@ class Rs485Manager:
                                 rx_detail=rx_detail,
                             )
                     else:
+                        await asyncio.sleep(MOCK_SCAN_DELAY_SECONDS)
                         self._append_scan_log(
                             current_port,
                             found,
@@ -2147,7 +2151,7 @@ class Rs485Manager:
         default_status = (
             "RS-485: template-driven mock"
             if effective_mode == "mock"
-            else f"RS-485: {'USB/Real' if effective_mode == 'usb_real' else 'Modbus'} on {self.bus['serial_port']} {self.bus['baudrate']} {self.bus['parity']} {self.bus['stop_bits']} stop"
+            else f"RS-485: USB to RS-485 {self.bus['serial_port']} {self.bus['baudrate']} {self.bus['parity']} {self.bus['stop_bits']} stop"
         )
         stale_mock_status = self.status == "RS-485: template-driven mock" and effective_mode != "mock"
         return {
@@ -2567,7 +2571,7 @@ def serial_port_options() -> list[dict[str, str]]:
             device = str(port.device)
             if device in seen or not is_allowed_serial_port(device):
                 continue
-            label = f"USB RS-485 ({device})"
+            label = f"USB to RS-485 {device}"
             description = str(getattr(port, "description", "") or "")
             if description and description != "n/a":
                 label = description if device in description else f"{description} ({device})"
@@ -2576,7 +2580,7 @@ def serial_port_options() -> list[dict[str, str]]:
     for device in windows_serial_ports_from_registry():
         if device in seen or not is_allowed_serial_port(device):
             continue
-        options.append({"value": device, "label": f"USB RS-485 ({device})"})
+        options.append({"value": device, "label": f"USB to RS-485 {device}"})
         seen.add(device)
     return options
 

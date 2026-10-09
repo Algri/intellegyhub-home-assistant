@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.219
+
+- Improve Controls layout and expose STE, ERR, and NET LEDs as direct GPIO outputs.
+
 ## 0.5.218
 
 - Stop the on-demand `pigpiod` process after a successful startup or shutdown buzzer signal, returning idle CPU usage to normal.
