@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.230
+
+- Refined RTC and Buzzer responsive layouts to prevent control overlap.
+- Reserved full-width X-Port PWM values and expanded slider space.
+
 ## 0.5.229
 
 - Restored X-BUS WebSocket state updates after the UI status marker change.

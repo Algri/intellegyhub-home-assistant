@@ -256,7 +256,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.229 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.230 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -314,7 +314,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.229", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.230", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -662,11 +662,12 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .control-cluster { display: inline-flex; align-items: center; gap: 10px; margin-left: auto; }
     .xport-control-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 10px; min-height: 42px; border: 0; border-radius: 0; padding: 0; background: transparent; color: var(--ha-text); }
     .xport-control-row.readout { grid-template-columns: auto minmax(0, 1fr) auto; }
-    .xport-control-row.pwm { display: grid; grid-template-columns: 18px 40px minmax(0, 1fr) 5ch; align-items: center; gap: 10px; min-width: 0; padding-right: 0; }
+    .xport-control-row.pwm { display: grid; grid-template-columns: 18px 40px minmax(0, 1fr) calc(6ch + 18px); align-items: center; gap: 10px; min-width: 0; padding-right: 0; }
     .xport-control-row.pwm > .xport-control-icon { grid-column: 1; }
     .xport-control-row.pwm > span { grid-column: 2; min-width: 0; }
     .xport-control-row.pwm > input[type="range"] { grid-column: 3; min-width: 0; }
-    .xport-control-row.pwm > strong { grid-column: 4; min-width: 0; }
+    .xport-control-row.pwm > strong { position: relative; grid-column: 4; box-sizing: border-box; min-width: 0; width: calc(6ch + 18px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .xport-control-row.pwm > strong::before { content: ''; position: absolute; top: 0; bottom: 0; left: 8px; border-left: 1px solid var(--ha-card-border); }
     .xport-control-row:has(> .toggle) { position: relative; grid-template-columns: auto minmax(0, 1fr) auto; }
     .xport-control-row:has(> .toggle) > .toggle { grid-column: 3; }
     .xport-control-row:has(> .toggle)::after { content: ''; position: absolute; top: 0; right: 68px; width: 1px; height: 100%; background: var(--ha-card-border); pointer-events: none; }
@@ -677,7 +678,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .xport-control-icon.input { fill: currentColor; stroke: none; }
     .xport-control-icon.do { fill: currentColor; stroke: none; }
     .xport-control-icon.state { fill: currentColor; stroke: none; }
-    .xport-control-row > strong { border-left: 1px solid var(--ha-card-border); padding-left: 16px; }
+    .xport-control-row > strong { padding-left: 16px; }
     .xport-control-row.pwm > input[type="range"] { width: 100%; min-width: 0; box-sizing: border-box; border: 0; padding: 0; outline: none; box-shadow: none; background: transparent; accent-color: var(--ha-primary); appearance: none; }
     .xport-control-row.pwm > input[type="range"]::-webkit-slider-runnable-track { height: 4px; border: 0; border-radius: 4px; background: var(--ha-row-border); }
     .xport-control-row.pwm > input[type="range"]::-webkit-slider-thumb { width: 16px; height: 16px; margin-top: -6px; border: 0; border-radius: 50%; background: var(--ha-primary); appearance: none; }
@@ -1539,15 +1540,15 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .diagnostic-rtc-actions svg { width: 18px; height: 18px; fill: currentColor; }
     .diagnostic-rtc-footer { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 18px; margin-top: 0; }
     .diagnostic-rtc-card .diagnostic-led-note { margin: 0; text-align: right; }
-    .diagnostic-rtc-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
-    .diagnostic-rtc-row { display: grid; grid-template-columns: 22px minmax(90px, 1fr) minmax(138px, auto); align-items: center; gap: 10px; min-height: 48px; border: 0; border-radius: 0; padding: 8px 0; background: transparent; }
+    .diagnostic-rtc-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.3fr) minmax(0, .7fr) minmax(0, .7fr); gap: 18px; }
+    .diagnostic-rtc-row { display: grid; grid-template-columns: 22px minmax(0, 1fr) minmax(0, .9fr); align-items: center; gap: 10px; min-width: 0; min-height: 48px; border: 0; border-radius: 0; padding: 8px 0; background: transparent; }
     .diagnostic-rtc-icon { width: 22px; height: 22px; color: var(--ha-primary); fill: currentColor; }
     .diagnostic-rtc-row:not(:last-child) { border-right: 1px solid var(--ha-row-border); padding-right: 18px; }
-    .diagnostic-rtc-row strong { min-width: 0; text-align: right; white-space: nowrap; }
-    .diagnostic-rtc-row span { display: block; min-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .diagnostic-rtc-row strong { min-width: 0; overflow: hidden; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+    .diagnostic-rtc-row span { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .diagnostic-rtc-error { min-height: 0; margin: 0; color: var(--ha-secondary); font-size: 13px; overflow-wrap: anywhere; }
     .buzzer-settings { display: grid; gap: 12px; }
-    .buzzer-row { display: grid; grid-template-columns: minmax(100px, 150px) minmax(0, 1fr); align-items: center; gap: 14px; min-height: 40px; }
+    .buzzer-row { display: grid; grid-template-columns: minmax(112px, 120px) minmax(0, 1fr); align-items: center; gap: 14px; min-height: 40px; }
     .buzzer-row label,
     .buzzer-volume-label { display: inline-flex; align-items: center; gap: 10px; color: var(--ha-text); font-size: 13px; font-weight: 700; }
     .buzzer-volume-control input[type="range"]:focus,
@@ -1636,6 +1637,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     @media (max-width: 1300px) { .overview-panel { grid-template-columns: 1fr; } .overview-identity { border: 0; min-height: 260px; } }
     @media (max-width: 1100px) { .ports, .carrier-io-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .xport-group-toolbar, .xport-group-toolbar.config-hidden { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .xport-group-toolbar .bus-note, .xport-group-toolbar.config-hidden .bus-note { grid-column: 1 / -1; } .relay-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); } .rs485-layout { grid-template-columns: 1fr; } .rs485-capability-grid, .rs485-device-settings { grid-template-columns: repeat(2, minmax(130px, 1fr)); } .rs485-polling-strip { grid-template-columns: 1fr auto; } .rs485-io-head, .rs485-io-row { grid-template-columns: 52px minmax(150px, 1fr) minmax(150px, 1fr) minmax(180px, .9fr); } }
+    @media (max-width: 1100px) { .diagnostic-rtc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     @media (max-width: 900px) { .diagnostic-led-grid, .diagnostic-rtc-grid, .buzzer-panel { grid-template-columns: 1fr; } .buzzer-actions { grid-template-columns: repeat(2, minmax(120px, 1fr)); grid-template-rows: auto; } .buzzer-actions .buzzer-group-title { grid-column: 1 / -1; } }
     @media (max-width: 620px) { body { padding: 10px; } .app-toolbar { justify-content: stretch; } .theme-switcher { width: 100%; justify-content: space-between; } .theme-choice { flex: 1; } .overview-identity { min-height: 260px; padding: 22px 18px; } .overview-wordmark { font-size: 22px; letter-spacing: .12em; } .overview-title-row { align-items: flex-start; flex-direction: column; gap: 14px; } .overview-title h1 { font-size: 34px; } .overview-title .subtitle { font-size: 16px; } .overview-facts { grid-template-columns: 88px minmax(0, 1fr); } .overview-facts dt, .overview-facts dd { font-size: 14px; } .overview-health { grid-template-columns: 1fr; gap: 18px; } .overview-health-item + .overview-health-item { border-left: 0; padding-left: 0; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+3), .overview-metric:nth-of-type(4) { border: 0; } .extension-panel:not(.overview-panel) { padding-left: 14px; padding-right: 14px; } #controls-section { padding: 18px 14px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .xport-group-toolbar, .xport-group-toolbar.config-hidden { grid-template-columns: 1fr; } .xport-group-toolbar .bus-note, .xport-group-toolbar.config-hidden .bus-note { grid-column: 1; } .ports, .carrier-io-grid, .relay-grid, .rs485-toolbar { grid-template-columns: 1fr; } .rs485-table-row, .rs485-table-row.scan, .rs485-table-row.configured { grid-template-columns: 1fr; align-items: stretch; } .rs485-device-summary { align-items: flex-start; flex-wrap: wrap; gap: 4px 10px; } .rs485-device-meta { flex-wrap: wrap; } .rs485-device-filters, .rs485-device-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } .rs485-row-actions { justify-content: flex-start; } .rs485-detail-head { flex-direction: column; } .rs485-device-identity { align-items: flex-start; } .rs485-detail-meta { position: static; flex-wrap: wrap; } .rs485-detail-last-seen { position: static; } .rs485-detail-actions { justify-content: flex-start; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-row { grid-template-columns: 1fr; gap: 6px; } }
     @media (max-width: 620px) { .global-nav .theme-switcher { width: auto; justify-content: initial; } .global-nav .theme-switcher span { display: none; } .global-nav .theme-choice { flex: 0 0 auto; } }
