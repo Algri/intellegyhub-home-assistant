@@ -256,7 +256,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.223 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.224 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -302,7 +302,10 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         # device changes are published to the integration WebSocket.
         app.state.rs485.set_publisher(app.state.runtime.broadcast_nowait)
         if app.state.rs485_enabled:
-            await app.state.rs485.start()
+            try:
+                await app.state.rs485.start()
+            except Exception:
+                LOGGER.exception("RS-485 startup failed; continuing with the main runtime")
         await app.state.runtime.start()
         try:
             yield
@@ -311,7 +314,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.223", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.224", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -1435,9 +1438,17 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     @media (max-width: 1100px) { .buzzer-preview-bottom { grid-template-columns: repeat(3, minmax(60px, 1fr)); } .buzzer-preview-play, .buzzer-preview-stop { grid-row: 2; } }
     @media (max-width: 620px) { .buzzer-panel { grid-template-columns: minmax(0, 1fr); } .buzzer-row { grid-template-columns: minmax(80px, 1fr); gap: 2px; } .buzzer-preview-bottom { grid-template-columns: repeat(2, minmax(0, 1fr)); } .buzzer-preview-metric { min-height: 38px; } .buzzer-preview-play, .buzzer-preview-stop { width: 100%; } .buzzer-wave-wrap { grid-template-rows: 110px 14px; min-height: 128px; } .buzzer-wave, .buzzer-wave-plot { height: 110px; } }
     .diagnostic-led-grid { display: grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 16px; margin-top: 18px; }
-    .diagnostic-led-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; min-height: 42px; border: 1px solid var(--ha-row-border); border-radius: 8px; padding: 8px 10px; background: var(--ha-row); }
-    .diagnostic-led-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .diagnostic-led-note { margin-top: 10px; color: var(--ha-secondary); font-size: 13px; overflow-wrap: anywhere; }
+    .diagnostic-led-grid .buzzer-group { padding: 18px; }
+    .diagnostic-led-grid .buzzer-group-title { margin-bottom: 4px; font-size: 14px; }
+    .diagnostic-led-row { display: grid; grid-template-columns: 32px minmax(0, 1fr) 1px auto; align-items: center; gap: 16px; min-height: 76px; padding: 12px 10px 8px; border: 0; border-radius: 0; background: transparent; }
+    .diagnostic-led-row::after { content: ''; grid-column: 3; grid-row: 1; width: 1px; height: 32px; background: var(--ha-row-border); }
+    .diagnostic-led-row > .toggle { grid-column: 4; grid-row: 1; }
+    .diagnostic-led-row > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .diagnostic-led-icon { display: inline-flex; width: 32px; height: 32px; align-items: center; justify-content: center; color: var(--ha-primary); }
+    .diagnostic-led-icon svg { display: block; width: 30px; height: 30px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .diagnostic-led-icon.err { color: #ff3b3b; }
+    .diagnostic-led-state { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+    .diagnostic-led-note { margin: 2px 10px 0; color: var(--ha-secondary); font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
     .diagnostic-rtc-card { margin-top: 18px; }
     .diagnostic-rtc-grid { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 12px 16px; }
     .diagnostic-rtc-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 42px; border: 1px solid var(--ha-row-border); border-radius: 8px; padding: 8px 10px; background: var(--ha-row); }
@@ -1885,8 +1896,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         <div class="buzzer-group">
           <div class="buzzer-group-title">STE LED</div>
           <div class="diagnostic-led-row">
+            <span class="diagnostic-led-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M2 12h4l3-8 5 16 3-8h5"/></svg></span>
             <span>Heartbeat</span>
-            <strong id="ste-heartbeat-state" class="state-text">OFF</strong>
+            <strong id="ste-heartbeat-state" class="state-text diagnostic-led-state">OFF</strong>
             <button id="ste-heartbeat-toggle" class="toggle" type="button" onclick="toggleSteHeartbeat()"><span>OFF</span></button>
           </div>
           <div class="diagnostic-led-note">Blinks the STE LED while the add-on is running.</div>
@@ -1894,8 +1906,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         <div class="buzzer-group">
           <div class="buzzer-group-title">NET LED</div>
           <div class="diagnostic-led-row">
+            <span class="diagnostic-led-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="m8.5 10.5 6.8-3M8.5 13.5l6.8 3"/></svg></span>
             <span>Connection indicator</span>
-            <strong id="net-led-state" class="state-text">OFF</strong>
+            <strong id="net-led-state" class="state-text diagnostic-led-state">OFF</strong>
             <button id="net-led-toggle" class="toggle" type="button" onclick="toggleNetLed()"><span>OFF</span></button>
           </div>
           <div class="diagnostic-led-note">Shows WebSocket client status: on when connected, blinking while disconnected.</div>
@@ -1903,8 +1916,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         <div class="buzzer-group">
           <div class="buzzer-group-title">ERR LED</div>
           <div class="diagnostic-led-row">
+            <span class="diagnostic-led-icon err" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 3 9 16H3L12 3z"/><path d="M12 9v4M12 16h.01"/></svg></span>
             <span>Error indicator</span>
-            <strong id="err-led-state" class="state-text">OFF</strong>
+            <strong id="err-led-state" class="state-text diagnostic-led-state">OFF</strong>
             <button id="err-led-toggle" class="toggle" type="button" onclick="toggleErrLed()"><span>OFF</span></button>
           </div>
           <div class="diagnostic-led-note">Reserved for add-on and hardware error indication.</div>
@@ -5364,7 +5378,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       const toggle = document.getElementById(toggleId);
       if (!state || !toggle) return;
       state.textContent = enabled ? 'ON' : 'OFF';
-      state.className = `state-text ${enabled ? 'on' : ''}`;
+      state.className = `state-text diagnostic-led-state ${enabled ? 'on' : ''}`;
       toggle.className = `toggle ${enabled ? 'on' : ''}`;
       toggle.innerHTML = `<span>${enabled ? 'ON' : 'OFF'}</span>`;
       toggle.title = title;
@@ -6222,7 +6236,11 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
 
     @app.websocket("/ws")
     async def websocket_endpoint(websocket: WebSocket) -> None:
-        current = runtime_or_503()
+        current: AppRuntime = app.state.runtime
+        if not current.ready:
+            await websocket.accept()
+            await websocket.close(code=1013, reason=current.error or "runtime not ready")
+            return
         await current.add_client(websocket)
         try:
             while True:

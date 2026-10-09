@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.224
+
+- Refine diagnostic LED cards to match the mockup layout and keep mock WebSocket startup failures isolated.
+
 ## 0.5.223
 
 - Refine the buzzer waveform density at minimum frequency and disable Play while the buzzer is disabled.
