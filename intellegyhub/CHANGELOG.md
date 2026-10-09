@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.221
+
+- Harden toggle clipping during the state transition animation.
+
 ## 0.5.220
 
 - Fix toggle corner clipping when GPIO controls switch state.
