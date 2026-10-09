@@ -256,7 +256,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.225 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.226 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -314,7 +314,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.225", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.226", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -456,38 +456,54 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .theme-switcher span { color: var(--ha-secondary); font-size: 12px; font-weight: 800; padding: 0 8px; text-transform: uppercase; letter-spacing: .08em; }
     .theme-choice { min-height: 30px !important; border-radius: 999px !important; padding: 4px 12px !important; border-color: transparent !important; color: var(--ha-secondary) !important; }
     .theme-choice.active { border-color: var(--ha-primary) !important; color: var(--ha-primary) !important; background: rgba(3, 169, 244, .12) !important; }
-    .overview-panel { display: grid; grid-template-columns: minmax(420px, .9fr) minmax(520px, 1.5fr); gap: 0; margin-top: 0; margin-bottom: 18px; padding: 0; overflow: hidden; }
-    .overview-identity { display: flex; flex-direction: column; min-height: 300px; padding: 34px 42px 32px; border-right: 1px solid var(--ha-card-border); }
-    .overview-badge-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 16px; }
-    .overview-wordmark { display: inline-flex; align-items: baseline; min-width: 0; color: var(--wordmark-main); font-size: 32px; line-height: 1; font-weight: 640; letter-spacing: .18em; white-space: nowrap; }
+    .overview-panel { position: relative; display: grid; grid-template-columns: minmax(420px, .9fr) minmax(520px, 1.5fr); gap: 0; margin-top: 0; margin-bottom: 18px; padding: 0; overflow: hidden; }
+    .overview-identity { display: flex; flex-direction: column; min-height: 0; padding: 24px 42px; border-right: 0; }
+    .overview-badge-row { display: flex; align-items: center; justify-content: flex-start; gap: 18px; margin-bottom: 16px; }
+    .overview-wordmark { display: inline-flex; align-items: baseline; min-width: 0; color: var(--wordmark-main); font-size: 40px; line-height: 1; font-weight: 640; letter-spacing: .16em; white-space: nowrap; }
     .overview-wordmark span { color: var(--wordmark-accent); }
-    .overview-logo-mark { width: 76px; height: 76px; object-fit: contain; flex: 0 0 auto; }
-    .overview-title-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 20px; }
-    .overview-title { min-width: 0; }
+    .overview-logo-mark { order: -1; width: 64px; height: 64px; object-fit: contain; flex: 0 0 auto; }
+    .overview-title-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 14px; }
+    .overview-title { width: max-content; max-width: 100%; min-width: 0; }
     .overview-title h1 { font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-size: 48px; line-height: 1; margin-bottom: 8px; font-weight: 800; }
-    .overview-title .subtitle { color: var(--ha-secondary); font-size: 21px; line-height: 1.25; margin-bottom: 0; font-weight: 700; }
-    .overview-title-divider { width: 100%; height: 1px; background: var(--ha-card-border); margin: 0 0 22px; }
-    .overview-facts { display: grid; grid-template-columns: 142px minmax(0, 1fr); gap: 12px 24px; margin-top: 0; font-size: 18px; line-height: 1.2; }
+    .overview-title .subtitle { color: var(--ha-secondary); font-size: 19px; line-height: 1.25; margin-bottom: 0; font-weight: 700; }
+    .overview-title-divider { width: calc(100% - 44px); height: 1px; background: var(--ha-card-border); margin: 0 0 16px; }
+    .overview-facts { display: grid; grid-template-columns: 142px minmax(0, 1fr); gap: 10px 24px; margin: 0; font-size: 18px; line-height: 1.2; }
     .overview-facts dt { color: var(--ha-secondary); font-size: 18px; font-weight: 800; letter-spacing: 0; }
     .overview-facts dd { margin: 0; color: var(--ha-text); font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-size: 18px; font-weight: 800; min-width: 0; overflow-wrap: anywhere; }
-    .overview-divider { width: 100%; height: 1px; background: var(--ha-card-border); margin: 34px 0 26px; }
-    .overview-health { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0; font-size: 22px; line-height: 1.25; }
+    .overview-divider { width: calc(100% - 44px); height: 1px; background: var(--ha-card-border); margin: 20px 0; }
+    .overview-health { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin: 0; font-size: 22px; line-height: 1.25; }
     .overview-health-item { min-width: 0; }
-    .overview-health-item + .overview-health-item { border-left: 1px solid var(--ha-card-border); padding-left: 46px; }
-    .overview-health dt { color: var(--ha-secondary); font-size: 17px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 14px; }
+    .overview-health-item + .overview-health-item { border-left: 0; padding-left: 0; }
+    .overview-health dt { color: var(--ha-secondary); font-size: 15px; line-height: 1.3; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 8px; }
     .overview-health dd { margin: 0; color: var(--ha-text); font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-size: 22px; font-weight: 800; min-width: 0; overflow-wrap: anywhere; }
     .overview-health-value { display: inline-flex; align-items: center; gap: 14px; font-family: inherit; }
+    .overview-health-updated { color: var(--ha-secondary); font-size: 16px; line-height: 1.3; font-weight: 600; white-space: nowrap; }
     .overview-sync-dot { width: 18px; height: 18px; border-radius: 50%; background: #448aff; }
     .overview-sync-dot.online { background: var(--ha-success); }
     .overview-sync-dot.offline { background: #ff6b6b; }
-    .overview-metrics { position: relative; display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); padding-bottom: 24px; }
-    .overview-metric { min-height: 135px; padding: 30px 24px; border-left: 0; border-top: 0; border-right: 1px solid var(--ha-card-border); border-bottom: 1px solid var(--ha-card-border); border-radius: 0; background: transparent; }
-    .overview-metric:nth-child(2n) { border-right: 0; }
-    .overview-metric:nth-last-child(-n+3) { border-bottom: 0; }
-    .overview-metric-label { color: var(--ha-secondary); font-size: 12px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; margin-bottom: 18px; }
-    .overview-metric-value { color: var(--ha-text); font-size: 27px; line-height: 1; font-weight: 800; margin-bottom: 12px; }
-    .overview-metric-meta { color: var(--ha-secondary); font-size: 12px; overflow-wrap: anywhere; }
-    .overview-updated { position: absolute; right: 24px; bottom: 10px; color: var(--ha-secondary); font-size: 12px; }
+    .overview-metrics { position: relative; display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); padding-bottom: 0; }
+    .overview-metric { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto auto; align-content: start; align-items: center; column-gap: 16px; row-gap: 6px; min-width: 0; min-height: 135px; padding: 24px; border: 0; border-radius: 0; background: transparent; }
+    .overview-metric-label { grid-column: 1; grid-row: 1; display: inline-flex; align-items: center; gap: 8px; min-width: 0; color: var(--ha-text); font-family: inherit; font-size: 18px; line-height: 1.3; font-weight: 600; letter-spacing: 0; text-transform: none; margin: 0; }
+    .overview-fact-label, .overview-health-label { display: inline-flex; align-items: center; gap: 8px; }
+    .overview-metric-label .overview-inline-icon { width: 20px; height: 20px; }
+    .overview-inline-icon { display: block; width: 20px; height: 20px; flex: 0 0 20px; color: var(--ha-primary); fill: currentColor; stroke: none; }
+    .overview-metric-value { grid-column: 2; grid-row: 1; justify-self: end; color: var(--ha-text); font-family: inherit; font-size: 18px; line-height: 1.3; font-weight: 600; letter-spacing: 0; font-variant-numeric: tabular-nums; white-space: nowrap; margin: 0; }
+    .overview-metric-meta { grid-column: 2; grid-row: 2; justify-self: end; text-align: right; color: var(--ha-secondary); font-family: inherit; font-size: 12px; line-height: 1.3; overflow-wrap: anywhere; }
+    .overview-metric-chart { grid-column: 1 / -1; grid-row: 3; display: block; width: 100%; height: auto; aspect-ratio: 400 / 140; margin-top: 8px; overflow: hidden; }
+    .overview-metric-chart text { fill: var(--ha-secondary); font-size: 12px; font-weight: 400; font-family: inherit; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+    .overview-metric-chart path { vector-effect: non-scaling-stroke; }
+    .overview-metric-chart .chart-grid { fill: none; stroke: var(--ha-row-border); stroke-width: 1; opacity: .65; }
+    .overview-metric-chart .chart-area { fill: var(--ha-primary); opacity: .08; }
+    .overview-metric-chart .chart-line { fill: none; stroke: var(--ha-primary); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .overview-metric-chart .chart-point { fill: var(--ha-primary); stroke: var(--ha-surface); stroke-width: 1.5; }
+    .overview-metric-chart .chart-hitarea { fill: transparent; cursor: crosshair; }
+    .overview-metric-chart .chart-hover-line { display: none; stroke: var(--ha-secondary); stroke-width: 1; stroke-dasharray: 3 3; pointer-events: none; }
+    .overview-metric-chart .chart-hover-point { display: none; fill: var(--ha-primary); stroke: var(--ha-surface); stroke-width: 2; pointer-events: none; }
+    .overview-metric-chart .chart-tooltip { display: none; pointer-events: none; }
+    .overview-metric-chart.is-hovered .chart-hover-line, .overview-metric-chart.is-hovered .chart-hover-point, .overview-metric-chart.is-hovered .chart-tooltip { display: block; }
+    .overview-metric-chart .chart-tooltip rect { fill: var(--ha-field); stroke: var(--ha-card-border); }
+    .overview-metric-chart .chart-tooltip text { fill: var(--ha-text); font-size: 11px; font-weight: 700; }
+    .overview-updated { position: absolute; top: 12px; right: 20px; z-index: 2; color: var(--ha-secondary); font-size: 11px; }
     .xport-panel {
       border: 1px solid var(--ha-card-border);
       border-radius: 12px;
@@ -1390,26 +1406,11 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .carrier-io-card.xmod1-group { order: 1; }
     .carrier-io-card.xmod2-group { order: 2; }
     .carrier-io-card.usb-group { order: 5; }
-    .carrier-io-title { display: grid; grid-template-columns: 26px minmax(0, 1fr) 1px auto; align-items: center; column-gap: 12px; min-height: 22px; margin-bottom: 12px; color: var(--ha-text); font-size: 16px; font-weight: 800; }
+    .carrier-io-title { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-height: 22px; margin-bottom: 12px; color: var(--ha-text); font-size: 16px; font-weight: 800; }
     .carrier-io-title small { color: var(--ha-secondary); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
-    .carrier-io-title-main { display: contents; }
-    .carrier-io-title-icon { display: inline-flex; width: 20px; height: 20px; align-items: center; justify-content: center; color: var(--ha-primary); }
-    .carrier-io-title-icon svg { display: block; width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    .carrier-io-title-icon svg .carrier-usb-mark { fill: currentColor; stroke: none; }
-    .carrier-io-title-icon svg .carrier-serial-mark { fill: currentColor; stroke: none; }
-    .carrier-io-title-icon svg .carrier-chip-mark { fill: currentColor; stroke: none; fill-rule: evenodd; }
-    .carrier-io-title-main > .carrier-io-title-icon { grid-column: 1; grid-row: 1; }
-    .carrier-io-title-main > span:not(.carrier-io-title-icon) { grid-column: 2; grid-row: 1; }
-    .carrier-io-title > small { grid-column: 4; grid-row: 1; }
-    .carrier-io-row { display: grid; grid-template-columns: 26px minmax(0, 1fr) 1px auto; align-items: center; gap: 12px; min-height: 58px; padding: 8px 10px; }
-    .carrier-io-row + .carrier-io-row { margin-top: 4px; }
-    .carrier-io-row > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .carrier-io-row::after { content: ''; grid-column: 3; grid-row: 1; width: 1px; height: 24px; background: var(--ha-row-border); }
-    .carrier-io-row > .toggle { grid-column: 4; grid-row: 1; }
-    .carrier-io-icon { display: inline-flex; width: 26px; height: 26px; align-items: center; justify-content: center; color: var(--ha-primary); }
-    .carrier-io-icon svg { display: block; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    .carrier-io-icon svg .carrier-usb-mark { fill: currentColor; stroke: none; }
-    .carrier-io-state { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
+    .carrier-io-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 42px; border: 1px solid var(--ha-row-border); border-radius: 8px; padding: 8px 10px; background: var(--ha-row); }
+    .carrier-io-row + .carrier-io-row { margin-top: 10px; }
+    .carrier-io-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .buzzer-panel {
       display: grid;
       grid-template-columns: minmax(0, 1.15fr) minmax(360px, .85fr);
@@ -1464,25 +1465,11 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .diagnostic-led-icon.err { color: #ff3b3b; }
     .diagnostic-led-state { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
     .diagnostic-led-note { margin: 2px 10px 0; color: var(--ha-secondary); font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
-    .diagnostic-rtc-card { margin-top: 18px; padding: 14px 16px; }
-    .diagnostic-rtc-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px 16px; }
-    .diagnostic-rtc-row { display: grid; grid-template-columns: 26px minmax(0, 1fr) 1px auto; align-items: center; gap: 12px; min-height: 54px; padding: 6px 8px; border: 0; border-radius: 0; background: transparent; }
-    .diagnostic-rtc-row::after { content: ''; grid-column: 3; grid-row: 1; width: 1px; height: 24px; background: var(--ha-row-border); }
-    .diagnostic-rtc-row > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .diagnostic-rtc-icon { display: inline-flex; width: 26px; height: 26px; align-items: center; justify-content: center; color: var(--ha-primary); }
-    .diagnostic-rtc-icon svg { display: block; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    .diagnostic-rtc-row strong { grid-column: 4; min-width: 0; padding-left: 4px; color: var(--ha-text); font-size: 13px; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
-    .diagnostic-rtc-row .state-text.on { color: var(--ha-primary); }
-    .diagnostic-rtc-actions { display: flex; gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--ha-card-border); }
-    .diagnostic-rtc-actions button { min-width: 132px; }
-    .diagnostic-rtc-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
-    .diagnostic-rtc-actions button::before { font-size: 18px; line-height: 1; color: var(--ha-primary); }
-    .diagnostic-rtc-actions #rtc-sync-button::before { content: '↻'; }
-    .diagnostic-rtc-actions button:not(#rtc-sync-button)::before { content: '⟳'; }
+    .diagnostic-rtc-card { margin-top: 18px; }
+    .diagnostic-rtc-grid { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 12px 16px; }
+    .diagnostic-rtc-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 42px; border: 1px solid var(--ha-row-border); border-radius: 8px; padding: 8px 10px; background: var(--ha-row); }
+    .diagnostic-rtc-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .diagnostic-rtc-error { min-height: 18px; margin-top: 10px; color: var(--ha-secondary); font-size: 13px; overflow-wrap: anywhere; }
-    .diagnostic-rtc-error:empty { display: none; }
-    .diagnostic-rtc-note { display: flex; align-items: flex-start; gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--ha-card-border); color: var(--ha-secondary); font-size: 13px; line-height: 1.45; }
-    .diagnostic-rtc-note svg { width: 20px; height: 20px; flex: 0 0 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     .buzzer-settings { display: grid; gap: 12px; }
     .buzzer-row { display: grid; grid-template-columns: minmax(100px, 150px) minmax(0, 1fr); align-items: center; gap: 14px; min-height: 40px; }
     .buzzer-row label,
@@ -1571,11 +1558,10 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       .rs485-logs-toolbar label { margin-top: 0; }
       .rs485-logs-actions { flex-wrap: wrap; }
     }
-    @media (max-width: 1300px) { .overview-panel { grid-template-columns: 1fr; } .overview-identity { border-right: 0; border-bottom: 1px solid var(--ha-card-border); min-height: 260px; } }
+    @media (max-width: 1300px) { .overview-panel { grid-template-columns: 1fr; } .overview-identity { border: 0; min-height: 260px; } }
     @media (max-width: 1100px) { .ports, .carrier-io-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .xport-group-toolbar, .xport-group-toolbar.config-hidden { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .xport-group-toolbar .bus-note, .xport-group-toolbar.config-hidden .bus-note { grid-column: 1 / -1; } .relay-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); } .rs485-layout { grid-template-columns: 1fr; } .rs485-capability-grid, .rs485-device-settings { grid-template-columns: repeat(2, minmax(130px, 1fr)); } .rs485-polling-strip { grid-template-columns: 1fr auto; } .rs485-io-head, .rs485-io-row { grid-template-columns: 52px minmax(150px, 1fr) minmax(150px, 1fr) minmax(180px, .9fr); } }
-    @media (max-width: 1100px) { .diagnostic-rtc-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } }
-    @media (max-width: 900px) { .diagnostic-led-grid, .buzzer-panel { grid-template-columns: 1fr; } .buzzer-actions { grid-template-columns: repeat(2, minmax(120px, 1fr)); grid-template-rows: auto; } .buzzer-actions .buzzer-group-title { grid-column: 1 / -1; } }
-    @media (max-width: 620px) { body { padding: 10px; } .app-toolbar { justify-content: stretch; } .theme-switcher { width: 100%; justify-content: space-between; } .theme-choice { flex: 1; } .overview-identity { min-height: 260px; padding: 22px 18px; } .overview-wordmark { font-size: 22px; letter-spacing: .12em; } .overview-title-row { align-items: flex-start; flex-direction: column; gap: 14px; } .overview-title h1 { font-size: 34px; } .overview-title .subtitle { font-size: 16px; } .overview-facts { grid-template-columns: 88px minmax(0, 1fr); } .overview-facts dt, .overview-facts dd { font-size: 14px; } .overview-health { grid-template-columns: 1fr; gap: 18px; } .overview-health-item + .overview-health-item { border-left: 0; padding-left: 0; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+3) { border-right: 0; border-bottom: 1px solid var(--ha-card-border); } .overview-metric:nth-of-type(4) { border-bottom: 0; } .xport-panel { padding: 18px 14px; border-radius: 12px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .xport-group-toolbar, .xport-group-toolbar.config-hidden { grid-template-columns: 1fr; } .xport-group-toolbar .bus-note, .xport-group-toolbar.config-hidden .bus-note { grid-column: 1; } .ports, .carrier-io-grid, .relay-grid, .rs485-toolbar { grid-template-columns: 1fr; } .rs485-table-row, .rs485-table-row.scan, .rs485-table-row.configured { grid-template-columns: 1fr; align-items: stretch; } .rs485-device-summary { align-items: flex-start; flex-wrap: wrap; gap: 4px 10px; } .rs485-device-meta { flex-wrap: wrap; } .rs485-device-filters, .rs485-device-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } .rs485-row-actions { justify-content: flex-start; } .rs485-detail-head { flex-direction: column; } .rs485-device-identity { align-items: flex-start; } .rs485-detail-meta { position: static; flex-wrap: wrap; } .rs485-device-list-head, .rs485-table-row.configured, .rs485-table-row.configured.discovered { min-width: 390px; grid-template-columns: var(--device-columns); align-items: center; } .rs485-detail-last-seen { position: static; } .rs485-detail-actions { justify-content: flex-start; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-row { grid-template-columns: 1fr; gap: 6px; } .diagnostic-rtc-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 900px) { .diagnostic-led-grid, .diagnostic-rtc-grid, .buzzer-panel { grid-template-columns: 1fr; } .buzzer-actions { grid-template-columns: repeat(2, minmax(120px, 1fr)); grid-template-rows: auto; } .buzzer-actions .buzzer-group-title { grid-column: 1 / -1; } }
+    @media (max-width: 620px) { body { padding: 10px; } .app-toolbar { justify-content: stretch; } .theme-switcher { width: 100%; justify-content: space-between; } .theme-choice { flex: 1; } .overview-identity { min-height: 260px; padding: 22px 18px; } .overview-wordmark { font-size: 22px; letter-spacing: .12em; } .overview-title-row { align-items: flex-start; flex-direction: column; gap: 14px; } .overview-title h1 { font-size: 34px; } .overview-title .subtitle { font-size: 16px; } .overview-facts { grid-template-columns: 88px minmax(0, 1fr); } .overview-facts dt, .overview-facts dd { font-size: 14px; } .overview-health { grid-template-columns: 1fr; gap: 18px; } .overview-health-item + .overview-health-item { border-left: 0; padding-left: 0; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+3), .overview-metric:nth-of-type(4) { border: 0; } .xport-panel { padding: 18px 14px; border-radius: 12px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .xport-group-toolbar, .xport-group-toolbar.config-hidden { grid-template-columns: 1fr; } .xport-group-toolbar .bus-note, .xport-group-toolbar.config-hidden .bus-note { grid-column: 1; } .ports, .carrier-io-grid, .relay-grid, .rs485-toolbar { grid-template-columns: 1fr; } .rs485-table-row, .rs485-table-row.scan, .rs485-table-row.configured { grid-template-columns: 1fr; align-items: stretch; } .rs485-device-summary { align-items: flex-start; flex-wrap: wrap; gap: 4px 10px; } .rs485-device-meta { flex-wrap: wrap; } .rs485-device-filters, .rs485-device-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } .rs485-row-actions { justify-content: flex-start; } .rs485-detail-head { flex-direction: column; } .rs485-device-identity { align-items: flex-start; } .rs485-detail-meta { position: static; flex-wrap: wrap; } .rs485-detail-last-seen { position: static; } .rs485-detail-actions { justify-content: flex-start; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-row { grid-template-columns: 1fr; gap: 6px; } }
     @media (max-width: 620px) { .global-nav .theme-switcher { width: auto; justify-content: initial; } .global-nav .theme-switcher span { display: none; } .global-nav .theme-choice { flex: 0 0 auto; } }
     @media (max-width: 620px) { .rs485-device-list-scroll { overflow-x: auto; } .rs485-device-list-head, .rs485-table-row.configured, .rs485-table-row.configured.discovered { min-width: 390px; grid-template-columns: var(--device-columns); align-items: center; } }
     @media (max-width: 620px) { .rs485-pagination button { min-width: 34px; width: 34px; padding: 0; font-size: 0; } .rs485-pagination button span { font-size: 20px; } }
@@ -1614,52 +1600,59 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         </div>
         <div class="overview-title-divider"></div>
         <dl class="overview-facts">
-          <dt>Serial</dt>
+          <dt><span class="overview-fact-label"><svg class="overview-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2,6H4V18H2V6M5,6H6V18H5V6M7,6H10V18H7V6M11,6H12V18H11V6M14,6H16V18H14V6M17,6H20V18H17V6M21,6H22V18H21V6Z"/></svg>Serial</span></dt>
           <dd id="carrier-identity-serial">--</dd>
-          <dt>Hardware</dt>
+          <dt><span class="overview-fact-label"><svg class="overview-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6,4H18V5H21V7H18V9H21V11H18V13H21V15H18V17H21V19H18V20H6V19H3V17H6V15H3V13H6V11H3V9H6V7H3V5H6V4M11,15V18H12V15H11M13,15V18H14V15H13M15,15V18H16V15H15Z"/></svg>Hardware</span></dt>
           <dd id="carrier-identity-hardware">--</dd>
-          <dt>Software</dt>
+          <dt><span class="overview-fact-label"><svg class="overview-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.6,16.6L19.2,12L14.6,7.4L16,6L22,12L16,18L14.6,16.6M9.4,16.6L4.8,12L9.4,7.4L8,6L2,12L8,18L9.4,16.6Z"/></svg>Software</span></dt>
           <dd id="carrier-identity-software">--</dd>
-          <dt>Variant</dt>
+          <dt><span class="overview-fact-label"><svg class="overview-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12,18.54L19.37,12.8L21,14.07L12,21.07L3,14.07L4.62,12.81L12,18.54M12,16L3,9L12,2L21,9L12,16M12,4.53L6.26,9L12,13.47L17.74,9L12,4.53Z"/></svg>Variant</span></dt>
           <dd id="carrier-identity-variant">--</dd>
         </dl>
         <div class="overview-divider"></div>
         <dl class="overview-health">
           <div class="overview-health-item">
-            <dt>Health</dt>
+            <dt><span class="overview-health-label"><svg class="overview-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5,4A5.5,5.5 0 0,0 2,9.5C2,10 2.09,10.5 2.22,11H6.3L7.57,7.63C7.87,6.83 9.05,6.75 9.43,7.63L11.5,13L12.09,11.58C12.22,11.25 12.57,11 13,11H21.78C21.91,10.5 22,10 22,9.5A5.5,5.5 0 0,0 16.5,4C14.64,4 13,4.93 12,6.34C11,4.93 9.36,4 7.5,4V4M3,12.5A1,1 0 0,0 2,13.5A1,1 0 0,0 3,14.5H5.44L11,20C12,20.9 12,20.9 13,20L18.56,14.5H21A1,1 0 0,0 22,13.5A1,1 0 0,0 21,12.5H13.4L12.47,14.8C12.07,15.81 10.92,15.67 10.55,14.83L8.5,9.5L7.54,11.83C7.39,12.21 7.05,12.5 6.6,12.5H3Z"/></svg>Health</span></dt>
             <dd class="overview-health-value">
               <span id="carrier-health-dot" class="overview-sync-dot"></span>
               <span id="carrier-health-state">Loading</span>
             </dd>
           </div>
           <div class="overview-health-item">
-            <dt>Uptime</dt>
+            <dt><span class="overview-health-label"><svg class="overview-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22C6.47,22 2,17.5 2,12A10,10 0 0,1 12,2M12.5,7V12.25L17,14.92L16.25,16.15L11,13V7H12.5Z"/></svg>Uptime</span></dt>
             <dd id="carrier-uptime">--</dd>
+          </div>
+          <div class="overview-health-item">
+            <dt><span class="overview-health-label"><svg class="overview-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21,10.12H14.22L16.96,7.38C14.23,4.65 9.77,4.65 7.04,7.38C4.31,10.11 4.31,14.56 7.04,17.29C9.77,20.02 14.22,20.02 16.95,17.29C18.31,15.93 19,14.14 19,12.34H21C21,14.65 20.11,16.96 18.36,18.71C14.85,22.22 9.15,22.22 5.64,18.71C2.13,15.2 2.13,9.5 5.64,5.99C9.15,2.48 14.85,2.48 18.36,5.99L21,3.35V10.12Z"/></svg>Updated</span></dt>
+            <dd id="overview-updated" class="overview-health-updated">--</dd>
           </div>
         </dl>
       </div>
       <div class="overview-metrics">
         <article class="overview-metric">
-          <div class="overview-metric-label">Board Temp</div>
+          <div class="overview-metric-label"><svg class="overview-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 13V5A3 3 0 0 0 9 5V13A5 5 0 1 0 15 13M12 4A1 1 0 0 1 13 5V8H11V5A1 1 0 0 1 12 4Z"/></svg>Board Temp</div>
           <div id="metric-board-temperature" class="overview-metric-value">--</div>
           <div id="metric-board-temperature-meta" class="overview-metric-meta">Loading</div>
+          <svg class="overview-metric-chart" viewBox="0 0 400 140" role="img" aria-label="Demo metric history over 30 minutes"><path class="chart-grid" d="M48 26H388M48 68H388M48 110H388"/><path class="chart-area" d="M48.00 73.60L70.67 71.92L93.33 72.76L116.00 67.72L138.67 65.20L161.33 68.56L184.00 63.52L206.67 64.36L229.33 66.88L252.00 61.84L274.67 64.36L297.33 62.68L320.00 66.04L342.67 63.52L365.33 64.36L388.00 65.20V110H48Z"/><path class="chart-line" d="M48.00 73.60L70.67 71.92L93.33 72.76L116.00 67.72L138.67 65.20L161.33 68.56L184.00 63.52L206.67 64.36L229.33 66.88L252.00 61.84L274.67 64.36L297.33 62.68L320.00 66.04L342.67 63.52L365.33 64.36L388.00 65.20"/><circle class="chart-point" cx="388" cy="65.20" r="3"/><text x="0" y="30">38.0</text><text x="0" y="72">36.5</text><text x="0" y="114">35.0</text><text x="48" y="134">-30 min</text><text x="218" y="134" text-anchor="middle">-15 min</text><text x="388" y="134" text-anchor="end">Now</text></svg>
         </article>
         <article class="overview-metric">
-          <div class="overview-metric-label">+5 V Rail</div>
+          <div class="overview-metric-label"><svg class="overview-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7,2H17L13.5,9H17L10,22V14H7V2M9,4V12H12V14.66L14,11H10.24L13.76,4H9Z"/></svg>+5 V Rail</div>
           <div id="metric-5v" class="overview-metric-value">--</div>
           <div id="metric-5v-meta" class="overview-metric-meta">Loading</div>
+          <svg class="overview-metric-chart" viewBox="0 0 400 140" role="img" aria-label="Demo metric history over 30 minutes"><path class="chart-grid" d="M48 26H388M48 68H388M48 110H388"/><path class="chart-area" d="M48.00 70.80L70.67 69.12L93.33 69.96L116.00 64.92L138.67 62.40L161.33 65.76L184.00 60.72L206.67 61.56L229.33 64.08L252.00 59.04L274.67 61.56L297.33 59.88L320.00 63.24L342.67 60.72L365.33 61.56L388.00 62.40V110H48Z"/><path class="chart-line" d="M48.00 70.80L70.67 69.12L93.33 69.96L116.00 64.92L138.67 62.40L161.33 65.76L184.00 60.72L206.67 61.56L229.33 64.08L252.00 59.04L274.67 61.56L297.33 59.88L320.00 63.24L342.67 60.72L365.33 61.56L388.00 62.40"/><circle class="chart-point" cx="388" cy="62.40" r="3"/><text x="0" y="30">5.20</text><text x="0" y="72">5.05</text><text x="0" y="114">4.90</text><text x="48" y="134">-30 min</text><text x="218" y="134" text-anchor="middle">-15 min</text><text x="388" y="134" text-anchor="end">Now</text></svg>
         </article>
         <article class="overview-metric">
-          <div class="overview-metric-label">+3.3 V Rail</div>
+          <div class="overview-metric-label"><svg class="overview-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7,2H17L13.5,9H17L10,22V14H7V2M9,4V12H12V14.66L14,11H10.24L13.76,4H9Z"/></svg>+3.3 V Rail</div>
           <div id="metric-3v3" class="overview-metric-value">--</div>
           <div id="metric-3v3-meta" class="overview-metric-meta">Loading</div>
+          <svg class="overview-metric-chart" viewBox="0 0 400 140" role="img" aria-label="Demo metric history over 30 minutes"><path class="chart-grid" d="M48 26H388M48 68H388M48 110H388"/><path class="chart-area" d="M48.00 76.40L70.67 74.72L93.33 75.56L116.00 70.52L138.67 68.00L161.33 71.36L184.00 66.32L206.67 67.16L229.33 69.68L252.00 64.64L274.67 67.16L297.33 65.48L320.00 68.84L342.67 66.32L365.33 67.16L388.00 68.00V110H48Z"/><path class="chart-line" d="M48.00 76.40L70.67 74.72L93.33 75.56L116.00 70.52L138.67 68.00L161.33 71.36L184.00 66.32L206.67 67.16L229.33 69.68L252.00 64.64L274.67 67.16L297.33 65.48L320.00 68.84L342.67 66.32L365.33 67.16L388.00 68.00"/><circle class="chart-point" cx="388" cy="68.00" r="3"/><text x="0" y="30">3.40</text><text x="0" y="72">3.30</text><text x="0" y="114">3.20</text><text x="48" y="134">-30 min</text><text x="218" y="134" text-anchor="middle">-15 min</text><text x="388" y="134" text-anchor="end">Now</text></svg>
         </article>
         <article class="overview-metric">
-          <div class="overview-metric-label">Input Voltage</div>
+          <div class="overview-metric-label"><svg class="overview-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 7V3H14V7H10V3H8V7C7 7 6 8 6 9V14.5L9.5 18V21H14.5V18L18 14.5V9C18 8 17 7 16 7M16 13.67L13.09 16.59L12.67 17H11.33L10.92 16.59L8 13.67V9.09C8 9.06 8.06 9 8.09 9H15.92C15.95 9 16 9.06 16 9.09V13.67Z"/></svg>Input Voltage</div>
           <div id="metric-vin" class="overview-metric-value">--</div>
           <div id="metric-vin-meta" class="overview-metric-meta">Loading</div>
+          <svg class="overview-metric-chart" viewBox="0 0 400 140" role="img" aria-label="Demo metric history over 30 minutes"><path class="chart-grid" d="M48 26H388M48 68H388M48 110H388"/><path class="chart-area" d="M48.00 76.40L70.67 74.72L93.33 75.56L116.00 70.52L138.67 68.00L161.33 71.36L184.00 66.32L206.67 67.16L229.33 69.68L252.00 64.64L274.67 67.16L297.33 65.48L320.00 68.84L342.67 66.32L365.33 67.16L388.00 68.00V110H48Z"/><path class="chart-line" d="M48.00 76.40L70.67 74.72L93.33 75.56L116.00 70.52L138.67 68.00L161.33 71.36L184.00 66.32L206.67 67.16L229.33 69.68L252.00 64.64L274.67 67.16L297.33 65.48L320.00 68.84L342.67 66.32L365.33 67.16L388.00 68.00"/><circle class="chart-point" cx="388" cy="68.00" r="3"/><text x="0" y="30">12.00</text><text x="0" y="72">11.50</text><text x="0" y="114">11.00</text><text x="48" y="134">-30 min</text><text x="218" y="134" text-anchor="middle">-15 min</text><text x="388" y="134" text-anchor="end">Now</text></svg>
         </article>
-        <div id="overview-updated" class="overview-updated">Updated --</div>
       </div>
     </section>
     <section id="xport-section" class="extension-panel xport-panel ui-nav-section">
@@ -1968,32 +1961,28 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         <div class="buzzer-group-title">RTC Clock</div>
         <div class="diagnostic-rtc-grid">
           <div class="diagnostic-rtc-row">
-            <span class="diagnostic-rtc-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
             <span>RTC time</span>
             <strong id="rtc-time">Not available</strong>
           </div>
           <div class="diagnostic-rtc-row">
-            <span class="diagnostic-rtc-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="1"/><path d="M8 21h8M12 17v4"/></svg></span>
             <span>System time</span>
             <strong id="rtc-system-time">Loading</strong>
           </div>
           <div class="diagnostic-rtc-row">
-            <span class="diagnostic-rtc-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 20V4M5 7l3-3 3 3M16 4v16M13 17l3 3 3-3"/></svg></span>
             <span>Difference</span>
             <strong id="rtc-difference">Unknown</strong>
           </div>
           <div class="diagnostic-rtc-row">
-            <span class="diagnostic-rtc-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg></span>
             <span>Status</span>
             <strong id="rtc-status" class="state-text">PENDING</strong>
           </div>
         </div>
-        <div class="diagnostic-rtc-actions">
+        <div class="toolbar">
           <button type="button" id="rtc-sync-button" onclick="syncRtc()">Sync RTC</button>
           <button type="button" onclick="refreshRtc()">Refresh</button>
         </div>
         <div id="rtc-error" class="diagnostic-rtc-error"></div>
-        <div class="diagnostic-rtc-note"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 10v6M12 7h.01"/></svg><span>RTC is handled by the host kernel driver. The add-on does not access the RTC I2C address directly.</span></div>
+        <div class="diagnostic-led-note">RTC is handled by the host kernel driver. The add-on does not access the RTC I2C address directly.</div>
       </div>
     </section>
     <section id="controls-section" class="extension-panel ui-nav-section">
@@ -2828,7 +2817,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         paintMetric('3v3', rails['3v3'], 2, ' V'),
         paintMetric('vin', rails.vin, 2, ' V')
       ].find(Boolean);
-      document.getElementById('overview-updated').textContent = updatedAt ? `Updated ${updatedAt}` : 'Updated --';
+      document.getElementById('overview-updated').textContent = updatedAt || '--';
     }
     async function renderCarrier() {
       try {
@@ -2890,7 +2879,9 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       }
       value.textContent = `${Number(metric.value).toFixed(precision)}${unit}`;
       meta.textContent = 'Normal';
-      return metric.last_read_utc || '';
+      if (!metric.last_read_utc) return '';
+      const updated = new Date(metric.last_read_utc);
+      return Number.isNaN(updated.getTime()) ? String(metric.last_read_utc).replace(/\s*UTC$/i, '') : updated.toLocaleTimeString([], { hour12: false });
     }
     const carrierGroups = [
       {
@@ -2919,53 +2910,6 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       }
       return result;
     }
-    function carrierItemIcon(name) {
-      const value = String(name || '').toLowerCase();
-      if (value.includes('usb')) return '<svg viewBox="0 0 24 24"><path class="carrier-usb-mark" d="M15 7v4h1v2h-3V5h2l-3-4-3 4h2v8H8v-2.07c.7-.37 1.2-1.08 1.2-1.93C9.2 7.78 8.21 6.8 7 6.8S4.8 7.78 4.8 9c0 .85.5 1.56 1.2 1.93V13a2 2 0 0 0 2 2h3v3.05c-.71.36-1.2 1.1-1.2 1.95a2.2 2.2 0 0 0 4.4 0c0-.85-.49-1.59-1.2-1.95V15h3a2 2 0 0 0 2-2v-2h1V7h-4z"/></svg>';
-      if (value.includes('reset')) return '<svg viewBox="0 0 24 24"><path d="M5 8a8 8 0 1 1-1 7"/><path d="M5 8V4M5 8h4"/></svg>';
-      if (value.includes('flash') || value.includes('enable')) return '<svg viewBox="0 0 24 24"><path d="m13 2-9 12h7l-1 8 9-12h-7z"/></svg>';
-      if (value.includes('termination') || value.includes('120r')) return '<svg viewBox="0 0 24 24"><path d="M2 12h3l2-4 2 8 2-8 2 8 2-8 2 4h3"/></svg>';
-      if (value.includes('led')) return '<svg viewBox="0 0 24 24"><path d="M9 18h6M10 22h4M8 14a6 6 0 1 1 8 0c-1 1-1 2-1 4H9c0-2 0-3-1-4z"/></svg>';
-      if (value.includes('power')) return '<svg viewBox="0 0 24 24"><path d="M12 2v10M6.2 5.8a8 8 0 1 0 11.6 0"/></svg>';
-      return '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M8 12h8"/></svg>';
-    }
-    function carrierIconSpan(name) {
-      const icon = document.createElement('span');
-      icon.className = 'carrier-io-icon';
-      icon.setAttribute('aria-hidden', 'true');
-      icon.innerHTML = carrierItemIcon(name);
-      return icon;
-    }
-    const mdiChip = 'M6,4H18V5H21V7H18V9H21V11H18V13H21V15H18V17H21V19H18V20H6V19H3V17H6V15H3V13H6V11H3V9H6V7H3V5H6V4M11,15V18H12V15H11M13,15V18H14V15H13M15,15V18H16V15H15Z';
-    function carrierGroupIcon(name) {
-      const value = String(name || '').toLowerCase();
-      if (value.includes('x-mod')) return `<svg viewBox="0 0 24 24"><path class="carrier-chip-mark" d="${mdiChip}"/></svg>`;
-      if (value.includes('rs-485')) return '<svg viewBox="0 0 24 24"><path class="carrier-serial-mark" d="M7 3h10v2h2v3h-3v6h-8V8H5V5h2V3m10 6h2v5h-2V9M11 15h2v7h-2v-7M5 9h2v5H5V9Z"/></svg>';
-      if (value === 'usb') return '<svg viewBox="0 0 24 24"><path class="carrier-usb-mark" d="M15 7v4h1v2h-3V5h2l-3-4-3 4h2v8H8v-2.07c.7-.37 1.2-1.08 1.2-1.93C9.2 7.78 8.21 6.8 7 6.8S4.8 7.78 4.8 9c0 .85.5 1.56 1.2 1.93V13a2 2 0 0 0 2 2h3v3.05c-.71.36-1.2 1.1-1.2 1.95a2.2 2.2 0 0 0 4.4 0c0-.85-.49-1.59-1.2-1.95V15h3a2 2 0 0 0 2-2v-2h1V7h-4z"/></svg>';
-      if (value.includes('output')) return '<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
-      if (value.includes('input')) return '<svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>';
-      return '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M8 12h8"/></svg>';
-    }
-    function carrierGroupTitle(name, meta = '') {
-      const title = document.createElement('div');
-      title.className = 'carrier-io-title';
-      const main = document.createElement('span');
-      main.className = 'carrier-io-title-main';
-      const icon = document.createElement('span');
-      icon.className = 'carrier-io-title-icon';
-      icon.setAttribute('aria-hidden', 'true');
-      icon.innerHTML = carrierGroupIcon(name);
-      const label = document.createElement('span');
-      label.textContent = name;
-      main.append(icon, label);
-      title.appendChild(main);
-      if (meta) {
-        const detail = document.createElement('small');
-        detail.textContent = meta;
-        title.appendChild(detail);
-      }
-      return title;
-    }
     async function renderCarrierIO() {
       const output = document.getElementById('output');
       try {
@@ -2985,7 +2929,10 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       root.innerHTML = '';
     const hostOutputCard = document.createElement('article');
       hostOutputCard.className = 'carrier-io-card carrier-io-host-outputs host-outputs';
-      hostOutputCard.appendChild(carrierGroupTitle('Host Outputs'));
+      const hostOutputTitle = document.createElement('div');
+      hostOutputTitle.className = 'carrier-io-title';
+      hostOutputTitle.textContent = 'Host Outputs';
+      hostOutputCard.appendChild(hostOutputTitle);
       for (const outputId of hostOutputOrder) {
         const item = hostOutputs[outputId] || { id: outputId, name: outputId, on: false };
         hostOutputCard.appendChild(hostOutputRow(item));
@@ -2993,7 +2940,10 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       root.appendChild(hostOutputCard);
       const hostInputCard = document.createElement('article');
       hostInputCard.className = 'carrier-io-card host-inputs';
-      hostInputCard.appendChild(carrierGroupTitle('Host Inputs', 'Digital inputs'));
+      const hostInputTitle = document.createElement('div');
+      hostInputTitle.className = 'carrier-io-title';
+      hostInputTitle.innerHTML = '<span>Host Inputs</span><small>Digital inputs</small>';
+      hostInputCard.appendChild(hostInputTitle);
       for (const buttonId of hostButtonOrder) {
         const item = hostButtons[buttonId] || { id: buttonId, name: buttonId.toUpperCase(), pressed: false };
         hostInputCard.appendChild(hostButtonRow(item));
@@ -3002,7 +2952,10 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       for (const group of carrierGroups) {
         const card = document.createElement('article');
         card.className = `carrier-io-card ${group.title === 'RS-485' ? 'rs485-group' : group.title === 'X-Mod1' ? 'xmod1-group' : group.title === 'X-Mod2' ? 'xmod2-group' : group.title === 'USB' ? 'usb-group' : ''}`;
-        card.appendChild(carrierGroupTitle(group.title));
+        const title = document.createElement('div');
+        title.className = 'carrier-io-title';
+        title.textContent = group.title;
+        card.appendChild(title);
         for (const outputId of group.outputs) {
           const item = byId[outputId] || { id: outputId, name: outputId, on: false };
           const row = document.createElement('div');
@@ -3011,7 +2964,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           const label = document.createElement('span');
           label.textContent = carrierGroupItemLabel(group.title, item.name);
           const state = document.createElement('span');
-          state.className = `state-text carrier-io-state ${item.on ? 'on' : ''}`;
+          state.className = `state-text ${item.on ? 'on' : ''}`;
           state.textContent = item.on ? 'ON' : 'OFF';
           const toggle = document.createElement('button');
           toggle.className = `toggle ${item.on ? 'on' : ''}`;
@@ -3019,7 +2972,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           toggle.disabled = !online;
           toggle.innerHTML = `<span>${item.on ? 'ON' : 'OFF'}</span>`;
           toggle.onclick = () => setCarrierOutput(item.id, !item.on);
-          row.append(carrierIconSpan(item.name), label, state, toggle);
+          row.append(label, state, toggle);
           card.appendChild(row);
         }
         root.appendChild(card);
@@ -3036,14 +2989,14 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       const label = document.createElement('span');
       label.textContent = item.name;
       const state = document.createElement('span');
-      state.className = `state-text carrier-io-state ${item.on ? 'on' : ''}`;
+      state.className = `state-text ${item.on ? 'on' : ''}`;
       state.textContent = item.on ? 'ON' : 'OFF';
       const toggle = document.createElement('button');
       toggle.className = `toggle ${item.on ? 'on' : ''}`;
       toggle.type = 'button';
       toggle.innerHTML = `<span>${item.on ? 'ON' : 'OFF'}</span>`;
       toggle.onclick = () => setHostOutput(item.id, !item.on);
-      row.append(carrierIconSpan(item.name), label, state, toggle);
+      row.append(label, state, toggle);
       return row;
     }
     function hostButtonRow(item) {
@@ -3053,14 +3006,14 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       const label = document.createElement('span');
       label.textContent = item.name;
       const state = document.createElement('span');
-      state.className = `state-text carrier-io-state ${item.pressed ? 'on' : ''}`;
+      state.className = `state-text ${item.pressed ? 'on' : ''}`;
       state.textContent = item.pressed ? 'PRESSED' : 'OPEN';
       const indicator = document.createElement('button');
       indicator.className = `toggle readonly ${item.pressed ? 'on' : ''}`;
       indicator.type = 'button';
       indicator.disabled = true;
       indicator.innerHTML = `<span>${item.pressed ? 'ON' : 'OFF'}</span>`;
-      row.append(carrierIconSpan(item.name), label, state, indicator);
+      row.append(label, state, indicator);
       return row;
     }
     function patchControlRow(attribute, id, active, action) {
@@ -5459,16 +5412,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       if (!value) return 'Not available';
       const date = new Date(value);
       if (Number.isNaN(date.getTime())) return value;
-      const formatted = date.toLocaleString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-      });
-      return formatted.replace(',', ' ·');
+      return date.toLocaleString();
     }
     function paintRtcStatus(payload) {
       const systemTime = document.getElementById('rtc-system-time');
@@ -5485,7 +5429,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       rtcTime.textContent = payload.rtc_local_time ? formatRtcTime(payload.rtc_local_time) : formatRtcTime(payload.rtc_time);
       difference.textContent = Number.isNaN(rtcDate.getTime()) || Number.isNaN(systemDate.getTime())
         ? 'Unknown'
-        : `${((rtcDate.getTime() - systemDate.getTime()) / 1000).toFixed(3)} s`;
+        : `${((rtcDate.getTime() - systemDate.getTime()) / 1000).toFixed(3)}s`;
       status.textContent = payload.status || 'UNKNOWN';
       status.className = `state-text ${payload.available ? 'on' : ''}`;
       syncButton.disabled = !payload.available;
@@ -5770,6 +5714,45 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     applyTheme('auto');
     loadTheme();
     initGlobalNavigation();
+    function enableOverviewChartHover() {
+      const ranges = [
+        { min: 35, max: 38, unit: '°C', decimals: 1 },
+        { min: 4.9, max: 5.2, unit: 'V', decimals: 2 },
+        { min: 3.2, max: 3.4, unit: 'V', decimals: 2 },
+        { min: 11, max: 12, unit: 'V', decimals: 2 }
+      ];
+      document.querySelectorAll('.overview-metric-chart').forEach((chart, chartIndex) => {
+        const line = chart.querySelector('.chart-line');
+        if (!line) return;
+        const points = [...line.getAttribute('d').matchAll(/[ML]([\d.]+) ([\d.]+)/g)].map((match) => ({ x: Number(match[1]), y: Number(match[2]) }));
+        const range = ranges[chartIndex] || ranges[0];
+        const hitarea = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        hitarea.setAttribute('class', 'chart-hitarea');
+        hitarea.setAttribute('x', '0'); hitarea.setAttribute('y', '26'); hitarea.setAttribute('width', '400'); hitarea.setAttribute('height', '84');
+        const hoverLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        hoverLine.setAttribute('class', 'chart-hover-line'); hoverLine.setAttribute('y1', '26'); hoverLine.setAttribute('y2', '110');
+        const hoverPoint = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        hoverPoint.setAttribute('class', 'chart-hover-point'); hoverPoint.setAttribute('r', '4');
+        const tooltip = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        tooltip.setAttribute('class', 'chart-tooltip');
+        tooltip.innerHTML = '<rect width="96" height="25" rx="4"/><text x="8" y="16"></text>';
+        chart.append(hitarea, hoverLine, hoverPoint, tooltip);
+        hitarea.addEventListener('pointermove', (event) => {
+          const rect = chart.getBoundingClientRect();
+          const x = Math.max(48, Math.min(388, ((event.clientX - rect.left) / rect.width) * 400));
+          const point = points.reduce((closest, candidate) => Math.abs(candidate.x - x) < Math.abs(closest.x - x) ? candidate : closest, points[0]);
+          const value = range.max - ((point.y - 26) / 84) * (range.max - range.min);
+          hoverLine.setAttribute('x1', point.x); hoverLine.setAttribute('x2', point.x);
+          hoverPoint.setAttribute('cx', point.x); hoverPoint.setAttribute('cy', point.y);
+          const tooltipX = point.x > 320 ? point.x - 104 : point.x + 8;
+          tooltip.setAttribute('transform', `translate(${tooltipX} ${Math.max(28, point.y - 34)})`);
+          tooltip.querySelector('text').textContent = `${value.toFixed(range.decimals)} ${range.unit}`;
+          chart.classList.add('is-hovered');
+        });
+        hitarea.addEventListener('pointerleave', () => chart.classList.remove('is-hovered'));
+      });
+    }
+    enableOverviewChartHover();
     renderCarrier();
     renderXPort();
     renderExtensions();

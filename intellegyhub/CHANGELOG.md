@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.226
+
+- Refine the Overview dashboard grid, spacing, branding scale, divider alignment, and metric status icons.
+
 ## 0.5.225
 
 - Use the official `mdiChip` glyph for X-Mod controls and document the Material icon sourcing rule.
