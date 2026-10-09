@@ -256,7 +256,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.219 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.220 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -311,7 +311,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.219", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.220", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -640,10 +640,13 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       height: 26px;
       min-height: 26px;
       border: 0;
-      border-radius: 999px;
+      border-radius: 999px !important;
       background: #5f6368;
       padding: 0;
       vertical-align: middle;
+      overflow: hidden;
+      box-sizing: border-box;
+      appearance: none;
     }
     .toggle::before {
       content: "";
@@ -658,6 +661,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       transition: transform .16s ease;
     }
     .toggle.on { background: var(--ha-primary); }
+    .toggle:focus, .toggle:focus-visible { outline: none; box-shadow: none; }
     .toggle.on::before { transform: translateX(32px); }
     .toggle span { position: relative; z-index: 1; display: block; padding-left: 7px; color: #fff; font-size: 9px; font-weight: 900; line-height: 26px; text-align: left; pointer-events: none; }
     .toggle:not(.on) span { padding-left: 28px; color: #202124; }

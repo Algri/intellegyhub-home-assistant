@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.220
+
+- Fix toggle corner clipping when GPIO controls switch state.
+
 ## 0.5.219
 
 - Improve Controls layout and expose STE, ERR, and NET LEDs as direct GPIO outputs.
