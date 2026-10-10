@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.233
+
+- Keep the top navigation on one row at medium widths.
+- Preserve the 60px navigation height while allowing horizontal scrolling.
+
 ## 0.5.232
 
 - Fix X-BUS module grids to reflow by card width before controls overlap.
