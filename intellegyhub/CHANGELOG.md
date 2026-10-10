@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.232
+
+- Fix X-BUS module grids to reflow by card width before controls overlap.
+- Keep xDI-16 and xDO-8 channel cells aligned across responsive layouts.
+
 ## 0.5.231
 
 - Fix overview metric grid collapsing into an incorrect 4+1 layout on wide screens.
