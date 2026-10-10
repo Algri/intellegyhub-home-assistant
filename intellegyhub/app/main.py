@@ -256,7 +256,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.230 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.231 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -314,7 +314,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.230", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.231", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -441,11 +441,13 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     main { width: min(100%, 1520px); margin: 0 auto; padding-bottom: 35vh; }
     .app-toolbar { display: flex; justify-content: flex-end; margin-bottom: 10px; }
-    .global-nav { position: sticky; top: 5px; z-index: 80; display: flex; width: 100%; min-width: 0; box-sizing: border-box; gap: 2px; overflow-x: auto; margin: -19px 0 16px; padding: 3px 24px; border: 1px solid var(--ha-row-border); border-radius: 9px; background: color-mix(in srgb, var(--ha-surface) 94%, transparent); box-shadow: 0 6px 18px rgba(0, 0, 0, .18); scrollbar-width: thin; }
-    .global-nav button { flex: 0 0 auto; min-height: 38px; padding: 7px 14px; border: 0 !important; border-radius: 6px; background: transparent !important; color: var(--ha-secondary) !important; font-size: 12px; font-weight: 800; white-space: nowrap; box-shadow: none !important; }
+    .global-nav { position: sticky; top: 5px; z-index: 80; display: flex; align-items: center; width: 100%; height: 60px; min-width: 0; box-sizing: border-box; gap: 0; overflow-x: auto; margin: -19px 0 16px; padding: 10px 28px; border: 0; border-radius: 12px; background: var(--ha-surface); box-shadow: 0 6px 18px rgba(0, 0, 0, .18); scrollbar-width: thin; }
+    .global-nav button { position: relative; flex: 0 0 auto; min-height: 42px; padding: 8px 22px; border: 0 !important; border-radius: 0; background: transparent !important; color: var(--ha-secondary) !important; font-size: 15px; font-weight: 700; white-space: nowrap; box-shadow: none !important; }
+    .global-nav > button[data-ui-nav-target] + button[data-ui-nav-target]::before { content: ''; position: absolute; left: 0; top: 8px; bottom: 8px; width: 1px; background: var(--ha-row-border); }
     .global-nav > button[data-ui-nav-target] { min-width: 86px; text-align: center; }
     .global-nav button:hover, .global-nav button:focus-visible { background: var(--ha-field) !important; color: var(--ha-text) !important; outline: none; box-shadow: none !important; }
-    .global-nav button.active { border: 1px solid var(--ha-primary) !important; border-radius: 10px !important; background: var(--ha-field) !important; color: var(--ha-primary) !important; }
+    .global-nav button.active { color: var(--ha-primary) !important; }
+    .global-nav > button[data-ui-nav-target].active::after { content: ''; position: absolute; left: 22px; right: 22px; bottom: 0; height: 2px; background: var(--ha-primary); }
     .global-nav .theme-switcher { flex: 0 0 auto; margin-left: auto; }
     .global-nav .theme-switcher { border: 0; background: transparent; box-shadow: none; padding: 0; }
     .global-nav .theme-switcher .theme-choice { min-height: 38px !important; }
@@ -461,7 +463,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .theme-choice::before { content: ''; width: 12px; height: 12px; flex: 0 0 12px; box-sizing: border-box; border: 2px solid currentColor; border-radius: 50%; }
     .theme-choice.active { border-color: transparent !important; color: var(--ha-primary) !important; background: transparent !important; }
     .theme-choice.active::before { box-shadow: inset 0 0 0 3px var(--ha-surface); background: var(--ha-primary); }
-    .overview-panel { position: relative; display: grid; grid-template-columns: minmax(420px, .9fr) minmax(520px, 1.5fr); gap: 0; margin-top: 0; margin-bottom: 18px; padding: 0; overflow: hidden; }
+    .overview-panel { position: relative; display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.5fr); gap: 0; margin-top: 0; margin-bottom: 18px; padding: 0; overflow: hidden; }
     .extension-panel.overview-panel { padding: 0; }
     .overview-identity { display: flex; flex-direction: column; min-height: 0; padding: 24px 42px; border-right: 0; }
     .overview-badge-row { display: flex; align-items: center; justify-content: flex-start; gap: 18px; margin-bottom: 16px; }
@@ -487,7 +489,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .overview-sync-dot { width: 18px; height: 18px; border-radius: 50%; background: #448aff; }
     .overview-sync-dot.online { background: var(--ha-success); }
     .overview-sync-dot.offline { background: #ff6b6b; }
-    .overview-metrics { position: relative; display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); padding-bottom: 0; }
+    .overview-metrics { position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding-bottom: 0; min-width: 0; }
     .overview-metric { display: block; min-width: 0; min-height: 135px; box-sizing: border-box; padding: 24px; border: 0; border-radius: 0; background: transparent; overflow: hidden; }
     .overview-metric-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; min-width: 0; padding-right: 14px; box-sizing: border-box; }
     .overview-metric-label { display: inline-flex; align-items: center; gap: 8px; min-width: 0; color: var(--ha-text); font-family: inherit; font-size: 18px; line-height: 1.3; font-weight: 600; letter-spacing: 0; text-transform: none; margin: 0; }
@@ -1427,8 +1429,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .module-card .danger-button:hover, .module-card .danger-button:focus-visible { border: 0 !important; background: transparent !important; color: var(--ha-danger-text); box-shadow: none !important; }
     .module-card .danger-button svg { display: block !important; width: 24px !important; height: 24px !important; flex: 0 0 24px; fill: currentColor; }
     .relay-grid { display: grid; grid-template-columns: repeat(4, minmax(180px, 1fr)); gap: 10px 14px; align-items: stretch; }
-    .module-card[data-module-kind="digital_input"] .relay-grid { grid-template-columns: repeat(8, minmax(120px, 1fr)); }
-    .module-card[data-module-kind="relay_output"] .relay-grid { grid-template-columns: repeat(8, minmax(120px, 1fr)) !important; }
+    .module-card[data-module-kind="digital_input"] .relay-grid, .module-card[data-module-kind="relay_output"] .relay-grid { grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); }
     .relay-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 12px; color: var(--ha-text); min-height: 42px; border: 0; border-radius: 0; padding: 8px 0; background: transparent; }
     .module-card .relay-row, .module-card .relay-row:hover, .module-card .relay-row:focus-within { border: 0 !important; border-radius: 0 !important; padding: 10px 12px !important; background: transparent !important; box-shadow: none !important; }
     .module-card .relay-row:nth-child(4n + 2), .module-card .relay-row:nth-child(4n + 3), .module-card .relay-row:nth-child(4n + 4) { border-left: 1px solid var(--ha-row-border) !important; padding-left: 18px !important; }
@@ -1533,18 +1534,19 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .diagnostic-led-state { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
     .diagnostic-led-note { margin: 2px 10px 0; color: var(--ha-secondary); font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
     .diagnostic-rtc-card { margin-top: 18px; }
-    .diagnostic-rtc-card { position: relative; border: 1px solid var(--ha-card-border); border-radius: 12px; padding: 20px 24px 22px; background: var(--ha-surface); }
+    .diagnostic-rtc-card { position: relative; container-type: inline-size; container-name: rtc-card; border: 1px solid var(--ha-card-border); border-radius: 12px; padding: 20px 24px 22px; background: var(--ha-surface); }
     .diagnostic-rtc-title { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
     .diagnostic-rtc-title::before { content: ''; width: 22px; height: 22px; flex: 0 0 22px; display: block; background: var(--ha-primary); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2M12 4C16.42 4 20 7.58 20 12C20 16.42 16.42 20 12 20C7.58 20 4 16.42 4 12C4 7.58 7.58 4 12 4M11 7V13L16.2 16.2L17.2 14.5L13 12V7H11Z'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2M12 4C16.42 4 20 7.58 20 12C20 16.42 16.42 20 12 20C7.58 20 4 16.42 4 12C4 7.58 7.58 4 12 4M11 7V13L16.2 16.2L17.2 14.5L13 12V7H11Z'/%3E%3C/svg%3E") center / contain no-repeat; }
     .diagnostic-rtc-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 136px; }
     .diagnostic-rtc-actions svg { width: 18px; height: 18px; fill: currentColor; }
     .diagnostic-rtc-footer { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 18px; margin-top: 0; }
     .diagnostic-rtc-card .diagnostic-led-note { margin: 0; text-align: right; }
-    .diagnostic-rtc-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.3fr) minmax(0, .7fr) minmax(0, .7fr); gap: 18px; }
-    .diagnostic-rtc-row { display: grid; grid-template-columns: 22px minmax(0, 1fr) minmax(0, .9fr); align-items: center; gap: 10px; min-width: 0; min-height: 48px; border: 0; border-radius: 0; padding: 8px 0; background: transparent; }
+    .diagnostic-rtc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 18px; }
+    .diagnostic-rtc-row { display: grid; grid-template-columns: 22px minmax(90px, auto) minmax(0, 1fr); align-items: center; gap: 10px; min-width: 0; min-height: 48px; border: 0; border-radius: 0; padding: 8px 0; background: transparent; }
     .diagnostic-rtc-icon { width: 22px; height: 22px; color: var(--ha-primary); fill: currentColor; }
     .diagnostic-rtc-row:not(:last-child) { border-right: 1px solid var(--ha-row-border); padding-right: 18px; }
     .diagnostic-rtc-row strong { min-width: 0; overflow: hidden; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+    .diagnostic-rtc-row:nth-child(-n+2) strong { overflow: visible; text-overflow: clip; font-size: 14px; }
     .diagnostic-rtc-row span { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .diagnostic-rtc-error { min-height: 0; margin: 0; color: var(--ha-secondary); font-size: 13px; overflow-wrap: anywhere; }
     .buzzer-settings { display: grid; gap: 12px; }
@@ -1599,6 +1601,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     pre { display: none; min-height: 180px; max-height: 360px; overflow: auto; border: 1px solid var(--ha-card-border); border-radius: 8px; padding: 14px; background: var(--ha-pre); color: #e5edf7; font-size: 13px; }
     pre.visible { display: block; }
     @media (max-width: 1300px) { .relay-grid { grid-template-columns: repeat(4, minmax(140px, 1fr)); } .rs485-toolbar { grid-template-columns: repeat(3, minmax(140px, 1fr)); } .rs485-actions { justify-content: flex-start; } }
+    @media (max-width: 1300px) { .global-nav { flex-wrap: wrap; overflow-x: visible; } .global-nav .theme-switcher { margin-left: 0; } }
     @media (max-width: 900px) {
       .rs485-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
       .rs485-toolbar .rs485-connection-intro { grid-column: 1 / -1; }
@@ -1637,8 +1640,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     @media (max-width: 1300px) { .overview-panel { grid-template-columns: 1fr; } .overview-identity { border: 0; min-height: 260px; } }
     @media (max-width: 1100px) { .ports, .carrier-io-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .xport-group-toolbar, .xport-group-toolbar.config-hidden { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .xport-group-toolbar .bus-note, .xport-group-toolbar.config-hidden .bus-note { grid-column: 1 / -1; } .relay-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); } .rs485-layout { grid-template-columns: 1fr; } .rs485-capability-grid, .rs485-device-settings { grid-template-columns: repeat(2, minmax(130px, 1fr)); } .rs485-polling-strip { grid-template-columns: 1fr auto; } .rs485-io-head, .rs485-io-row { grid-template-columns: 52px minmax(150px, 1fr) minmax(150px, 1fr) minmax(180px, .9fr); } }
-    @media (max-width: 1100px) { .diagnostic-rtc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-    @media (max-width: 900px) { .diagnostic-led-grid, .diagnostic-rtc-grid, .buzzer-panel { grid-template-columns: 1fr; } .buzzer-actions { grid-template-columns: repeat(2, minmax(120px, 1fr)); grid-template-rows: auto; } .buzzer-actions .buzzer-group-title { grid-column: 1 / -1; } }
+    @media (max-width: 900px) { .diagnostic-led-grid, .buzzer-panel { grid-template-columns: 1fr; } .buzzer-actions { grid-template-columns: repeat(2, minmax(120px, 1fr)); grid-template-rows: auto; } .buzzer-actions .buzzer-group-title { grid-column: 1 / -1; } }
     @media (max-width: 620px) { body { padding: 10px; } .app-toolbar { justify-content: stretch; } .theme-switcher { width: 100%; justify-content: space-between; } .theme-choice { flex: 1; } .overview-identity { min-height: 260px; padding: 22px 18px; } .overview-wordmark { font-size: 22px; letter-spacing: .12em; } .overview-title-row { align-items: flex-start; flex-direction: column; gap: 14px; } .overview-title h1 { font-size: 34px; } .overview-title .subtitle { font-size: 16px; } .overview-facts { grid-template-columns: 88px minmax(0, 1fr); } .overview-facts dt, .overview-facts dd { font-size: 14px; } .overview-health { grid-template-columns: 1fr; gap: 18px; } .overview-health-item + .overview-health-item { border-left: 0; padding-left: 0; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+3), .overview-metric:nth-of-type(4) { border: 0; } .extension-panel:not(.overview-panel) { padding-left: 14px; padding-right: 14px; } #controls-section { padding: 18px 14px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .xport-group-toolbar, .xport-group-toolbar.config-hidden { grid-template-columns: 1fr; } .xport-group-toolbar .bus-note, .xport-group-toolbar.config-hidden .bus-note { grid-column: 1; } .ports, .carrier-io-grid, .relay-grid, .rs485-toolbar { grid-template-columns: 1fr; } .rs485-table-row, .rs485-table-row.scan, .rs485-table-row.configured { grid-template-columns: 1fr; align-items: stretch; } .rs485-device-summary { align-items: flex-start; flex-wrap: wrap; gap: 4px 10px; } .rs485-device-meta { flex-wrap: wrap; } .rs485-device-filters, .rs485-device-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } .rs485-row-actions { justify-content: flex-start; } .rs485-detail-head { flex-direction: column; } .rs485-device-identity { align-items: flex-start; } .rs485-detail-meta { position: static; flex-wrap: wrap; } .rs485-detail-last-seen { position: static; } .rs485-detail-actions { justify-content: flex-start; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-row { grid-template-columns: 1fr; gap: 6px; } }
     @media (max-width: 620px) { .global-nav .theme-switcher { width: auto; justify-content: initial; } .global-nav .theme-switcher span { display: none; } .global-nav .theme-choice { flex: 0 0 auto; } }
     @media (max-width: 620px) { .global-nav button { min-height: 34px; padding: 6px 10px; font-size: 11px; } .global-nav > button[data-ui-nav-target] { min-width: 72px; } }
@@ -2065,7 +2067,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       <div class="module-row">
         <div>
           <div class="eyebrow">Carrier Board I/O</div>
-          <h1 class="controls-title"><svg class="controls-title-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7H18A5 5 0 0 1 23 12A5 5 0 0 1 18 17C16.36 17 14.91 16.21 14 15H10C9.09 16.21 7.64 17 6 17A5 5 0 0 1 1 12A5 5 0 0 1 6 7M19.75 9.5A1.25 1.25 0 0 0 18.5 10.75A1.25 1.25 0 0 0 19.75 12A1.25 1.25 0 0 0 21 10.75A1.25 1.25 0 0 0 19.75 9.5M17.25 12A1.25 1.25 0 0 0 16 13.25A1.25 1.25 0 0 0 17.25 14.5A1.25 1.25 0 0 0 18.5 13.25A1.25 1.25 0 0 0 17.25 12M5 9V11H3V13H5V15H7V13H9V11H7V9H5Z"/></svg>CONTROLS</h1>
+          <h1 class="controls-title"><svg class="controls-title-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 13C6.14 13 4.59 14.28 4.14 16H2V18H4.14C4.59 19.72 6.14 21 8 21S11.41 19.72 11.86 18H22V16H11.86C11.41 14.28 9.86 13 8 13M8 19C6.9 19 6 18.1 6 17C6 15.9 6.9 15 8 15S10 15.9 10 17C10 18.1 9.1 19 8 19M19.86 6C19.41 4.28 17.86 3 16 3S12.59 4.28 12.14 6H2V8H12.14C12.59 9.72 14.14 11 16 11S19.41 9.72 19.86 8H22V6H19.86M16 9C14.9 9 14 8.1 14 7C14 5.9 14.9 5 16 5S18 5.9 18 7C18 8.1 17.1 9 16 9Z"/></svg>CONTROLS</h1>
           <div class="subtitle">MCP23017 controlled carrier outputs</div>
           <div id="carrier-io-status" class="status">CONTROLS: loading...</div>
         </div>
@@ -2077,7 +2079,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       <div class="module-row">
         <div>
           <div class="eyebrow">Service Tools</div>
-          <h1 class="tools-title"><svg class="tools-title-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M22.7 19L13.6 9.9C14.5 7.6 14 4.9 12.2 3.1C10.4 1.3 7.7 .8 5.4 1.7L9.2 5.5L5.5 9.2L1.7 5.4C.8 7.7 1.3 10.4 3.1 12.2C4.9 14 7.6 14.5 9.9 13.6L19 22.7C19.4 23.1 20 23.1 20.4 22.7L22.7 20.4C23.1 20 23.1 19.4 22.7 19M7.5 11C5 11 3 9 3 6.5C3 6 3.1 5.6 3.2 5.2L5.5 7.5L7.5 5.5L5.2 3.2C5.6 3.1 6 3 6.5 3C9 3 11 5 11 7.5C11 8.1 10.9 8.7 10.7 9.2L8.8 11.1C8.3 11 7.9 11 7.5 11Z"/></svg>TOOLS</h1>
+          <h1 class="tools-title"><svg class="tools-title-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M22.7 19L13.6 9.9C14.5 7.6 14 4.9 12.2 3.1C10.4 1.3 7.7 0.8 5.4 1.7L9.2 5.5L5.5 9.2L1.7 5.4C0.8 7.7 1.3 10.4 3.1 12.2C4.9 14 7.6 14.5 9.9 13.6L19 22.7C19.4 23.1 20 23.1 20.4 22.7L22.7 20.4C23.1 20 23.1 19.4 22.7 19Z"/></svg>TOOLS</h1>
           <div class="subtitle">Quick access to health, state, device discovery and I2C diagnostics.</div>
         </div>
         <div class="transport">REST</div>

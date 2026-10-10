@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.231
+
+- Fix overview metric grid collapsing into an incorrect 4+1 layout on wide screens.
+- Make websocket diagnostic indicator test timing deterministic.
+
 ## 0.5.230
 
 - Refined RTC and Buzzer responsive layouts to prevent control overlap.
