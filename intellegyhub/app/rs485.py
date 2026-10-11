@@ -2171,7 +2171,7 @@ class Rs485Manager:
             "selected_id": selected_id or (current_port_devices[0]["id"] if current_port_devices else (devices[0]["id"] if devices else None)),
             "mock": self.mock,
             "effective_mode": effective_mode,
-            "serial_ports": serial_port_options(),
+            "serial_ports": serial_port_options(self.mock),
         }
 
     def command_snapshot(self, device: Rs485Device, status: str) -> dict[str, Any]:
@@ -2559,7 +2559,12 @@ def default_bus_settings() -> dict[str, Any]:
     }
 
 
-def serial_port_options() -> list[dict[str, str]]:
+def serial_port_options(mock: bool = True) -> list[dict[str, str]]:
+    if not mock:
+        return [
+            {"value": "/dev/ttyAMA3", "label": "RS-485 CH1 (/dev/ttyAMA3)"},
+            {"value": "/dev/ttyAMA5", "label": "RS-485 CH2 (/dev/ttyAMA5)"},
+        ]
     options: list[dict[str, str]] = []
     seen = {option["value"] for option in options}
     if list_ports is not None:

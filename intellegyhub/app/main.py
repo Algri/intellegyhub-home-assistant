@@ -256,7 +256,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.233 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+                "Starting v0.5.234 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -314,7 +314,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.233", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.234", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -1433,18 +1433,13 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .relay-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 12px; color: var(--ha-text); min-height: 42px; border: 0; border-radius: 0; padding: 8px 0; background: transparent; }
     .module-card .relay-row, .module-card .relay-row:hover, .module-card .relay-row:focus-within { border: 0 !important; border-radius: 0 !important; padding: 10px 12px !important; background: transparent !important; box-shadow: none !important; }
     .module-card .relay-row { border-left: 0 !important; padding-left: 12px !important; }
-    .module-card .relay-row { grid-template-columns: 18px minmax(16px, 1fr) auto; }
+    .module-card .relay-row { position: relative; grid-template-columns: 18px minmax(16px, 1fr) auto; }
     .module-card .relay-row > span:nth-child(2) { min-width: 2ch; overflow: visible; text-overflow: clip; }
-    .module-card .relay-row:nth-child(8n + 2),
-    .module-card .relay-row:nth-child(8n + 3),
-    .module-card .relay-row:nth-child(8n + 4),
-    .module-card .relay-row:nth-child(8n + 5),
-    .module-card .relay-row:nth-child(8n + 6),
-    .module-card .relay-row:nth-child(8n + 7),
-    .module-card .relay-row:nth-child(8n + 8) { border-left: 1px solid var(--ha-row-border) !important; padding-left: 18px !important; }
     .module-card .relay-row:hover, .module-card .relay-row:focus-within { background: transparent !important; }
     .module-card .relay-row .toggle { position: relative; margin-left: 0; }
-    .relay-row .control-divider { display: none; }
+    .module-card .relay-row .control-divider { position: absolute; top: 50%; right: -7px; display: block !important; width: 1px; min-width: 1px; height: 28px; transform: translateY(-50%); background: var(--ha-row-border); }
+    .module-card .relay-row:nth-child(8n) .control-divider,
+    .module-card .relay-row:last-child .control-divider { display: none !important; }
     .module-card .relay-row .state-text { display: none; }
     .relay-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .state-text { min-width: 30px; text-align: right; color: var(--ha-secondary); font-size: 12px; font-weight: 800; letter-spacing: .04em; }
@@ -1656,14 +1651,32 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     @container (max-width: 1200px) {
       .module-card[data-module-kind="digital_input"] .relay-grid,
       .module-card[data-module-kind="relay_output"] .relay-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .module-card .relay-row:nth-child(4n) .control-divider { display: none !important; }
+      .module-card .relay-row:nth-child(n) { border-left: 0 !important; padding-left: 12px !important; }
     }
     @container (max-width: 700px) {
       .module-card[data-module-kind="digital_input"] .relay-grid,
       .module-card[data-module-kind="relay_output"] .relay-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .module-card .relay-row:nth-child(2n) .control-divider { display: none !important; }
+      .module-card .relay-row:nth-child(n) { border-left: 0 !important; padding-left: 12px !important; }
     }
     @container (max-width: 440px) {
       .module-card[data-module-kind="digital_input"] .relay-grid,
       .module-card[data-module-kind="relay_output"] .relay-grid { grid-template-columns: 1fr; }
+      .module-card .relay-row .control-divider { display: none !important; }
+      .module-card .relay-row:nth-child(n) { border-left: 0 !important; padding-left: 12px !important; }
+    }
+    @media (max-width: 1100px) {
+      .module-card .relay-row:nth-child(n) { border-left: 0 !important; padding-left: 12px !important; }
+      .module-card .relay-row:nth-child(4n) .control-divider { display: none !important; }
+    }
+    @media (max-width: 900px) {
+      .module-card .relay-row:nth-child(n) { border-left: 0 !important; padding-left: 12px !important; }
+      .module-card .relay-row:nth-child(2n) .control-divider { display: none !important; }
+    }
+    @media (max-width: 620px) {
+      .module-card .relay-row:nth-child(n) { border-left: 0 !important; padding-left: 12px !important; }
+      .module-card .relay-row .control-divider { display: none !important; }
     }
   </style>
 </head>
@@ -3319,7 +3332,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           toggle.onclick = () => setExtensionRelay(module.id, index + 1, !on);
           const divider = document.createElement('span');
           divider.className = 'control-divider';
-          row.append(icon, label, state, divider, toggle);
+          row.append(icon, label, state, toggle, divider);
           grid.appendChild(row);
         });
         } else if (isInputModule) {
@@ -3339,7 +3352,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           indicator.innerHTML = `<span>${active ? 'ON' : 'OFF'}</span>`;
           const divider = document.createElement('span');
           divider.className = 'control-divider';
-          row.append(icon, label, state, divider, indicator);
+          row.append(icon, label, state, indicator, divider);
           grid.appendChild(row);
         });
         }

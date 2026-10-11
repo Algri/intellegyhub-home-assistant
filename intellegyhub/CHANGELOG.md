@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.234
+
+- Restrict production RS-485 port options to the two carrier interfaces.
+- Preserve serial discovery behavior in mock mode.
+
 ## 0.5.233
 
 - Keep the top navigation on one row at medium widths.
