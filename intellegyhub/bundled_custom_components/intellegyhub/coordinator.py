@@ -104,7 +104,29 @@ class IntellegyHubGpioManager:
         self._notify()
 
     async def async_set_rs485_capability(self, device_id: str, capability_id: str, value) -> dict:
-        result = await self.client.set_rs485_capability(device_id, capability_id, value)
+        device = next(
+            (item for item in self.rs485.get("devices", []) if item.get("id") == device_id),
+            None,
+        )
+        old_value = None
+        had_old_value = False
+        if isinstance(device, dict):
+            values = device.setdefault("values", {})
+            had_old_value = capability_id in values
+            old_value = values.get(capability_id)
+            values[capability_id] = value
+            self._notify()
+        try:
+            result = await self.client.set_rs485_capability(device_id, capability_id, value)
+        except Exception:
+            if isinstance(device, dict):
+                values = device.setdefault("values", {})
+                if had_old_value:
+                    values[capability_id] = old_value
+                else:
+                    values.pop(capability_id, None)
+                self._notify()
+            raise
         if isinstance(result.get("devices"), list):
             changed = self.rs485 != result
             self.rs485 = result

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.235
+
+- Update RS-485 switch entities optimistically in Home Assistant.
+- Roll back RS-485 state when the backend command fails.
+
 ## 0.5.234
 
 - Restrict production RS-485 port options to the two carrier interfaces.
