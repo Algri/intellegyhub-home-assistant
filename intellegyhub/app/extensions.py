@@ -638,6 +638,7 @@ class ExtensionManager:
         self._lock = asyncio.Lock()
         self._relay_command_lock = asyncio.Lock()
         self._module_persistence_task: asyncio.Task | None = None
+        self._power_refresh_task: asyncio.Task | None = None
         self._pending_modules_snapshot: list[ExtensionModule] | None = None
         self._publisher: Callable[[dict[str, Any]], Any] | None = None
         self._xdi16_task: asyncio.Task | None = None
@@ -675,6 +676,9 @@ class ExtensionManager:
 
     async def stop(self) -> None:
         self._stopped.set()
+        if self._power_refresh_task is not None:
+            await self._power_refresh_task
+            self._power_refresh_task = None
         await self.hardware.stop_xdi16_interrupt()
         if self._xdi16_task:
             self._xdi16_task.cancel()
@@ -688,6 +692,11 @@ class ExtensionManager:
             self._module_persistence_task = None
         await self.store.save_power(self.power_on)
         await self.store.save_modules(list(self.modules.values()))
+
+    async def wait_for_power_refresh(self) -> None:
+        if self._power_refresh_task is not None:
+            await self._power_refresh_task
+            self._power_refresh_task = None
 
     def _persist_modules_nowait(self) -> None:
         self._pending_modules_snapshot = copy.deepcopy(list(self.modules.values()))
@@ -717,20 +726,52 @@ class ExtensionManager:
         }
 
     async def set_power(self, on: bool) -> dict[str, Any]:
+        if self._power_refresh_task is not None and not self._power_refresh_task.done():
+            if on:
+                await self._power_refresh_task
+            else:
+                self._power_refresh_task.cancel()
+                try:
+                    await self._power_refresh_task
+                except asyncio.CancelledError:
+                    pass
+        self._power_refresh_task = None
         async with self._lock:
+            if self._module_persistence_task is not None and not self._module_persistence_task.done():
+                await self._module_persistence_task
             self.power_on = await self.hardware.set_power(on)
             await self.store.save_power(self.power_on)
             if self.power_on:
-                await asyncio.sleep(POWER_SETTLE_SECONDS)
-                await self._refresh_stored_modules_locked()
                 self._wake_xdi16_interrupt()
+                if isinstance(self.hardware, ExtensionHardware):
+                    self._power_refresh_task = asyncio.create_task(
+                        self._refresh_after_power_on(), name="intellegyhub_xbus_power_refresh"
+                    )
+                else:
+                    await self._refresh_stored_modules_locked()
             else:
                 self._mark_modules_unavailable("BUS_POWER_OFF")
-                await self.store.save_modules(list(self.modules.values()))
+                self._persist_modules_nowait()
             self.error = None
             await self._publish({"type": "extension_power_changed", "on": self.power_on})
             await self._publish({"type": "extensions_changed", "extensions": self.snapshot()})
             return self.snapshot()
+
+    async def _refresh_after_power_on(self) -> None:
+        await asyncio.sleep(POWER_SETTLE_SECONDS)
+        try:
+            async with self._lock:
+                if not self.power_on:
+                    return
+                await self._refresh_stored_modules_locked()
+                self._wake_xdi16_interrupt()
+                await self._publish({"type": "extensions_changed", "extensions": self.snapshot()})
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            self.error = str(exc)
+            LOGGER.exception("X-BUS power refresh failed")
+            await self._publish({"type": "extensions_changed", "extensions": self.snapshot()})
 
     async def scan(self) -> dict[str, Any]:
         async with self._lock:

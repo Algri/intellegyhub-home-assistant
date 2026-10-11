@@ -256,7 +256,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-        "Starting v0.5.236 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+        "Starting v0.5.237 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -314,7 +314,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.236", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.237", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -3439,18 +3439,59 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         modules.appendChild(card);
       }
     }
+    let extensionPowerRequestInFlight = false;
     async function toggleExtensionPower() {
+      if (extensionPowerRequestInFlight) return;
       const on = document.getElementById('extension-power-toggle').classList.contains('on');
-      const payload = await requestJson('api/v1/extensions/power', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ on: !on })
-      });
-      paintExtensions(payload);
+      const desired = !on;
+      extensionPowerRequestInFlight = true;
+      const powerToggle = document.getElementById('extension-power-toggle');
+      powerToggle.disabled = true;
+      applyExtensionPowerState(desired);
+      try {
+        const payload = await requestJson('api/v1/extensions/power', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ on: desired })
+        });
+        extensionState = payload;
+        applyExtensionPowerState(Boolean(payload.power && payload.power.on), payload.modules);
+      } catch (error) {
+        applyExtensionPowerState(on);
+        throw error;
+      } finally {
+        extensionPowerRequestInFlight = false;
+        powerToggle.disabled = false;
+      }
     }
     async function scanExtensions() {
       const payload = await requestJson('api/v1/extensions/scan', { method: 'POST' });
       paintExtensions(payload);
+    }
+    function applyExtensionPowerState(powerOn, modules = null) {
+      const powerToggle = document.getElementById('extension-power-toggle');
+      powerToggle.className = `toggle ${powerOn ? 'on' : ''}`;
+      powerToggle.querySelector('span').textContent = powerOn ? 'ON' : 'OFF';
+      const busReady = document.querySelector('.xbus-hero .xbus-ready');
+      busReady.textContent = powerOn ? 'BUS READY' : 'BUS OFF';
+      busReady.classList.toggle('off', !powerOn);
+      document.querySelectorAll('#modules .module-card').forEach((card) => {
+        const status = card.querySelector('.xbus-module-status');
+        if (status) {
+          if (!powerOn) {
+            status.classList.add('offline');
+            status.textContent = 'OFFLINE';
+          } else if (Array.isArray(modules)) {
+            const module = modules.find((item) => item.id === card.dataset.moduleId);
+            const online = Boolean(module && module.available);
+            status.classList.toggle('offline', !online);
+            status.textContent = online ? 'ONLINE' : 'OFFLINE';
+          }
+        }
+        card.querySelectorAll('.relay-row .toggle:not(.readonly)').forEach((toggle) => {
+          toggle.disabled = !powerOn;
+        });
+      });
     }
     async function setExtensionRelay(moduleId, channel, on) {
       const payload = await requestJson(`api/v1/extensions/modules/${moduleId}/relays/${channel}`, {
@@ -3481,7 +3522,6 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     function patchExtensions(payload) {
       if (!extensionState || !Array.isArray(extensionState.modules) ||
-          Boolean(extensionState.power && extensionState.power.on) !== Boolean(payload.power && payload.power.on) ||
           extensionState.modules.length !== payload.modules.length) {
         paintExtensions(payload);
         return;
@@ -3492,6 +3532,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         return;
       }
       extensionState = payload;
+      applyExtensionPowerState(Boolean(payload.power && payload.power.on));
       for (const module of payload.modules) {
         const card = cards.get(module.id);
         const online = Boolean(module.available && payload.power.on);
@@ -3709,8 +3750,6 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
             patchRs485Live({ devices: [message.device] });
           }
         } else if (message.type === 'extension_module_removed') {
-          renderExtensions();
-        } else if (message.type === 'extension_power_changed') {
           renderExtensions();
         } else if (message.type === 'onewire_changed') {
           paintOneWire(message.onewire);

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.237
+
+- Make X-BUS power switching responsive with optimistic UI updates and background module refresh.
+- Cancel pending module refreshes when powering the bus off.
+
 ## 0.5.236
 
 - Refine the X-BUS hero layout, module positioning, power status indicator, and responsive presentation.
