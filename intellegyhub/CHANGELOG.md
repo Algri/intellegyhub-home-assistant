@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.236
+
+- Refine the X-BUS hero layout, module positioning, power status indicator, and responsive presentation.
+
 ## 0.5.235
 
 - Update RS-485 switch entities optimistically in Home Assistant.

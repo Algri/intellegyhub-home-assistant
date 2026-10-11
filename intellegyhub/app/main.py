@@ -256,7 +256,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-                "Starting v0.5.235 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+        "Starting v0.5.236 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -314,7 +314,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.235", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.236", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -787,6 +787,69 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .xport-title-icon { width: 34px; height: 34px; color: var(--ha-primary); fill: currentColor; flex: 0 0 34px; }
     .xbus-title { display: inline-flex; align-items: center; gap: 12px; }
     .xbus-title-icon { width: 34px; height: 34px; color: var(--ha-primary); fill: currentColor; flex: 0 0 34px; }
+    .xbus-hero { position: relative; overflow: hidden; border: 0; border-radius: 0; padding: 0; background: transparent; }
+    .xbus-hero > * { position: relative; z-index: 1; }
+    .xbus-hero .module-row { margin-bottom: 10px; min-height: 180px; }
+    .xbus-hero .module-row > div:first-child { min-width: 0; }
+    .xbus-hero .eyebrow { color: var(--ha-primary); font-size: 13px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+    .xbus-hero .xbus-title { margin: 8px 0 20px; font-size: 36px; line-height: 1.05; }
+    .xbus-hero .subtitle { max-width: 620px; font-size: 16px; }
+    .xbus-hero #extension-status { display: inline-flex; align-items: center; gap: 10px; margin-top: 0; color: var(--ha-success-text); font-size: 17px; font-weight: 800; }
+    .xbus-hero #extension-status::before { content: ''; width: 11px; height: 11px; border-radius: 50%; background: var(--ha-success-text); box-shadow: 0 0 0 6px var(--ha-success-bg); }
+    .xbus-hero .notice { max-width: 690px; margin: 0; }
+    .xbus-hero .transport { white-space: nowrap; }
+    .xbus-status-line { display: flex; align-items: center; gap: 18px; min-width: 0; margin-top: 18px; }
+    .xbus-status-line .notice { display: inline-flex; align-items: center; gap: 10px; padding-left: 18px; border-left: 1px solid var(--ha-card-border); }
+    .xbus-status-line .notice svg { width: 22px; height: 22px; flex: 0 0 22px; fill: currentColor; }
+    .xbus-visual { position: absolute !important; z-index: 0 !important; top: -38px; right: 150px; width: min(58%, 820px); height: 270px; display: flex; align-items: center; justify-content: center; pointer-events: none; transform: translateX(100px); }
+    .xbus-visual img { display: block; width: 100%; height: 100%; object-fit: contain; object-position: center; opacity: .96; }
+    .xbus-toolbar { display: grid; grid-template-columns: minmax(330px, 1.4fr) minmax(320px, 1fr) minmax(390px, 2.3fr); gap: 24px; align-items: center; margin-top: 12px; border: 1px solid var(--ha-card-border); border-radius: 8px; padding: 12px 16px; background: var(--ha-surface); }
+    .xbus-toolbar > * { min-width: 0; }
+    .xbus-toolbar .bus-power-control, .xbus-toolbar .bus-note, .xbus-scan-panel { height: 64px; min-height: 64px; box-sizing: border-box; border: 0; border-radius: 0; background: transparent; }
+    .xbus-toolbar .bus-power-control { display: grid; grid-template-columns: 38px minmax(0, 1fr) 58px; gap: 12px; align-items: center; padding: 6px 12px 6px 0; }
+    .xbus-toolbar .bus-power-control .xbus-panel-icon { justify-content: flex-start; }
+    .xbus-toolbar .bus-power-control .xbus-panel-copy { display: block; }
+    .xbus-toolbar .bus-power-control .toggle { justify-self: end; }
+    .xbus-toolbar .bus-power-control .xbus-panel-copy small { margin-top: 4px; white-space: normal; }
+    .xbus-toolbar .bus-action { width: auto; min-width: 142px; height: 42px; min-height: 42px; font-size: 14px; }
+    .xbus-toolbar .bus-note { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 6px 0 6px 12px; color: var(--ha-text); font-size: 15px; font-weight: 700; }
+    .xbus-panel-icon { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; color: var(--ha-primary); background: transparent; }
+    .xbus-panel-icon svg { width: 26px; height: 26px; fill: currentColor; }
+    .xbus-panel-copy { min-width: 0; }
+    .xbus-panel-copy strong, .xbus-panel-copy small { display: block; }
+    .xbus-panel-copy small { min-width: 0; margin-top: 6px; color: var(--ha-secondary); font-size: 13px; font-weight: 500; white-space: normal; }
+    .xbus-scan-panel { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; min-width: 0; padding: 6px 12px 6px 20px; border-left: 1px solid var(--ha-card-border); }
+    .xbus-scan-panel strong { min-width: 0; font-size: 14px; }
+    .xbus-toolbar .bus-note { border-left: 1px solid var(--ha-card-border); }
+    .xbus-ready { display: inline-flex; align-items: center; justify-content: flex-start; gap: 10px; width: 100px; min-width: 100px; margin-right: 20px; padding: 0; color: var(--ha-secondary); white-space: nowrap; }
+    .xbus-ready::before { content: ''; flex: 0 0 11px; width: 11px; height: 11px; aspect-ratio: 1 / 1; border-radius: 50%; background: var(--ha-success-text); box-shadow: 0 0 0 6px var(--ha-success-bg); }
+    .xbus-ready.off::before { background: var(--ha-secondary); box-shadow: none; }
+    @media (max-width: 1250px) {
+      .xbus-hero .xbus-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .xbus-hero .xbus-toolbar .bus-note { grid-column: 1 / -1; }
+    }
+    @media (max-width: 1500px) and (min-width: 1301px) {
+      .xbus-hero .xbus-visual { right: 105px; width: min(55%, 700px); transform: none; }
+    }
+    @media (max-width: 1300px) {
+      .xbus-hero { display: flex; flex-direction: column; }
+      .xbus-hero .module-row { order: 1; min-height: 0; margin-bottom: 0; }
+      .xbus-hero .xbus-visual { position: relative !important; order: 2; top: auto; right: auto; width: 100%; height: 180px; opacity: 1; }
+      .xbus-hero .xbus-toolbar { order: 3; margin-top: 12px; }
+    }
+    @media (max-width: 950px) {
+      .xbus-hero .xbus-toolbar { grid-template-columns: 1fr; }
+      .xbus-hero .xbus-toolbar .bus-note { grid-column: auto; }
+    }
+    @media (max-width: 650px) {
+      .xbus-hero .xbus-toolbar .bus-power-control { height: auto; min-height: 64px; grid-template-columns: 38px minmax(0, 1fr) 58px; gap: 12px; }
+      .xbus-hero .xbus-toolbar .bus-power-control .xbus-panel-icon, .xbus-hero .xbus-toolbar .bus-note .xbus-panel-icon { width: 38px; height: 38px; }
+      .xbus-hero .xbus-toolbar .bus-power-control .xbus-panel-copy small { white-space: normal; }
+      .xbus-hero .xbus-toolbar .bus-note { height: auto; min-height: 64px; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 12px; }
+      .xbus-hero .xbus-toolbar .bus-note .xbus-ready { grid-column: 3; justify-self: end; }
+      .xbus-hero .xbus-status-line { flex-direction: column; align-items: flex-start; }
+      .xbus-hero .xbus-status-line .notice { padding-left: 0; border-left: 0; }
+    }
     .rs485-title { display: inline-flex; align-items: center; gap: 12px; }
     .rs485-title-icon { width: 34px; height: 34px; color: var(--ha-primary); fill: currentColor; flex: 0 0 34px; }
     .onewire-title { display: inline-flex; align-items: center; gap: 12px; }
@@ -1643,11 +1706,21 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     @media (max-width: 1300px) { .overview-panel { grid-template-columns: 1fr; } .overview-identity { border: 0; min-height: 260px; } }
     @media (max-width: 1100px) { .ports, .carrier-io-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .xport-group-toolbar, .xport-group-toolbar.config-hidden { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .xport-group-toolbar .bus-note, .xport-group-toolbar.config-hidden .bus-note { grid-column: 1 / -1; } .relay-grid, .module-card[data-module-kind="digital_input"] .relay-grid, .module-card[data-module-kind="relay_output"] .relay-grid { grid-template-columns: repeat(4, minmax(145px, 1fr)); } .rs485-layout { grid-template-columns: 1fr; } .rs485-capability-grid, .rs485-device-settings { grid-template-columns: repeat(2, minmax(130px, 1fr)); } .rs485-polling-strip { grid-template-columns: 1fr auto; } .rs485-io-head, .rs485-io-row { grid-template-columns: 52px minmax(150px, 1fr) minmax(150px, 1fr) minmax(180px, .9fr); } }
     @media (max-width: 900px) { .diagnostic-led-grid, .buzzer-panel { grid-template-columns: 1fr; } .buzzer-actions { grid-template-columns: repeat(2, minmax(120px, 1fr)); grid-template-rows: auto; } .buzzer-actions .buzzer-group-title { grid-column: 1 / -1; } }
-    @media (max-width: 620px) { body { padding: 10px; } .app-toolbar { justify-content: stretch; } .theme-switcher { width: 100%; justify-content: space-between; } .theme-choice { flex: 1; } .overview-identity { min-height: 260px; padding: 22px 18px; } .overview-wordmark { font-size: 22px; letter-spacing: .12em; } .overview-title-row { align-items: flex-start; flex-direction: column; gap: 14px; } .overview-title h1 { font-size: 34px; } .overview-title .subtitle { font-size: 16px; } .overview-facts { grid-template-columns: 88px minmax(0, 1fr); } .overview-facts dt, .overview-facts dd { font-size: 14px; } .overview-health { grid-template-columns: 1fr; gap: 18px; } .overview-health-item + .overview-health-item { border-left: 0; padding-left: 0; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+3), .overview-metric:nth-of-type(4) { border: 0; } .extension-panel:not(.overview-panel) { padding-left: 14px; padding-right: 14px; } #controls-section { padding: 18px 14px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .xport-group-toolbar, .xport-group-toolbar.config-hidden { grid-template-columns: 1fr; } .xport-group-toolbar .bus-note, .xport-group-toolbar.config-hidden .bus-note { grid-column: 1; } .ports, .carrier-io-grid, .relay-grid, .module-card[data-module-kind="digital_input"] .relay-grid, .module-card[data-module-kind="relay_output"] .relay-grid, .rs485-toolbar { grid-template-columns: 1fr; } .module-card .relay-row { border-left: 0 !important; padding-left: 12px !important; } .rs485-table-row, .rs485-table-row.scan, .rs485-table-row.configured { grid-template-columns: 1fr; align-items: stretch; } .rs485-device-summary { align-items: flex-start; flex-wrap: wrap; gap: 4px 10px; } .rs485-device-meta { flex-wrap: wrap; } .rs485-device-filters, .rs485-device-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } .rs485-row-actions { justify-content: flex-start; } .rs485-detail-head { flex-direction: column; } .rs485-device-identity { align-items: flex-start; } .rs485-detail-meta { position: static; flex-wrap: wrap; } .rs485-detail-last-seen { position: static; } .rs485-detail-actions { justify-content: flex-start; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-row { grid-template-columns: 1fr; gap: 6px; } }
+    @media (max-width: 900px) { .xbus-visual { opacity: .3; width: 58%; right: 0; } .xbus-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); } .xbus-toolbar .bus-note { grid-column: 1 / -1; } }
+    @media (max-width: 620px) { body { padding: 10px; } .app-toolbar { justify-content: stretch; } .theme-switcher { width: 100%; justify-content: space-between; } .theme-choice { flex: 1; } .overview-identity { min-height: 260px; padding: 22px 18px; } .overview-wordmark { font-size: 22px; letter-spacing: .12em; } .overview-title-row { align-items: flex-start; flex-direction: column; gap: 14px; } .overview-title h1 { font-size: 34px; } .overview-title .subtitle { font-size: 16px; } .overview-facts { grid-template-columns: 88px minmax(0, 1fr); } .overview-facts dt, .overview-facts dd { font-size: 14px; } .overview-health { grid-template-columns: 1fr; gap: 18px; } .overview-health-item + .overview-health-item { border-left: 0; padding-left: 0; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+3), .overview-metric:nth-of-type(4) { border: 0; } .extension-panel:not(.overview-panel) { padding-left: 14px; padding-right: 14px; } #controls-section { padding: 18px 14px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .xport-group-toolbar, .xport-group-toolbar.config-hidden { grid-template-columns: 1fr; } .xport-group-toolbar .bus-note, .xport-group-toolbar.config-hidden .bus-note { grid-column: 1; } .ports, .carrier-io-grid, .relay-grid, .module-card[data-module-kind="digital_input"] .relay-grid, .module-card[data-module-kind="relay_output"] .relay-grid, .rs485-toolbar { grid-template-columns: 1fr; } .module-card .relay-row { border-left: 0 !important; padding-left: 12px !important; } .rs485-table-row, .rs485-table-row.scan, .rs485-table-row.configured { grid-template-columns: 1fr; align-items: stretch; } .rs485-device-summary { align-items: flex-start; flex-wrap: wrap; gap: 4px 10px; } .rs485-device-meta { flex-wrap: wrap; } .rs485-device-filters, .rs485-device-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } .rs485-row-actions { justify-content: flex-start; } .rs485-detail-head { flex-direction: column; } .rs485-device-identity { align-items: flex-start; } .rs485-detail-meta { position: static; flex-wrap: wrap; } .rs485-detail-last-seen { position: static; } .rs485-detail-actions { justify-content: flex-start; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-row { grid-template-columns: 1fr; gap: 6px; } .xbus-hero { padding: 22px 16px 16px; } .xbus-hero .xbus-title { font-size: 30px; } .xbus-visual { display: none; } .xbus-toolbar { grid-template-columns: 1fr; } .xbus-toolbar .bus-note { grid-column: auto; grid-template-columns: 48px minmax(0, 1fr); } .xbus-toolbar .bus-note .xbus-ready { grid-column: 1 / -1; justify-self: start; } .xbus-toolbar .bus-power-control { grid-template-columns: 48px minmax(0, 1fr) 98px; gap: 10px; } .xbus-toolbar .bus-power-control, .xbus-toolbar .bus-action, .xbus-toolbar .bus-note { min-height: 64px; height: auto; } .xbus-panel-copy small { white-space: normal; } .xbus-status-line { align-items: flex-start; flex-direction: column; gap: 8px; } .xbus-status-line .notice { padding-left: 0; border-left: 0; } }
     @media (max-width: 620px) { .global-nav .theme-switcher { width: auto; justify-content: initial; } .global-nav .theme-switcher span { display: none; } .global-nav .theme-choice { flex: 0 0 auto; } }
     @media (max-width: 620px) { .global-nav button { min-height: 34px; padding: 6px 10px; font-size: 11px; } .global-nav > button[data-ui-nav-target] { min-width: 72px; } }
     @media (max-width: 620px) { .rs485-device-list-scroll { overflow-x: auto; } .rs485-device-list-head, .rs485-table-row.configured, .rs485-table-row.configured.discovered { min-width: 390px; grid-template-columns: var(--device-columns); align-items: center; } }
     @media (max-width: 620px) { .rs485-pagination button { min-width: 34px; width: 34px; padding: 0; font-size: 0; } .rs485-pagination button span { font-size: 20px; } }
+    @media (max-width: 650px) {
+      .xbus-hero .xbus-visual { display: flex; }
+      .xbus-hero .xbus-toolbar { grid-template-columns: minmax(0, 1fr); }
+      .xbus-hero .xbus-toolbar .bus-power-control { grid-template-columns: 38px minmax(0, 1fr) 58px; gap: 12px; }
+      .xbus-hero .xbus-toolbar .bus-power-control .xbus-panel-copy small { white-space: normal; }
+      .xbus-hero .xbus-toolbar .bus-note { grid-template-columns: 38px minmax(0, 1fr) auto; }
+      .xbus-hero .xbus-toolbar .bus-note .xbus-ready { grid-column: 3; justify-self: end; }
+      .xbus-hero .xbus-scan-panel, .xbus-hero .xbus-toolbar .bus-note { border-left: 0; border-top: 1px solid var(--ha-card-border); }
+    }
     @container (max-width: 1200px) {
       .module-card[data-module-kind="digital_input"] .relay-grid,
       .module-card[data-module-kind="relay_output"] .relay-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -1790,23 +1863,26 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       <div id="ports" class="ports"></div>
     </section>
     <section id="xbus-section" class="extension-panel ui-nav-section">
+      <div class="xbus-hero">
+      <div class="xbus-visual" aria-hidden="true"><img src="assets/xbus-modules.png" alt=""></div>
       <div class="module-row">
         <div>
           <div class="eyebrow">Hardware Bus</div>
           <h1 class="xbus-title"><svg class="xbus-title-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.92 19.92L4 12L11.92 4.08L13.33 5.5L7.83 11H22V13H7.83L13.34 18.5L11.92 19.92M4 12V2H2V22H4V12Z"/></svg>X-BUS</h1>
           <div class="subtitle">External expansion bus for xDO-8 / xDI-16 modules</div>
-          <div id="extension-status" class="status">X-BUS: loading...</div>
+          <div class="xbus-status-line"><div id="extension-status" class="status">loading...</div><p class="notice"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11,9H13V7H11M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17H13V11H11V17Z"/></svg>Detected modules stay stored until removed.</p></div>
         </div>
         <div class="transport">I2C-1</div>
       </div>
-      <p class="notice">X-BUS is the external I2C expansion bus. Detected modules stay stored until removed.</p>
-      <div class="extension-actions bus-toolbar">
+      <div class="extension-actions bus-toolbar xbus-toolbar">
         <div class="bus-power-control">
-          <span class="metric">Bus power</span>
+          <span class="xbus-panel-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M11 15H6L13 1V9H18L11 23V15Z"/></svg></span>
+          <span class="xbus-panel-copy"><strong>Bus power</strong><small>Supply power to X-BUS modules</small></span>
           <button id="extension-power-toggle" class="toggle" type="button" onclick="toggleExtensionPower()"><span>OFF</span></button>
         </div>
-        <button class="bus-action" onclick="scanExtensions()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 3A6.5 6.5 0 0 0 3 9.5C3 13.09 5.91 16 9.5 16C11.11 16 12.59 15.41 13.73 14.43L19.3 20L20.7 18.6L15.13 13.03A6.47 6.47 0 0 0 16 9.5A6.5 6.5 0 0 0 9.5 3M9.5 5C12 5 14 7 14 9.5S12 14 9.5 14 5 12 5 9.5 7 5 9.5 5Z"/></svg>Scan</button>
-        <div class="bus-note">Power control: MCP23017 / I2C-10 / 0x20 / GPB7</div>
+        <div class="xbus-scan-panel"><strong>Module discovery</strong><button class="bus-action" onclick="scanExtensions()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z"/></svg>Scan</button></div>
+        <div class="bus-note"><span class="xbus-panel-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6,4H18V5H21V7H18V9H21V11H18V13H21V15H18V17H21V19H18V20H6V19H3V17H6V15H3V13H6V11H3V9H6V7H3V5H6V4M11,15V18H12V15H11M13,15V18H14V15H13M15,15V18H16V15H15Z"/></svg></span><span class="xbus-panel-copy"><strong>Power control</strong><small>MCP23017 / I2C-10 / 0x20 / GPB7</small></span><span class="xbus-ready" aria-live="polite">BUS READY</span></div>
+      </div>
       </div>
       <div id="modules" class="modules"></div>
     </section>
@@ -3268,10 +3344,13 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     function paintExtensions(payload) {
       extensionState = payload;
       const powerOn = Boolean(payload.power && payload.power.on);
-      document.getElementById('extension-status').textContent = `X-BUS: ${payload.modules.length} module${payload.modules.length === 1 ? '' : 's'} detected`;
+      document.getElementById('extension-status').textContent = `${payload.modules.length} module${payload.modules.length === 1 ? '' : 's'} detected`;
       const powerToggle = document.getElementById('extension-power-toggle');
       powerToggle.className = `toggle ${powerOn ? 'on' : ''}`;
       powerToggle.querySelector('span').textContent = powerOn ? 'ON' : 'OFF';
+      const busReady = document.querySelector('.xbus-hero .xbus-ready');
+      busReady.textContent = powerOn ? 'BUS READY' : 'BUS OFF';
+      busReady.classList.toggle('off', !powerOn);
       const modules = document.getElementById('modules');
       modules.innerHTML = '';
       if (!payload.modules.length) {
@@ -4777,7 +4856,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         ? pageItems.map((entry, index) => entry.type === 'configured' ? (() => { const device = entry.device; return `
             <div class="rs485-table-row configured ${device.id === rs485SelectedId ? 'selected' : ''}" role="button" tabindex="0" aria-selected="${device.id === rs485SelectedId ? 'true' : 'false'}" onclick="selectRs485MockDevice('${device.id}')" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectRs485MockDevice('${device.id}'); }">
               <div class="rs485-device-index">${(rs485DevicePage - 1) * rs485DevicePageSize + index + 1}</div>
-              <div class="rs485-device-title"><img class="rs485-list-icon" src="rs485_assets/${device.template_id}.png" alt="">${device.name}</div>
+              <div class="rs485-device-title"><img class="rs485-list-icon" src="assets/${device.template_id}.png" alt="">${device.name}</div>
               <div class="rs485-list-address">${device.slave_address}</div>
               <span class="rs485-device-status ${rs485CommunicationStatus(device).toLowerCase()}" data-rs485-live-status="${device.id}">${rs485CommunicationStatus(device)}</span>
               <details class="rs485-list-action-menu" onclick="event.stopPropagation()" onfocusout="setTimeout(() => { if (!this.contains(document.activeElement)) this.removeAttribute('open'); }, 0)">
@@ -4902,7 +4981,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       detail.innerHTML = `
         <div class="rs485-detail-head">
           <div class="rs485-device-identity">
-            <img class="rs485-device-icon" src="rs485_assets/${selected.template_id}.png" alt="">
+            <img class="rs485-device-icon" src="assets/${selected.template_id}.png" alt="">
             <div class="rs485-device-identity-copy">
             <div class="rs485-device-title-row"><div class="module-title">${selected.name}</div></div>
             <div class="rs485-device-subtitle"></div>
@@ -5990,14 +6069,21 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
 
     @app.get("/rs485-icons/{template_id}.png", include_in_schema=False)
     async def rs485_icon(template_id: str) -> FileResponse:
-        icon = Path(__file__).resolve().parents[1] / "rs485_assets" / f"{template_id}.png"
+        icon = Path(__file__).resolve().parents[1] / "assets" / f"{template_id}.png"
         if not icon.is_file():
             raise HTTPException(status_code=404, detail="RS-485 device icon not found")
         return FileResponse(icon)
 
+    @app.get("/assets/{asset_name}.png", include_in_schema=False)
+    async def asset(asset_name: str) -> FileResponse:
+        asset_path = Path(__file__).resolve().parents[1] / "assets" / f"{asset_name}.png"
+        if not asset_path.is_file():
+            raise HTTPException(status_code=404, detail="Asset not found")
+        return FileResponse(asset_path)
+
     @app.get("/rs485_assets/{template_id}.png", include_in_schema=False)
     async def rs485_asset(template_id: str) -> FileResponse:
-        asset = Path(__file__).resolve().parents[1] / "rs485_assets" / f"{template_id}.png"
+        asset = Path(__file__).resolve().parents[1] / "assets" / f"{template_id}.png"
         if not asset.is_file():
             raise HTTPException(status_code=404, detail="RS-485 device asset not found")
         return FileResponse(asset)
