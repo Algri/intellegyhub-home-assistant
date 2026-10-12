@@ -676,9 +676,7 @@ class ExtensionManager:
 
     async def stop(self) -> None:
         self._stopped.set()
-        if self._power_refresh_task is not None:
-            await self._power_refresh_task
-            self._power_refresh_task = None
+        await self._cancel_power_refresh()
         await self.hardware.stop_xdi16_interrupt()
         if self._xdi16_task:
             self._xdi16_task.cancel()
@@ -695,8 +693,24 @@ class ExtensionManager:
 
     async def wait_for_power_refresh(self) -> None:
         if self._power_refresh_task is not None:
-            await self._power_refresh_task
-            self._power_refresh_task = None
+            task = self._power_refresh_task
+            try:
+                await task
+            finally:
+                if self._power_refresh_task is task:
+                    self._power_refresh_task = None
+
+    async def _cancel_power_refresh(self) -> None:
+        task = self._power_refresh_task
+        if task is None:
+            return
+        self._power_refresh_task = None
+        if not task.done():
+            task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
     def _persist_modules_nowait(self) -> None:
         self._pending_modules_snapshot = copy.deepcopy(list(self.modules.values()))
@@ -730,11 +744,7 @@ class ExtensionManager:
             if on:
                 await self._power_refresh_task
             else:
-                self._power_refresh_task.cancel()
-                try:
-                    await self._power_refresh_task
-                except asyncio.CancelledError:
-                    pass
+                await self._cancel_power_refresh()
         self._power_refresh_task = None
         async with self._lock:
             if self._module_persistence_task is not None and not self._module_persistence_task.done():

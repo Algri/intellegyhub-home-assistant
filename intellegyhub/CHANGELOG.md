@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.238
+
+- Cancel pending X-BUS module refreshes during shutdown and power-off.
+- Add regression coverage for stopping while an X-BUS refresh is active.
+- Reduce the X-BUS module artwork by 15% while keeping it centered.
+
 ## 0.5.237
 
 - Make X-BUS power switching responsive with optimistic UI updates and background module refresh.

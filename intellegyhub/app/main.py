@@ -256,7 +256,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-        "Starting v0.5.237 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+        "Starting v0.5.238 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -314,7 +314,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.237", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.238", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -802,7 +802,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .xbus-status-line .notice { display: inline-flex; align-items: center; gap: 10px; padding-left: 18px; border-left: 1px solid var(--ha-card-border); }
     .xbus-status-line .notice svg { width: 22px; height: 22px; flex: 0 0 22px; fill: currentColor; }
     .xbus-visual { position: absolute !important; z-index: 0 !important; top: -38px; right: 150px; width: min(58%, 820px); height: 270px; display: flex; align-items: center; justify-content: center; pointer-events: none; transform: translateX(100px); }
-    .xbus-visual img { display: block; width: 100%; height: 100%; object-fit: contain; object-position: center; opacity: .96; }
+    .xbus-visual img { display: block; width: 85%; height: 85%; object-fit: contain; object-position: center; opacity: .96; }
     .xbus-toolbar { display: grid; grid-template-columns: minmax(330px, 1.4fr) minmax(320px, 1fr) minmax(390px, 2.3fr); gap: 24px; align-items: center; margin-top: 12px; border: 1px solid var(--ha-card-border); border-radius: 8px; padding: 12px 16px; background: var(--ha-surface); }
     .xbus-toolbar > * { min-width: 0; }
     .xbus-toolbar .bus-power-control, .xbus-toolbar .bus-note, .xbus-scan-panel { height: 64px; min-height: 64px; box-sizing: border-box; border: 0; border-radius: 0; background: transparent; }
