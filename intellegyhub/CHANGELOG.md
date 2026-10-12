@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.239
+
+- Align the X-BUS module artwork to the right edge of its visual area.
+- Preserve the module glow without clipping and keep mobile positioning responsive.
+
 ## 0.5.238
 
 - Cancel pending X-BUS module refreshes during shutdown and power-off.

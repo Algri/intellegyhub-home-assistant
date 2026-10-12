@@ -256,7 +256,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-        "Starting v0.5.238 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+        "Starting v0.5.239 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -314,7 +314,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.238", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.239", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -787,7 +787,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .xport-title-icon { width: 34px; height: 34px; color: var(--ha-primary); fill: currentColor; flex: 0 0 34px; }
     .xbus-title { display: inline-flex; align-items: center; gap: 12px; }
     .xbus-title-icon { width: 34px; height: 34px; color: var(--ha-primary); fill: currentColor; flex: 0 0 34px; }
-    .xbus-hero { position: relative; overflow: hidden; border: 0; border-radius: 0; padding: 0; background: transparent; }
+    .xbus-hero { position: relative; overflow: visible; border: 0; border-radius: 0; padding: 0; background: transparent; }
     .xbus-hero > * { position: relative; z-index: 1; }
     .xbus-hero .module-row { margin-bottom: 10px; min-height: 180px; }
     .xbus-hero .module-row > div:first-child { min-width: 0; }
@@ -801,8 +801,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .xbus-status-line { display: flex; align-items: center; gap: 18px; min-width: 0; margin-top: 18px; }
     .xbus-status-line .notice { display: inline-flex; align-items: center; gap: 10px; padding-left: 18px; border-left: 1px solid var(--ha-card-border); }
     .xbus-status-line .notice svg { width: 22px; height: 22px; flex: 0 0 22px; fill: currentColor; }
-    .xbus-visual { position: absolute !important; z-index: 0 !important; top: -38px; right: 150px; width: min(58%, 820px); height: 270px; display: flex; align-items: center; justify-content: center; pointer-events: none; transform: translateX(100px); }
-    .xbus-visual img { display: block; width: 85%; height: 85%; object-fit: contain; object-position: center; opacity: .96; }
+    .xbus-visual { position: absolute !important; z-index: 0 !important; top: -38px; right: 100px; width: min(58%, 820px); height: 270px; display: flex; align-items: center; justify-content: flex-end; pointer-events: none; transform: none; }
+    .xbus-visual img { display: block; width: 85%; height: 85%; object-fit: contain; object-position: center; opacity: .96; transform: translateX(140px); }
     .xbus-toolbar { display: grid; grid-template-columns: minmax(330px, 1.4fr) minmax(320px, 1fr) minmax(390px, 2.3fr); gap: 24px; align-items: center; margin-top: 12px; border: 1px solid var(--ha-card-border); border-radius: 8px; padding: 12px 16px; background: var(--ha-surface); }
     .xbus-toolbar > * { min-width: 0; }
     .xbus-toolbar .bus-power-control, .xbus-toolbar .bus-note, .xbus-scan-panel { height: 64px; min-height: 64px; box-sizing: border-box; border: 0; border-radius: 0; background: transparent; }
@@ -829,12 +829,13 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       .xbus-hero .xbus-toolbar .bus-note { grid-column: 1 / -1; }
     }
     @media (max-width: 1500px) and (min-width: 1301px) {
-      .xbus-hero .xbus-visual { right: 105px; width: min(55%, 700px); transform: none; }
+      .xbus-hero .xbus-visual { right: 100px; width: min(55%, 700px); transform: none; }
     }
     @media (max-width: 1300px) {
       .xbus-hero { display: flex; flex-direction: column; }
       .xbus-hero .module-row { order: 1; min-height: 0; margin-bottom: 0; }
       .xbus-hero .xbus-visual { position: relative !important; order: 2; top: auto; right: auto; width: 100%; height: 180px; opacity: 1; }
+      .xbus-hero .xbus-visual img { transform: none; }
       .xbus-hero .xbus-toolbar { order: 3; margin-top: 12px; }
     }
     @media (max-width: 950px) {
