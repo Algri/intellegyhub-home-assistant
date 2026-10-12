@@ -42,7 +42,10 @@ class AppConfig:
     onewire_bridge2_poll_interval_seconds: int = 30
     power_button_shutdown_enabled: bool = True
     power_button_shutdown_hold_seconds: float = 1.0
+    zigbee_flash_to_reset_seconds: float | None = None
     zigbee_reset_pulse_seconds: float | None = None
+    zigbee_flash_after_reset_seconds: float | None = None
+    zigbee_bootloader_startup_seconds: float | None = None
     rs485_enabled: bool = True
     chip_path: str = "/dev/gpiochip0"
     mock: bool = False
@@ -100,7 +103,10 @@ def load_config(path: Path | None = None) -> AppConfig:
     buzzer = _group(options, "buzzer")
     rs485 = _group(options, "rs485")
     zigbee_firmware = _group(options, "zigbee_firmware")
+    flash_to_reset_value = _option(zigbee_firmware, "flash_to_reset_seconds", None)
     reset_pulse_value = _option(zigbee_firmware, "reset_pulse_seconds", None)
+    flash_after_reset_value = _option(zigbee_firmware, "flash_after_reset_seconds", None)
+    bootloader_startup_value = _option(zigbee_firmware, "bootloader_startup_seconds", None)
     config = AppConfig(
         led_gpio=FIXED_LED_GPIO,
         led_active_low=False,
@@ -146,7 +152,10 @@ def load_config(path: Path | None = None) -> AppConfig:
         power_button_shutdown_hold_seconds=float(
             _option(power_button, "shutdown_hold_seconds", options.get("power_button_shutdown_hold_seconds", 1.0))
         ),
+        zigbee_flash_to_reset_seconds=(float(flash_to_reset_value) if flash_to_reset_value is not None else None),
         zigbee_reset_pulse_seconds=(float(reset_pulse_value) if reset_pulse_value is not None else None),
+        zigbee_flash_after_reset_seconds=(float(flash_after_reset_value) if flash_after_reset_value is not None else None),
+        zigbee_bootloader_startup_seconds=(float(bootloader_startup_value) if bootloader_startup_value is not None else None),
         rs485_enabled=_bool_option(rs485, "enabled", _bool_option(options, "rs485_enabled", True)),
         mock=mock,
     )
@@ -191,5 +200,12 @@ def validate_config(config: AppConfig) -> None:
         raise ValueError("onewire_bus2_poll_interval_seconds must be between 1 and 3600")
     if not 0.1 <= config.power_button_shutdown_hold_seconds <= 1.5:
         raise ValueError("power_button_shutdown_hold_seconds must be between 0.1 and 1.5")
-    if config.zigbee_reset_pulse_seconds is not None and not 0.001 <= config.zigbee_reset_pulse_seconds <= 5:
-        raise ValueError("zigbee_reset_pulse_seconds must be between 0.001 and 5")
+    timing_values = {
+        "zigbee_flash_to_reset_seconds": config.zigbee_flash_to_reset_seconds,
+        "zigbee_reset_pulse_seconds": config.zigbee_reset_pulse_seconds,
+        "zigbee_flash_after_reset_seconds": config.zigbee_flash_after_reset_seconds,
+        "zigbee_bootloader_startup_seconds": config.zigbee_bootloader_startup_seconds,
+    }
+    for name, value in timing_values.items():
+        if value is not None and not 0.001 <= value <= 5:
+            raise ValueError(f"{name} must be between 0.001 and 5")

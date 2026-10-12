@@ -6,6 +6,7 @@ import glob
 import json
 import logging
 import os
+from dataclasses import replace
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
@@ -99,6 +100,14 @@ class BuzzerSettingsPayload(BaseModel):
 class ZigbeeFirmwareInstallPayload(BaseModel):
     port: str
     revision: str
+
+
+class ZigbeeFirmwarePortPayload(BaseModel):
+    port: str
+
+
+class ZigbeeFirmwareErasePayload(ZigbeeFirmwarePortPayload):
+    pass
 
 
 class SteHeartbeatPayload(BaseModel):
@@ -262,7 +271,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-        "Starting v0.5.240 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+        "Starting v0.5.241 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -316,10 +325,16 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         app.state.zigbee_firmware.set_carrier(app.state.runtime.carrier)
         app.state.zigbee_firmware.set_publisher(app.state.runtime.broadcast_nowait)
         if 'config' in locals():
-            reset_pulse = config.zigbee_reset_pulse_seconds
-            if reset_pulse is None:
-                reset_pulse = app.state.zigbee_firmware.timing.reset_pulse_seconds
-            app.state.zigbee_firmware.set_timing(FirmwareTiming(reset_pulse_seconds=reset_pulse))
+            timing = app.state.zigbee_firmware.timing
+            configured_timing = {
+                "flash_to_reset_seconds": config.zigbee_flash_to_reset_seconds,
+                "reset_pulse_seconds": config.zigbee_reset_pulse_seconds,
+                "flash_after_reset_seconds": config.zigbee_flash_after_reset_seconds,
+                "bootloader_startup_seconds": config.zigbee_bootloader_startup_seconds,
+            }
+            overrides = {name: value for name, value in configured_timing.items() if value is not None}
+            if overrides:
+                app.state.zigbee_firmware.set_timing(replace(timing, **overrides))
         await app.state.zigbee_firmware.start()
         try:
             yield
@@ -329,7 +344,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.240", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.241", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -1829,6 +1844,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       <button type="button" data-ui-nav-target="rtc-section">RTC</button>
       <button type="button" data-ui-nav-target="controls-section">Controls</button>
       <button type="button" data-ui-nav-target="tools-section">Tools</button>
+      <button type="button" data-ui-nav-target="zigbee-firmware-section">Zigbee</button>
       <div class="theme-switcher" role="group" aria-label="Theme">
         <span>Theme</span>
         <button class="theme-choice" type="button" data-theme-choice="auto" onclick="setTheme('auto')">Auto</button>
@@ -2300,8 +2316,10 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           </div>
         </div>
         <div class="zigbee-firmware-actions">
+          <button id="zigbee-detect-coordinator" class="bus-action" type="button" onclick="detectZigbeeCoordinator()">Detect</button>
           <button id="zigbee-check-updates" class="bus-action" type="button" onclick="checkZigbeeFirmware()">Check updates</button>
           <button id="zigbee-install-firmware" class="bus-action" type="button" onclick="installZigbeeFirmware()" disabled>Install firmware</button>
+          <button id="zigbee-erase-firmware" class="bus-action danger-button" type="button" onclick="eraseZigbeeFirmware()" disabled>Erase</button>
           <div id="zigbee-firmware-status" class="zigbee-firmware-status" role="status" aria-live="polite">Select a coordinator port and check for releases.</div>
         </div>
         <div id="zigbee-firmware-operation" class="zigbee-firmware-operation" aria-live="polite">
@@ -3096,7 +3114,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     function selectZigbeeCoordinatorPort(option) {
       const currentStatus = zigbeeFirmwareState?.operation?.status || '';
-      if (['DOWNLOADING', 'VERIFYING_IMAGE', 'STOPPING_ZIGBEE', 'WAITING_FOR_BOOTLOADER', 'ERASING', 'FLASHING', 'VERIFYING_FLASH', 'RESTARTING_COORDINATOR', 'STARTING_ZIGBEE'].includes(currentStatus)) {
+      if (['DOWNLOADING', 'VERIFYING_IMAGE', 'WAITING_FOR_BOOTLOADER', 'ERASING', 'FLASHING', 'VERIFYING_FLASH', 'RESTARTING_COORDINATOR'].includes(currentStatus)) {
         setZigbeeFirmwareStatus('A firmware update is already running.', 'error');
         return;
       }
@@ -3108,6 +3126,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       select.querySelectorAll('.mode-option').forEach((item) => item.classList.toggle('active', item === option));
       select.classList.remove('open');
       resetZigbeeFirmwareState();
+      refreshZigbeeFirmwareState();
     }
 
     const zigbeeFirmwareState = { port: '/dev/ttyUSB0', releases: [], selected: '', checking: false, request: 0, operation: null, pollTimer: null };
@@ -3118,11 +3137,16 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       status.className = `zigbee-firmware-status ${kind}`.trim();
     }
     function updateZigbeeInstallButton() {
-      const button = document.getElementById('zigbee-install-firmware');
-      if (!button) return;
       const status = zigbeeFirmwareState.operation?.status || '';
-      const active = ['DOWNLOADING', 'VERIFYING_IMAGE', 'STOPPING_ZIGBEE', 'WAITING_FOR_BOOTLOADER', 'ERASING', 'FLASHING', 'VERIFYING_FLASH', 'RESTARTING_COORDINATOR', 'STARTING_ZIGBEE'].includes(status);
-      button.disabled = zigbeeFirmwareState.checking || active || !zigbeeFirmwareState.selected;
+      const active = ['DOWNLOADING', 'VERIFYING_IMAGE', 'WAITING_FOR_BOOTLOADER', 'ERASING', 'FLASHING', 'VERIFYING_FLASH', 'RESTARTING_COORDINATOR'].includes(status);
+      const port = zigbeeFirmwareState.operation?.ports?.find((item) => item.path === zigbeeFirmwareState.port);
+      const unavailable = port?.available !== true;
+      const detect = document.getElementById('zigbee-detect-coordinator');
+      const install = document.getElementById('zigbee-install-firmware');
+      const erase = document.getElementById('zigbee-erase-firmware');
+      if (detect) detect.disabled = zigbeeFirmwareState.checking || active;
+      if (install) install.disabled = zigbeeFirmwareState.checking || active || unavailable || !zigbeeFirmwareState.selected;
+      if (erase) erase.disabled = zigbeeFirmwareState.checking || active || unavailable;
     }
     function resetZigbeeFirmwareState() {
       zigbeeFirmwareState.request += 1;
@@ -3154,6 +3178,23 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     function firmwareReleaseDate(value) {
       const date = new Date(value);
       return Number.isNaN(date.getTime()) ? 'date unavailable' : date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+    function renderZigbeeCoordinatorPorts(ports) {
+      const select = document.getElementById('zigbee-coordinator-port');
+      if (!select || !Array.isArray(ports)) return;
+      const probed = zigbeeFirmwareState.operation?.ports_detected === true;
+      const detected = new Map(ports.map((item) => [item.path, item]));
+      select.querySelectorAll('.mode-option').forEach((option) => {
+        const item = detected.get(option.dataset.value);
+        const available = Boolean(item?.available);
+        option.disabled = probed && !available;
+        option.title = !probed ? '' : (available ? (item?.status === 'NO_RESPONSE' ? 'Coordinator firmware not detected' : '') : 'Module port unavailable');
+        option.classList.toggle('unavailable', probed && !available);
+      });
+      const current = detected.get(select.dataset.value);
+      if (!probed) setZigbeeFirmwareStatus('Press Detect to check coordinator ports.');
+      else if (current?.status === 'NO_RESPONSE') setZigbeeFirmwareStatus('Coordinator detected; firmware version unavailable.');
+      else if (current?.status === 'READY') setZigbeeFirmwareStatus('Coordinator detected.');
     }
     function renderZigbeeFirmwareSelect() {
       const select = document.getElementById('zigbee-available-firmware');
@@ -3197,17 +3238,37 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if (request === zigbeeFirmwareState.request) { zigbeeFirmwareState.checking = false; if (button) { button.disabled = false; button.textContent = 'Check updates'; } updateZigbeeInstallButton(); }
       }
     }
+    async function detectZigbeeCoordinator() {
+      const button = document.getElementById('zigbee-detect-coordinator');
+      if (button?.disabled) return;
+      const request = ++zigbeeFirmwareState.request;
+      if (button) { button.disabled = true; button.textContent = 'Detecting...'; }
+      setZigbeeFirmwareStatus('Checking coordinator ports...');
+      try {
+        const payload = await requestJson('api/v1/zigbee/firmware/detect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ port: zigbeeFirmwareState.port })
+        });
+        if (request !== zigbeeFirmwareState.request) return;
+        zigbeeFirmwareState.operation = payload;
+        renderZigbeeCoordinatorPorts(payload.ports);
+        renderZigbeeFirmwareOperation(payload);
+      } catch (error) {
+        if (request === zigbeeFirmwareState.request) setZigbeeFirmwareStatus(`Unable to detect coordinator: ${errorDetail(error)}`, 'error');
+      } finally {
+        if (request === zigbeeFirmwareState.request) { if (button) { button.disabled = false; button.textContent = 'Detect'; } updateZigbeeInstallButton(); }
+      }
+    }
     function zigbeeFirmwareStage(status) {
       return {
         DOWNLOADING: 'download',
         VERIFYING_IMAGE: 'download',
-        STOPPING_ZIGBEE: 'connect',
         WAITING_FOR_BOOTLOADER: 'connect',
         ERASING: 'erase',
         FLASHING: 'flash',
         VERIFYING_FLASH: 'flash',
         RESTARTING_COORDINATOR: 'finish',
-        STARTING_ZIGBEE: 'finish',
         COMPLETED: 'finish',
         FAILED: 'finish'
       }[status] || null;
@@ -3216,13 +3277,11 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       return {
         DOWNLOADING: 'Downloading...',
         VERIFYING_IMAGE: 'Verifying image...',
-        STOPPING_ZIGBEE: 'Stopping Zigbee2MQTT...',
         WAITING_FOR_BOOTLOADER: 'Waiting for bootloader...',
         ERASING: 'Erasing...',
         FLASHING: 'Flashing...',
         VERIFYING_FLASH: 'Verifying...',
         RESTARTING_COORDINATOR: 'Restarting coordinator...',
-        STARTING_ZIGBEE: 'Starting Zigbee2MQTT...',
         COMPLETED: 'Completed',
         FAILED: 'Failed'
       }[status] || status || 'Ready';
@@ -3274,12 +3333,14 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     async function refreshZigbeeFirmwareState() {
       try {
-        const payload = await requestJson('api/v1/zigbee/firmware');
+        const port = zigbeeFirmwareState.port || '/dev/ttyUSB0';
+        const payload = await requestJson(`api/v1/zigbee/firmware?port=${encodeURIComponent(port)}`);
         zigbeeFirmwareState.operation = payload;
+        renderZigbeeCoordinatorPorts(payload.ports);
         renderZigbeeFirmwareOperation(payload);
         updateZigbeeInstallButton();
         const status = payload.status || 'IDLE';
-        const active = ['DOWNLOADING', 'VERIFYING_IMAGE', 'STOPPING_ZIGBEE', 'WAITING_FOR_BOOTLOADER', 'ERASING', 'FLASHING', 'VERIFYING_FLASH', 'RESTARTING_COORDINATOR', 'STARTING_ZIGBEE'].includes(status);
+      const active = ['DOWNLOADING', 'VERIFYING_IMAGE', 'WAITING_FOR_BOOTLOADER', 'ERASING', 'FLASHING', 'VERIFYING_FLASH', 'RESTARTING_COORDINATOR'].includes(status);
         if (active) {
           zigbeeFirmwareState.pollTimer = window.setTimeout(refreshZigbeeFirmwareState, 500);
         }
@@ -3289,6 +3350,10 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     }
     function installZigbeeFirmware() {
       if (!zigbeeFirmwareState.selected || document.getElementById('zigbee-install-firmware')?.disabled) return;
+      const portLabel = document.getElementById('zigbee-coordinator-port')?.querySelector('.mode-trigger')?.textContent || zigbeeFirmwareState.port;
+      const release = zigbeeFirmwareState.releases.find((item) => item.revision === zigbeeFirmwareState.selected);
+      const releaseLabel = release ? `${release.revision} · ${release.firmware_target}` : zigbeeFirmwareState.selected;
+      if (!window.confirm(`Install ${releaseLabel} on ${portLabel}? The existing coordinator firmware will be erased first.`)) return;
       requestJson('api/v1/zigbee/firmware/install', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -3300,6 +3365,24 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         refreshZigbeeFirmwareState();
       }).catch((error) => {
         setZigbeeFirmwareStatus(`Unable to start firmware update: ${errorDetail(error)}`, 'error');
+        updateZigbeeInstallButton();
+      });
+    }
+    function eraseZigbeeFirmware() {
+      if (document.getElementById('zigbee-erase-firmware')?.disabled) return;
+      const portLabel = document.getElementById('zigbee-coordinator-port')?.querySelector('.mode-trigger')?.textContent || zigbeeFirmwareState.port;
+      if (!window.confirm(`Erase all coordinator firmware memory on ${portLabel}? This cannot be undone.`)) return;
+      requestJson('api/v1/zigbee/firmware/erase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ port: zigbeeFirmwareState.port })
+      }).then((payload) => {
+        zigbeeFirmwareState.operation = payload;
+        renderZigbeeFirmwareOperation(payload);
+        updateZigbeeInstallButton();
+        refreshZigbeeFirmwareState();
+      }).catch((error) => {
+        setZigbeeFirmwareStatus(`Unable to erase coordinator firmware: ${errorDetail(error)}`, 'error');
         updateZigbeeInstallButton();
       });
     }
@@ -6480,8 +6563,17 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         return await runtime_or_503().async_snapshot()
 
     @app.get("/api/v1/zigbee/firmware")
-    async def get_zigbee_firmware() -> dict:
-        return await app.state.zigbee_firmware.refresh_installed_firmware()
+    async def get_zigbee_firmware(port: str = "/dev/ttyUSB0") -> dict:
+        if port not in {"/dev/ttyUSB0", "/dev/ttyUSB1"}:
+            raise HTTPException(status_code=400, detail="Unsupported coordinator port")
+        return app.state.zigbee_firmware.snapshot(port)
+
+    @app.post("/api/v1/zigbee/firmware/detect")
+    async def post_zigbee_firmware_detect(payload: ZigbeeFirmwarePortPayload) -> dict:
+        try:
+            return await app.state.zigbee_firmware.refresh_installed_firmware(payload.port)
+        except ZigbeeFirmwareError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.get("/api/v1/zigbee/firmware/releases")
     async def get_zigbee_firmware_releases() -> dict:
@@ -6501,6 +6593,15 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     async def post_zigbee_firmware_install(payload: ZigbeeFirmwareInstallPayload) -> dict:
         try:
             return await app.state.zigbee_firmware.start_update(payload.port, payload.revision)
+        except ZigbeeFirmwareBusyError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except ZigbeeFirmwareError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/api/v1/zigbee/firmware/erase")
+    async def post_zigbee_firmware_erase(payload: ZigbeeFirmwareErasePayload) -> dict:
+        try:
+            return await app.state.zigbee_firmware.start_erase(payload.port)
         except ZigbeeFirmwareBusyError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         except ZigbeeFirmwareError as exc:

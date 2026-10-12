@@ -1,10 +1,17 @@
 # Changelog
 
+## 0.5.241
+
+- Add manual CC2652P7 coordinator detection through the selected X-Mod UART and direct ZNP `SYS_VERSION` readback.
+- Verify ROM bootloader communication before erase/write and document the configurable MCP23017 Flash/Reset timing sequence.
+- Add safe, confirmed Erase handling and keep production firmware updates independent of Zigbee2MQTT.
+- Keep the hardware-free mock representative with the `20250321-mock` revision and persisted operation logs.
+
 ## 0.5.240
 
 - Add the CC2652P7 coordinator firmware update flow for X-Mod1 and X-Mod2.
 - Validate Koenkk firmware archives, control the MCP23017 bootloader sequence, and run `cc2538-bsl` with persisted operation logs.
-- Keep mock firmware updates hardware-free while production reads the installed coordinator revision from Zigbee2MQTT startup logs.
+- Keep mock firmware updates hardware-free while production reads the installed coordinator revision directly from the coordinator over UART.
 
 ## 0.5.239
 
