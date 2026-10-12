@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.244
+
+- Release the CC2652P7 coordinator Reset and delayed `SYS_VERSION` readback
+  flow for reliable post-flash startup detection.
+
+## 0.5.243
+
+- Restart the CC2652P7 coordinator with Reset after `cc2538-bsl` completes.
+- Retry the post-reset ZNP `SYS_VERSION` read during a configurable 3-second
+  application startup window and log the wait stage.
+
+## 0.5.242
+
+- Fix CC2652P7 ROM bootloader success handling (`0x40`) and recover the coordinator with Reset after a failed preflight.
+- Run `cc2538-bsl` non-interactively with forced erase confirmation and verify the installed revision through ZNP `SYS_VERSION` after restart.
+
 ## 0.5.241
 
 - Add manual CC2652P7 coordinator detection through the selected X-Mod UART and direct ZNP `SYS_VERSION` readback.

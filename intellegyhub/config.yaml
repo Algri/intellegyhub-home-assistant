@@ -2,7 +2,7 @@ name: IntellegyHUB
 slug: intellegyhub
 description: IntellegyHUB hardware runtime for Home Assistant native entities
 url: https://intellegyhub.com
-version: 0.5.241
+version: 0.5.244
 stage: stable
 arch:
   - aarch64
@@ -71,6 +71,7 @@ schema:
     reset_pulse_seconds: float(0.001,5)?
     flash_after_reset_seconds: float(0.001,5)?
     bootloader_startup_seconds: float(0.001,5)?
+    coordinator_startup_seconds: float(0.001,5)?
   buzzer:
     startup_enabled: bool
     shutdown_enabled: bool

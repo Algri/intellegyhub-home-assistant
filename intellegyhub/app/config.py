@@ -46,6 +46,7 @@ class AppConfig:
     zigbee_reset_pulse_seconds: float | None = None
     zigbee_flash_after_reset_seconds: float | None = None
     zigbee_bootloader_startup_seconds: float | None = None
+    zigbee_coordinator_startup_seconds: float | None = None
     rs485_enabled: bool = True
     chip_path: str = "/dev/gpiochip0"
     mock: bool = False
@@ -107,6 +108,7 @@ def load_config(path: Path | None = None) -> AppConfig:
     reset_pulse_value = _option(zigbee_firmware, "reset_pulse_seconds", None)
     flash_after_reset_value = _option(zigbee_firmware, "flash_after_reset_seconds", None)
     bootloader_startup_value = _option(zigbee_firmware, "bootloader_startup_seconds", None)
+    coordinator_startup_value = _option(zigbee_firmware, "coordinator_startup_seconds", None)
     config = AppConfig(
         led_gpio=FIXED_LED_GPIO,
         led_active_low=False,
@@ -156,6 +158,7 @@ def load_config(path: Path | None = None) -> AppConfig:
         zigbee_reset_pulse_seconds=(float(reset_pulse_value) if reset_pulse_value is not None else None),
         zigbee_flash_after_reset_seconds=(float(flash_after_reset_value) if flash_after_reset_value is not None else None),
         zigbee_bootloader_startup_seconds=(float(bootloader_startup_value) if bootloader_startup_value is not None else None),
+        zigbee_coordinator_startup_seconds=(float(coordinator_startup_value) if coordinator_startup_value is not None else None),
         rs485_enabled=_bool_option(rs485, "enabled", _bool_option(options, "rs485_enabled", True)),
         mock=mock,
     )
@@ -205,6 +208,7 @@ def validate_config(config: AppConfig) -> None:
         "zigbee_reset_pulse_seconds": config.zigbee_reset_pulse_seconds,
         "zigbee_flash_after_reset_seconds": config.zigbee_flash_after_reset_seconds,
         "zigbee_bootloader_startup_seconds": config.zigbee_bootloader_startup_seconds,
+        "zigbee_coordinator_startup_seconds": config.zigbee_coordinator_startup_seconds,
     }
     for name, value in timing_values.items():
         if value is not None and not 0.001 <= value <= 5:

@@ -38,6 +38,14 @@ ROM_BSL_SYNC = b"\x55\x55"
 ROM_BSL_PING = b"\x03\x20\x20"
 ROM_BSL_STATUS = b"\x03\x23\x23"
 ROM_BSL_TIMEOUT_SECONDS = 8.0
+ROM_BSL_STATUS_SUCCESS = 0x40
+ROM_BSL_STATUS_NAMES = {
+    0x40: "success",
+    0x41: "unknown command",
+    0x42: "invalid command",
+    0x43: "invalid address",
+    0x44: "flash operation failed",
+}
 ZNP_SOF = 0xFE
 ZNP_SYS_VERSION_CMD = (0x21, 0x02)
 ZNP_SYS_VERSION_RESPONSE_CMD = (0x61, 0x02)
@@ -239,8 +247,13 @@ class RomBootloaderProbe:
                 if not RomBootloaderProbe._wait_for_ack(connection):
                     raise ZigbeeFirmwareError("ROM bootloader did not acknowledge status request")
                 status = RomBootloaderProbe._read_packet(connection)
-                if not status or status[0] != 0:
+                if not status or status[0] != ROM_BSL_STATUS_SUCCESS:
                     code = status[0] if status else "missing"
+                    description = ROM_BSL_STATUS_NAMES.get(code, "unknown status") if isinstance(code, int) else "missing status"
+                    if isinstance(code, int):
+                        raise ZigbeeFirmwareError(
+                            f"ROM bootloader returned status {code} (0x{code:02X}, {description})"
+                        )
                     raise ZigbeeFirmwareError(f"ROM bootloader returned status {code}")
                 connection.write(b"\x00\xCC")
                 connection.flush()
@@ -248,7 +261,12 @@ class RomBootloaderProbe:
             raise
         except Exception as exc:
             raise ZigbeeFirmwareError(f"Unable to probe ROM bootloader on {port}: {_safe_error(exc)}") from exc
-        return {"responsive": True, "protocol": "cc2538-rom-bsl", "port": port}
+        return {
+            "responsive": True,
+            "protocol": "cc2538-rom-bsl",
+            "port": port,
+            "status": ROM_BSL_STATUS_SUCCESS,
+        }
 
     @staticmethod
     def _wait_for_ack(connection: Any) -> bool:
@@ -350,6 +368,7 @@ class FirmwareTiming:
     flash_after_reset_seconds: float = 0.1
     reset_pulse_seconds: float = 0.05
     bootloader_startup_seconds: float = 0.1
+    coordinator_startup_seconds: float = 3.0
 
     @classmethod
     def from_environment(cls) -> "FirmwareTiming":
@@ -359,6 +378,7 @@ class FirmwareTiming:
             "reset_pulse_seconds": "ZIGBEE_RESET_PULSE_SECONDS",
             "flash_after_reset_seconds": "ZIGBEE_FLASH_AFTER_RESET_SECONDS",
             "bootloader_startup_seconds": "ZIGBEE_BOOTLOADER_STARTUP_SECONDS",
+            "coordinator_startup_seconds": "ZIGBEE_COORDINATOR_STARTUP_SECONDS",
         }
         for field, name in names.items():
             value = os.environ.get(name)
@@ -376,6 +396,7 @@ class FirmwareTiming:
             "reset_pulse_seconds": self.reset_pulse_seconds,
             "flash_after_reset_seconds": self.flash_after_reset_seconds,
             "bootloader_startup_seconds": self.bootloader_startup_seconds,
+            "coordinator_startup_seconds": self.coordinator_startup_seconds,
         }
         for name, value in values.items():
             if not 0.001 <= value <= 5:
@@ -741,6 +762,7 @@ class ZigbeeFirmwareManager:
                 "reset_pulse_ms": round(self.timing.reset_pulse_seconds * 1000),
                 "flash_after_reset_ms": round(self.timing.flash_after_reset_seconds * 1000),
                 "bootloader_startup_ms": round(self.timing.bootloader_startup_seconds * 1000),
+                "coordinator_startup_ms": round(self.timing.coordinator_startup_seconds * 1000),
             },
             "mock": self.mock,
             "started": self._started,
@@ -865,6 +887,8 @@ class ZigbeeFirmwareManager:
             if self.carrier is None and not self.mock:
                 raise ZigbeeFirmwareError("Carrier MCP23017 is not available")
             manifest = None if erase_only else await self._prepare_image(release or {})
+            if not erase_only:
+                await self._append_log("system", "Firmware image loaded and validated")
             release_revision = "erase" if erase_only else str((release or {}).get("revision"))
             separator = chr(0xB7)
             await self._set_state(
@@ -881,54 +905,76 @@ class ZigbeeFirmwareManager:
             await self._set_state(status="WAITING_FOR_BOOTLOADER", stage="connect", detail="Entering ROM bootloader")
             await self._enter_bootloader(port)
             controls_asserted = True
+            await self._append_log("system", "Flash/Reset sequence completed")
             await self._set_state(detail="Checking ROM bootloader communication")
             bootloader = await self.bootloader_probe.probe(port)
             if not bootloader.get("responsive"):
                 raise ZigbeeFirmwareError("ROM bootloader did not respond; erase/write was not started")
+            bootloader_status = bootloader.get("status")
+            if isinstance(bootloader_status, int):
+                await self._append_log("system", f"ROM bootloader connected (status 0x{bootloader_status:02X})")
+            else:
+                await self._append_log("system", "ROM bootloader connected")
             await self._set_state(detail="ROM bootloader connected")
             if erase_only:
+                await self._append_log("system", "Starting cc2538-bsl erase")
                 erased = await (self._run_mock_eraser if self.mock else self._run_eraser)(port, self._process_line)
                 if not erased:
                     raise ZigbeeFirmwareError("cc2538-bsl did not confirm a successful erase")
                 self._mark_mock_memory_erased(port)
+                await self._append_log("system", "cc2538-bsl erase completed")
             else:
+                await self._append_log("system", "Starting cc2538-bsl write and verify")
                 verified, verification_seen = await self._flasher(port, Path(manifest["hex"]), self._process_line)
                 if not verified or not verification_seen:
                     raise ZigbeeFirmwareError("cc2538-bsl did not confirm a successful flash verification")
                 self._mark_mock_memory_flashed(port)
+                await self._append_log("system", "cc2538-bsl write and verification completed")
             await self._set_state(
                 status="RESTARTING_COORDINATOR",
                 stage="finish",
                 detail="Releasing bootloader controls and restarting coordinator",
             )
+            await self._append_log("system", "Releasing bootloader controls")
             await self._release_controls(port)
+            await self._append_log("system", "Resetting coordinator")
             await self._restart_coordinator(port)
-            try:
-                installed = await self.coordinator_reader.read_firmware_version(port)
-            except ZigbeeFirmwareError:
-                installed = None
-                LOGGER.info("Coordinator firmware readback was not available after flash", exc_info=True)
+            await self._append_log("system", "Waiting for coordinator application startup")
+            installed = await self._read_firmware_after_restart(port)
             if installed:
                 self._state["installed_firmware"] = installed
+                await self._append_log("system", f"Coordinator firmware readback: {installed.get('version', 'unknown')}")
                 self._state["detected_ports"] = {
                     **self._state.get("detected_ports", {}),
                     port: {"available": True, "detected": True, "status": "READY", "firmware": installed},
                 }
             elif erase_only:
+                await self._append_log("system", "Coordinator firmware readback unavailable after erase")
                 self._state["installed_firmware"] = None
                 self._state["detected_ports"] = {
                     **self._state.get("detected_ports", {}),
                     port: {"available": True, "detected": False, "status": "NO_RESPONSE", "firmware": None},
                 }
+            else:
+                await self._append_log("system", "Coordinator firmware readback unavailable")
             await self._persist_and_publish()
         except asyncio.CancelledError:
             primary_error = "Firmware update cancelled"
         except Exception as exc:
             primary_error = _safe_error(exc)
             LOGGER.exception("Zigbee firmware update failed")
+            with contextlib.suppress(Exception):
+                await self._append_log("error", primary_error)
         finally:
-            if controls_asserted or primary_error is not None:
+            if controls_asserted:
                 await self._release_controls(port)
+            if controls_asserted and primary_error is not None:
+                try:
+                    await self._restart_coordinator(port)
+                    await self._append_log("system", "Coordinator reset after failed ROM bootloader operation")
+                except Exception as exc:
+                    LOGGER.exception("Unable to recover coordinator after failed firmware operation")
+                    await self._append_log("error", f"Coordinator recovery failed: {_safe_error(exc)}")
             if lease is not None:
                 lease.release()
             if primary_error is not None:
@@ -1027,6 +1073,23 @@ class ZigbeeFirmwareManager:
         finally:
             await self.carrier.set_output(reset_output, False)
 
+    async def _read_firmware_after_restart(self, port: str) -> dict[str, Any] | None:
+        """Wait for the application to leave ROM BSL before reading SYS_VERSION."""
+        deadline = time.monotonic() + self.timing.coordinator_startup_seconds
+        while True:
+            try:
+                installed = await self.coordinator_reader.read_firmware_version(port)
+            except ZigbeeFirmwareError:
+                installed = None
+                LOGGER.info("Coordinator firmware readback is not ready after reset", exc_info=True)
+            if installed:
+                return installed
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                LOGGER.info("Coordinator firmware readback was not available after reset")
+                return None
+            await asyncio.sleep(min(0.25, remaining))
+
     async def _run_mock_flasher(
         self,
         port: str,
@@ -1097,6 +1160,7 @@ class ZigbeeFirmwareManager:
         if not command:
             raise ZigbeeFirmwareError("ZIGBEE_BSL_COMMAND is empty")
         command.extend(["-p", port, "-b", str(FIRMWARE_BAUDRATE), "-e", "-f", "/dev/null"])
+        await self._append_log("system", f"Starting utility: {shlex.join(command)}")
         try:
             process = await asyncio.create_subprocess_exec(
                 *command,
@@ -1145,7 +1209,8 @@ class ZigbeeFirmwareManager:
         command = shlex.split(os.environ.get("ZIGBEE_BSL_COMMAND", "cc2538-bsl"))
         if not command:
             raise ZigbeeFirmwareError("ZIGBEE_BSL_COMMAND is empty")
-        command.extend(["-p", port, "-b", str(FIRMWARE_BAUDRATE), "-e", "-w", "-v", str(hex_path)])
+        command.extend(["-f", "-p", port, "-b", str(FIRMWARE_BAUDRATE), "-e", "-w", "-v", str(hex_path)])
+        await self._append_log("system", f"Starting utility: {shlex.join(command)}")
         try:
             process = await asyncio.create_subprocess_exec(
                 *command,
@@ -1165,7 +1230,12 @@ class ZigbeeFirmwareManager:
                     return
                 line = raw.decode("utf-8", errors="replace").rstrip("\r\n")
                 lower = line.lower()
-                if "verify" in lower or "verification" in lower or "crc" in lower and "match" in lower:
+                if (
+                    "verify" in lower
+                    or "verified" in lower
+                    or "verification" in lower
+                    or ("crc" in lower and "match" in lower)
+                ):
                     verification_seen = True
                 await on_line(name, line)
 
