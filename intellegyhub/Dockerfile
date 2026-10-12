@@ -16,19 +16,21 @@ RUN git clone --depth 1 --branch v79 https://github.com/joan2937/pigpio.git /tmp
 FROM ghcr.io/home-assistant/aarch64-base-python:3.12-alpine3.20
 
 LABEL \
-  io.hass.version="0.5.239" \
+  io.hass.version="0.5.240" \
   io.hass.type="app" \
   io.hass.arch="aarch64"
 
 WORKDIR /app
 
-RUN apk add --no-cache i2c-tools libgpiod
+COPY requirements.txt /tmp/requirements.txt
+RUN apk add --no-cache i2c-tools libgpiod git \
+  && pip install --no-cache-dir -r /tmp/requirements.txt \
+  && pip install --no-cache-dir git+https://github.com/JelmerT/cc2538-bsl.git \
+  && apk del git
 COPY --from=pigpio-build /usr/local/bin/pig* /usr/local/bin/
 COPY --from=pigpio-build /usr/local/lib/libpigpio* /usr/local/lib/
 COPY --from=pigpio-build /usr/local/include/pigpio* /usr/local/include/
 ENV LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
-COPY requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 COPY app /app/app
 COPY icon.png /app/icon.png

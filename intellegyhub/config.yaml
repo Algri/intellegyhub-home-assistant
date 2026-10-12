@@ -2,7 +2,7 @@ name: IntellegyHUB
 slug: intellegyhub
 description: IntellegyHUB hardware runtime for Home Assistant native entities
 url: https://intellegyhub.com
-version: 0.5.239
+version: 0.5.240
 stage: stable
 arch:
   - aarch64
@@ -23,6 +23,8 @@ devices:
   - /dev/gpiomem
   - /dev/ttyAMA3
   - /dev/ttyAMA5
+  - /dev/ttyUSB0
+  - /dev/ttyUSB1
   - /dev/i2c-1
   - /dev/i2c-10
   - /dev/rtc0
@@ -45,6 +47,7 @@ options:
   power_button:
     shutdown_enabled: true
     shutdown_hold_seconds: 1.0
+  zigbee_firmware: {}
   buzzer:
     startup_enabled: true
     shutdown_enabled: true
@@ -63,6 +66,8 @@ schema:
   power_button:
     shutdown_enabled: bool
     shutdown_hold_seconds: float(0.1,1.5)
+  zigbee_firmware:
+    reset_pulse_seconds: float(0.001,5)?
   buzzer:
     startup_enabled: bool
     shutdown_enabled: bool

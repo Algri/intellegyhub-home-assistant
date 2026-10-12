@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.240
+
+- Add the CC2652P7 coordinator firmware update flow for X-Mod1 and X-Mod2.
+- Validate Koenkk firmware archives, control the MCP23017 bootloader sequence, and run `cc2538-bsl` with persisted operation logs.
+- Keep mock firmware updates hardware-free while production reads the installed coordinator revision from Zigbee2MQTT startup logs.
+
 ## 0.5.239
 
 - Align the X-BUS module artwork to the right edge of its visual area.
