@@ -271,7 +271,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-        "Starting v0.5.244 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+        "Starting v0.5.245 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -345,7 +345,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.244", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.245", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -934,8 +934,14 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .zigbee-firmware-step.done { color: var(--ha-primary); }
     .zigbee-firmware-step.done::before { content: '✓'; display: grid; place-items: center; width: 14px; height: 14px; border-color: var(--ha-primary); background: var(--ha-primary); color: var(--ha-surface); font-size: 11px; line-height: 1; }
     .zigbee-firmware-step.done:not(:last-child)::after { background: var(--ha-primary); }
-    .zigbee-firmware-console-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--ha-text); font-size: 13px; font-weight: 700; }
-    .zigbee-firmware-console-live { padding: 5px 10px; border: 1px solid var(--ha-row-border); border-radius: 999px; color: var(--ha-primary); font-weight: 700; }
+    .zigbee-firmware-console-panel { display: grid; gap: 10px; }
+    .zigbee-firmware-console-panel summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 28px; cursor: pointer; list-style: none; color: var(--ha-text); font-size: 13px; font-weight: 700; }
+    .zigbee-firmware-console-panel summary::-webkit-details-marker { display: none; }
+    .zigbee-firmware-console-panel summary:focus, .zigbee-firmware-console-panel summary:focus-visible { outline: none; }
+    .zigbee-firmware-console-panel summary::before { content: ''; display: block; width: 9px; height: 9px; margin: -4px 2px 0 3px; border-right: 3px solid var(--ha-primary); border-bottom: 3px solid var(--ha-primary); transform: rotate(45deg); transition: transform .16s ease; }
+    .zigbee-firmware-console-panel[open] summary::before { margin-top: 4px; transform: rotate(225deg); }
+    .zigbee-firmware-console-panel summary > span:first-of-type { margin-right: auto; }
+    .zigbee-firmware-console-live { padding: 5px 10px; border: 1px solid var(--ha-row-border); border-radius: 999px; color: var(--ha-primary); font-weight: 700; white-space: nowrap; }
     .zigbee-firmware-console { display: block; width: 100%; height: 180px; min-height: 180px; max-height: 180px; box-sizing: border-box; overflow-y: auto; overflow-x: hidden; margin: 0; padding: 10px 12px; border: 1px solid var(--ha-row-border); border-radius: 8px; background: var(--ha-pre); color: var(--ha-secondary); font: 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
     .zigbee-firmware-toolbar .bus-action { height: 48px; min-height: 48px; }
     .functions-title { display: inline-flex; align-items: center; gap: 12px; }
@@ -2321,6 +2327,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           <button id="zigbee-check-updates" class="bus-action" type="button" onclick="checkZigbeeFirmware()">Check updates</button>
           <button id="zigbee-install-firmware" class="bus-action" type="button" onclick="installZigbeeFirmware()" disabled>Install firmware</button>
           <button id="zigbee-erase-firmware" class="bus-action danger-button" type="button" onclick="eraseZigbeeFirmware()" disabled>Erase</button>
+          <button id="zigbee-clear-firmware-log" class="bus-action" type="button" onclick="clearZigbeeFirmwareOperation()" disabled>Clear log</button>
           <div id="zigbee-firmware-status" class="zigbee-firmware-status" role="status" aria-live="polite">Select a coordinator port and check for releases.</div>
         </div>
         <div id="zigbee-firmware-operation" class="zigbee-firmware-operation" aria-live="polite">
@@ -2343,8 +2350,10 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
             <div class="zigbee-firmware-step" data-firmware-step="flash">Flash</div>
             <div class="zigbee-firmware-step" data-firmware-step="finish">Finish</div>
           </div>
-          <div class="zigbee-firmware-console-head"><span>Operation log</span><span class="zigbee-firmware-console-live">Live output</span></div>
-          <pre id="zigbee-firmware-console" class="zigbee-firmware-console" data-empty="true">Waiting for utility output...</pre>
+          <details id="zigbee-firmware-console-panel" class="zigbee-firmware-console-panel" open ontoggle="if (this.open) { const output = document.getElementById('zigbee-firmware-console'); if (output) output.scrollTop = output.scrollHeight; }">
+            <summary><span>Operation log</span><span class="zigbee-firmware-console-live">Live output</span></summary>
+            <pre id="zigbee-firmware-console" class="zigbee-firmware-console" data-empty="true">Waiting for utility output...</pre>
+          </details>
         </div>
       </div>
     </section>
@@ -3130,7 +3139,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       refreshZigbeeFirmwareState();
     }
 
-    const zigbeeFirmwareState = { port: '/dev/ttyUSB0', releases: [], selected: '', checking: false, request: 0, operation: null, pollTimer: null };
+    const zigbeeFirmwareState = { port: '/dev/ttyUSB0', releases: [], selected: '', checking: false, request: 0, operation: null, pollTimer: null, consoleOperationId: null, consoleStatus: null };
     function setZigbeeFirmwareStatus(message, kind = '') {
       const status = document.getElementById('zigbee-firmware-status');
       if (!status) return;
@@ -3145,13 +3154,17 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       const detect = document.getElementById('zigbee-detect-coordinator');
       const install = document.getElementById('zigbee-install-firmware');
       const erase = document.getElementById('zigbee-erase-firmware');
+      const clear = document.getElementById('zigbee-clear-firmware-log');
       if (detect) detect.disabled = zigbeeFirmwareState.checking || active;
       if (install) install.disabled = zigbeeFirmwareState.checking || active || unavailable || !zigbeeFirmwareState.selected;
       if (erase) erase.disabled = zigbeeFirmwareState.checking || active || unavailable;
+      if (clear) clear.disabled = !zigbeeFirmwareState.operation || active || status === 'IDLE';
     }
     function resetZigbeeFirmwareState() {
       zigbeeFirmwareState.request += 1;
       zigbeeFirmwareState.operation = null;
+      zigbeeFirmwareState.consoleOperationId = null;
+      zigbeeFirmwareState.consoleStatus = null;
       if (zigbeeFirmwareState.pollTimer) { window.clearTimeout(zigbeeFirmwareState.pollTimer); zigbeeFirmwareState.pollTimer = null; }
       zigbeeFirmwareState.checking = false;
       zigbeeFirmwareState.port = document.getElementById('zigbee-coordinator-port')?.dataset.value || '/dev/ttyUSB0';
@@ -3188,12 +3201,14 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       select.querySelectorAll('.mode-option').forEach((option) => {
         const item = detected.get(option.dataset.value);
         const available = Boolean(item?.available);
+        const busy = item?.status === 'BUSY';
         option.disabled = probed && !available;
-        option.title = !probed ? '' : (available ? (item?.status === 'NO_RESPONSE' ? 'Coordinator firmware not detected' : '') : 'Module port unavailable');
+        option.title = !probed ? '' : (available ? (item?.status === 'NO_RESPONSE' ? 'Coordinator firmware not detected' : '') : (busy ? 'Coordinator port is busy' : 'Module port unavailable'));
         option.classList.toggle('unavailable', probed && !available);
       });
       const current = detected.get(select.dataset.value);
       if (!probed) setZigbeeFirmwareStatus('Press Detect to check coordinator ports.');
+      else if (current?.status === 'BUSY') setZigbeeFirmwareStatus('Coordinator port is busy. Stop Zigbee2MQTT and try again.', 'error');
       else if (current?.status === 'NO_RESPONSE') setZigbeeFirmwareStatus('Coordinator detected; firmware version unavailable.');
       else if (current?.status === 'READY') setZigbeeFirmwareStatus('Coordinator detected.');
     }
@@ -3295,17 +3310,35 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       const progressLabel = document.getElementById('zigbee-firmware-progress-label');
       const consoleOutput = document.getElementById('zigbee-firmware-console');
       const installedElement = document.getElementById('zigbee-installed-firmware');
-      const wasAtBottom = !consoleOutput || consoleOutput.scrollHeight - consoleOutput.scrollTop - consoleOutput.clientHeight <= 4;
       const status = operation?.status || 'IDLE';
       const stage = operation?.stage || zigbeeFirmwareStage(status);
       const complete = status === 'COMPLETED';
+      const operationId = operation?.operation_id || null;
+      const operationChanged = operationId !== zigbeeFirmwareState.consoleOperationId;
+      const statusChanged = status !== zigbeeFirmwareState.consoleStatus;
+      const active = ['DOWNLOADING', 'VERIFYING_IMAGE', 'WAITING_FOR_BOOTLOADER', 'ERASING', 'FLASHING', 'VERIFYING_FLASH', 'RESTARTING_COORDINATOR'].includes(status);
+      const consolePanel = document.getElementById('zigbee-firmware-console-panel');
+      if (operationChanged) {
+        zigbeeFirmwareState.consoleOperationId = operationId;
+        if (consolePanel) consolePanel.open = status === 'FAILED' || active;
+      } else if (statusChanged && status === 'COMPLETED') {
+        if (consolePanel) consolePanel.open = false;
+      } else if (statusChanged && status === 'FAILED') {
+        if (consolePanel) consolePanel.open = true;
+      }
+      zigbeeFirmwareState.consoleStatus = status;
+      const wasAtBottom = !consoleOutput || !consolePanel?.open || consoleOutput.scrollHeight - consoleOutput.scrollTop - consoleOutput.clientHeight <= 4;
       const installedFirmware = operation?.installed_firmware;
       if (installedElement) {
         installedElement.value = installedFirmware?.version || 'Version unavailable';
         if (installedFirmware?.revision) installedElement.dataset.revision = installedFirmware.revision;
         else delete installedElement.dataset.revision;
       }
-      if (stateElement) { stateElement.textContent = zigbeeFirmwareStateLabel(status); stateElement.className = `zigbee-firmware-operation-state ${complete ? 'success' : ''}`.trim(); }
+      if (stateElement) {
+        const failed = status === 'FAILED';
+        stateElement.textContent = zigbeeFirmwareStateLabel(status);
+        stateElement.className = `zigbee-firmware-operation-state ${complete ? 'success' : (failed ? 'error' : '')}`.trim();
+      }
       if (detailElement) detailElement.textContent = operation?.detail || 'No operation running.';
       if (targetElement) targetElement.textContent = operation?.target || '';
       const progress = Number.isFinite(operation?.progress) ? operation.progress : null;
@@ -3325,7 +3358,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
           ? logs.map((entry) => `${entry.timestamp || '--:--:--'}  ${entry.line || ''}`).join('\n')
           : 'Waiting for utility output...';
         consoleOutput.dataset.empty = logs.length ? 'false' : 'true';
-        if (wasAtBottom) consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        if (consolePanel?.open && wasAtBottom) consoleOutput.scrollTop = consoleOutput.scrollHeight;
       }
       const panel = document.getElementById('zigbee-firmware-operation');
       if (panel) panel.classList.toggle('visible', status !== 'IDLE');
@@ -3386,6 +3419,25 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         setZigbeeFirmwareStatus(`Unable to erase coordinator firmware: ${errorDetail(error)}`, 'error');
         updateZigbeeInstallButton();
       });
+    }
+    async function clearZigbeeFirmwareOperation() {
+      const button = document.getElementById('zigbee-clear-firmware-log');
+      if (button?.disabled) return;
+      if (button) button.disabled = true;
+      try {
+        const payload = await requestJson('api/v1/zigbee/firmware/clear', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ port: zigbeeFirmwareState.port })
+        });
+        zigbeeFirmwareState.operation = payload;
+        renderZigbeeCoordinatorPorts(payload.ports);
+        renderZigbeeFirmwareOperation(payload);
+        updateZigbeeInstallButton();
+      } catch (error) {
+        setZigbeeFirmwareStatus(`Unable to clear firmware operation: ${errorDetail(error)}`, 'error');
+        updateZigbeeInstallButton();
+      }
     }
 
     async function callApi(path) {
@@ -6603,6 +6655,15 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     async def post_zigbee_firmware_erase(payload: ZigbeeFirmwareErasePayload) -> dict:
         try:
             return await app.state.zigbee_firmware.start_erase(payload.port)
+        except ZigbeeFirmwareBusyError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except ZigbeeFirmwareError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/api/v1/zigbee/firmware/clear")
+    async def post_zigbee_firmware_clear(payload: ZigbeeFirmwarePortPayload) -> dict:
+        try:
+            return await app.state.zigbee_firmware.clear_operation(payload.port)
         except ZigbeeFirmwareBusyError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         except ZigbeeFirmwareError as exc:

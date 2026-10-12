@@ -35,7 +35,6 @@ MOCK_COORDINATOR_REVISION = "20250321-mock"
 ROM_BSL_ACK = 0xCC
 ROM_BSL_NACK = 0x33
 ROM_BSL_SYNC = b"\x55\x55"
-ROM_BSL_PING = b"\x03\x20\x20"
 ROM_BSL_STATUS = b"\x03\x23\x23"
 ROM_BSL_TIMEOUT_SECONDS = 8.0
 ROM_BSL_STATUS_SUCCESS = 0x40
@@ -240,9 +239,6 @@ class RomBootloaderProbe:
                 connection.write(ROM_BSL_SYNC)
                 if not RomBootloaderProbe._wait_for_ack(connection):
                     raise ZigbeeFirmwareError("ROM bootloader rejected the synchronization sequence")
-                connection.write(ROM_BSL_PING)
-                if not RomBootloaderProbe._wait_for_ack(connection):
-                    raise ZigbeeFirmwareError("ROM bootloader did not acknowledge ping")
                 connection.write(ROM_BSL_STATUS)
                 if not RomBootloaderProbe._wait_for_ack(connection):
                     raise ZigbeeFirmwareError("ROM bootloader did not acknowledge status request")
@@ -432,6 +428,11 @@ def _utc_now() -> str:
 def _safe_error(exc: BaseException) -> str:
     message = str(exc).strip()
     return message or exc.__class__.__name__
+
+
+def _is_uart_busy_error(exc: BaseException) -> bool:
+    message = _safe_error(exc).lower()
+    return "could not exclusively lock" in message or "resource temporarily unavailable" in message or "errno 11" in message
 
 
 def _release_label(release: dict[str, Any]) -> str:
@@ -781,11 +782,32 @@ class ZigbeeFirmwareManager:
             raise ZigbeeFirmwareError("Unsupported coordinator port")
         detected_ports = await self.detect_coordinator_ports()
         selected = detected_ports.get(port) or {"detected": False, "firmware": None}
+        # A manual detection starts a new UI inspection; do not keep showing a
+        # stale install/erase result from an earlier operation.
+        self._state = empty_update_state()
+        self._state["detected_ports"] = detected_ports
         self._state["port"] = port
         self._state["port_label"] = PORT_PROFILES[port]["label"]
         self._state["installed_firmware"] = selected.get("firmware") if selected.get("detected") else None
         await self._persist_and_publish()
         return self.snapshot()
+
+    async def clear_operation(self, port: str = "/dev/ttyUSB0") -> dict[str, Any]:
+        """Clear the last operation while preserving the selected coordinator detection."""
+        async with self._operation_lock:
+            if self._state.get("status") in ACTIVE_UPDATE_STATES:
+                raise ZigbeeFirmwareBusyError("A firmware update is already running")
+            if port not in PORT_PROFILES:
+                raise ZigbeeFirmwareError("Unsupported coordinator port")
+            detected_ports = self._state.get("detected_ports", {})
+            selected = detected_ports.get(port) or {}
+            self._state = empty_update_state()
+            self._state["detected_ports"] = detected_ports
+            self._state["port"] = port
+            self._state["port_label"] = PORT_PROFILES[port]["label"]
+            self._state["installed_firmware"] = selected.get("firmware") if selected.get("detected") else None
+            await self._persist_and_publish()
+            return self.snapshot(port)
 
     async def detect_coordinator_ports(self) -> dict[str, dict[str, Any]]:
         async def probe(path: str) -> tuple[str, dict[str, Any]]:
@@ -793,6 +815,14 @@ class ZigbeeFirmwareManager:
                 firmware = await self.coordinator_reader.read_firmware_version(path)
             except ZigbeeFirmwareError as exc:
                 LOGGER.info("Coordinator probe failed port=%s: %s", path, exc)
+                if _is_uart_busy_error(exc):
+                    return path, {
+                        "available": False,
+                        "detected": False,
+                        "status": "BUSY",
+                        "detail": "Coordinator UART is busy; stop Zigbee2MQTT before detection or firmware operation.",
+                        "firmware": None,
+                    }
                 return path, {"available": False, "detected": False, "status": "UNAVAILABLE", "firmware": None}
             return path, {
                 "available": True,
@@ -916,6 +946,12 @@ class ZigbeeFirmwareManager:
             else:
                 await self._append_log("system", "ROM bootloader connected")
             await self._set_state(detail="ROM bootloader connected")
+            if not self.mock:
+                # cc2538-bsl opens the UART itself and toggles DTR/RTS. Re-enter
+                # ROM after the non-destructive preflight so that those lines
+                # cannot leave the target between the probe and the utility.
+                await self._append_log("system", "Re-entering ROM bootloader before cc2538-bsl")
+                await self._enter_bootloader(port)
             if erase_only:
                 await self._append_log("system", "Starting cc2538-bsl erase")
                 erased = await (self._run_mock_eraser if self.mock else self._run_eraser)(port, self._process_line)
@@ -991,7 +1027,11 @@ class ZigbeeFirmwareManager:
                     status="COMPLETED",
                     stage="finish",
                     progress=100,
-                    detail="Coordinator firmware written, verified, and restarted",
+                    detail=(
+                        "Coordinator flash erased and restarted"
+                        if erase_only
+                        else "Coordinator firmware written, verified, and restarted"
+                    ),
                     verification={
                         "erase_verified" if erase_only else "flash_verified": True,
                         "coordinator_restarted": True,
@@ -1159,7 +1199,7 @@ class ZigbeeFirmwareManager:
         command = shlex.split(os.environ.get("ZIGBEE_BSL_COMMAND", "cc2538-bsl"))
         if not command:
             raise ZigbeeFirmwareError("ZIGBEE_BSL_COMMAND is empty")
-        command.extend(["-p", port, "-b", str(FIRMWARE_BAUDRATE), "-e", "-f", "/dev/null"])
+        command.extend(["-f", "-p", port, "-b", str(FIRMWARE_BAUDRATE), "-e", "/dev/null"])
         await self._append_log("system", f"Starting utility: {shlex.join(command)}")
         try:
             process = await asyncio.create_subprocess_exec(
@@ -1170,12 +1210,26 @@ class ZigbeeFirmwareManager:
         except OSError as exc:
             raise ZigbeeFirmwareError(f"Unable to start cc2538-bsl: {_safe_error(exc)}") from exc
 
+        erase_seen = False
+
         async def read_stream(stream: asyncio.StreamReader, name: str) -> None:
+            nonlocal erase_seen
+            pending = ""
             while True:
-                raw = await stream.readline()
+                raw = await stream.read(4096)
                 if not raw:
-                    return
-                await on_line(name, raw.decode("utf-8", errors="replace").rstrip("\r\n"))
+                    break
+                pending += raw.decode("utf-8", errors="replace")
+                lines = re.split(r"[\r\n]+", pending)
+                pending = lines.pop()
+                for line in lines:
+                    if re.search(r"\berase\s+(?:done|successful|completed)\b", line, re.IGNORECASE):
+                        erase_seen = True
+                    await on_line(name, line)
+            if pending:
+                if re.search(r"\berase\s+(?:done|successful|completed)\b", pending, re.IGNORECASE):
+                    erase_seen = True
+                await on_line(name, pending)
 
         readers = [
             asyncio.create_task(read_stream(process.stdout, "stdout")),
@@ -1198,7 +1252,7 @@ class ZigbeeFirmwareManager:
                 if not reader.done():
                     reader.cancel()
             await asyncio.gather(*readers, return_exceptions=True)
-        return process.returncode == 0
+        return process.returncode == 0 and erase_seen
 
     async def _run_flasher(
         self,
@@ -1224,12 +1278,26 @@ class ZigbeeFirmwareManager:
 
         async def read_stream(stream: asyncio.StreamReader, name: str) -> None:
             nonlocal verification_seen
+            pending = ""
             while True:
-                raw = await stream.readline()
+                raw = await stream.read(4096)
                 if not raw:
-                    return
-                line = raw.decode("utf-8", errors="replace").rstrip("\r\n")
-                lower = line.lower()
+                    break
+                pending += raw.decode("utf-8", errors="replace")
+                lines = re.split(r"[\r\n]+", pending)
+                pending = lines.pop()
+                for line in lines:
+                    lower = line.lower()
+                    if (
+                        "verify" in lower
+                        or "verified" in lower
+                        or "verification" in lower
+                        or ("crc" in lower and "match" in lower)
+                    ):
+                        verification_seen = True
+                    await on_line(name, line)
+            if pending:
+                lower = pending.lower()
                 if (
                     "verify" in lower
                     or "verified" in lower
@@ -1237,7 +1305,7 @@ class ZigbeeFirmwareManager:
                     or ("crc" in lower and "match" in lower)
                 ):
                     verification_seen = True
-                await on_line(name, line)
+                await on_line(name, pending)
 
         readers = [
             asyncio.create_task(read_stream(process.stdout, "stdout")),

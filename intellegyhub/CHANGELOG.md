@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.245
+
+- Add a `Clear log` action beside the Zigbee Firmware controls.
+- Clear completed or failed firmware operation results while preserving the detected coordinator firmware version.
+- Keep the operation log collapsible with the existing RS-485-style disclosure behavior.
+
 ## 0.5.244
 
 - Release the CC2652P7 coordinator Reset and delayed `SYS_VERSION` readback
