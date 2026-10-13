@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.247
+
+- Remove the redundant blue refresh/check icon from the Zigbee firmware selector and restore the standard dropdown affordance.
+- Keep release checks on the `Check updates` action.
+- Fix the Zigbee firmware card responsive layout for tablet and mobile widths, including operation-stage connector overflow.
+- Align the release asset verification with the current `assets/mio-8.png` package path and `/rs485_assets/` compatibility route.
+
 ## 0.5.246
 
 - Refresh the CC2652P7 firmware card with IHZB-C1 identification, product imagery and consistent action icons.
