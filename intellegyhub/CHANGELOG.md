@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.246
+
+- Refresh the CC2652P7 firmware card with IHZB-C1 identification, product imagery and consistent action icons.
+- Keep the firmware asset URL case-correct for Linux/HAOS deployments.
+- Add the project UI style system and review checklist for fixed dimensions, themes, icons and responsive states.
+
 ## 0.5.245
 
 - Add a `Clear log` action beside the Zigbee Firmware controls.

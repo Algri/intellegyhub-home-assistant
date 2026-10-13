@@ -190,9 +190,9 @@ Once configured, supported IntellegyHUB hardware and connected devices become av
 
 | Resource | Description |
 |---|---|
-| [Platform overview](intellegyhub/README.md) | IntellegyHUB product philosophy, capabilities, and platform overview |
-| [Changelog](intellegyhub/CHANGELOG.md) | Release history and current software changes |
-| [Technical runtime notes](intellegyhub/DOCS.md) | Low-level development and runtime information |
+| [Platform overview](../../README.md) | IntellegyHUB product philosophy, capabilities, and platform overview |
+| [Changelog](../../addon/CHANGELOG.md) | Release history and current software changes |
+| [Technical runtime notes](../../addon/DOCS.md) | Low-level development and runtime information |
 
 For bugs and feature requests, use [GitHub Issues](https://github.com/Algri/intellegyhub-home-assistant/issues).
 

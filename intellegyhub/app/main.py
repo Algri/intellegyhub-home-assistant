@@ -271,7 +271,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
             LOGGER.info(
-        "Starting v0.5.245 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
+        "Starting v0.5.246 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
                 config.chip_path,
                 config.led_gpio,
                 config.led_active_low,
@@ -345,7 +345,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.245", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.246", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -944,6 +944,35 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .zigbee-firmware-console-live { padding: 5px 10px; border: 1px solid var(--ha-row-border); border-radius: 999px; color: var(--ha-primary); font-weight: 700; white-space: nowrap; }
     .zigbee-firmware-console { display: block; width: 100%; height: 180px; min-height: 180px; max-height: 180px; box-sizing: border-box; overflow-y: auto; overflow-x: hidden; margin: 0; padding: 10px 12px; border: 1px solid var(--ha-row-border); border-radius: 8px; background: var(--ha-pre); color: var(--ha-secondary); font: 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
     .zigbee-firmware-toolbar .bus-action { height: 48px; min-height: 48px; }
+    .zigbee-firmware-header { position: relative; min-height: 0; margin-bottom: 18px; }
+    .zigbee-firmware-header-copy { min-width: 0; }
+    .zigbee-firmware-header .zigbee-firmware-title { gap: 20px; font-size: 38px; line-height: 1.1; font-weight: 600; }
+    .zigbee-firmware-header .zigbee-firmware-title-icon { width: 46px; height: 46px; flex-basis: 46px; }
+    .zigbee-firmware-header .subtitle { max-width: 840px; font-size: 16px; line-height: 1.35; }
+    .zigbee-firmware-chip-profile { position: absolute; top: -12px; right: 0; display: flex; align-items: center; gap: 16px; min-width: 300px; }
+    .zigbee-firmware-chip-image { width: 190px; height: 142px; object-fit: contain; mix-blend-mode: screen; filter: drop-shadow(0 0 18px rgba(0, 168, 255, .22)); }
+    .zigbee-firmware-chip-meta { display: flex; width: 170px; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+    .zigbee-firmware-chip-meta .transport { min-width: 132px; margin-top: 0; padding: 9px 22px; font-size: 15px; font-weight: 700; text-align: center; }
+    .zigbee-firmware-chip-label { color: var(--ha-secondary); font-size: 15px; line-height: 1.25; white-space: nowrap; }
+    .zigbee-firmware-chip-soc { color: var(--ha-muted, var(--ha-secondary)); font-size: 12px; line-height: 1.25; white-space: nowrap; }
+    html[data-theme="light"] .zigbee-firmware-chip-image { mix-blend-mode: normal; filter: drop-shadow(0 0 18px rgba(0, 120, 220, .18)); }
+    .zigbee-firmware-field .mode-trigger { height: 48px; min-height: 48px; border-radius: 8px; padding-left: 16px; font-size: 14px; }
+    .zigbee-firmware-available-control { position: relative; }
+    .zigbee-firmware-available-control .mode-trigger { padding-right: 52px; }
+    .zigbee-firmware-refresh { position: absolute; top: 50%; right: 10px; z-index: 1; width: 34px; min-width: 34px; height: 34px; min-height: 34px; padding: 5px; border: 0 !important; border-radius: 50% !important; background: transparent !important; color: var(--ha-primary); transform: translateY(-50%); box-shadow: none !important; }
+    .zigbee-firmware-refresh:hover, .zigbee-firmware-refresh:focus-visible { background: transparent !important; outline: none; }
+    .zigbee-firmware-refresh:disabled { opacity: .55; }
+    .zigbee-firmware-refresh svg { display: block; width: 24px; height: 24px; fill: currentColor; }
+    .zigbee-firmware-action-icon { width: 22px; height: 22px; flex: 0 0 22px; fill: currentColor; }
+    .zigbee-firmware-actions { gap: 10px; }
+    .zigbee-firmware-actions .bus-action { min-width: 142px; height: 48px; min-height: 48px; border-radius: 8px; padding: 8px 14px; font-size: inherit; }
+    #zigbee-detect-coordinator { border-color: var(--ha-primary); background: var(--ha-primary); color: var(--ha-surface); }
+    #zigbee-detect-coordinator:hover, #zigbee-detect-coordinator:focus-visible { border-color: var(--ha-primary); background: #1aaef0; color: var(--ha-surface); }
+    #zigbee-install-firmware:disabled { border-color: #39434d; background: rgba(255, 255, 255, .025); color: #7d8995; opacity: 1; }
+    #zigbee-erase-firmware { border-color: #ff3b30; color: #ff5148; }
+    #zigbee-erase-firmware:hover, #zigbee-erase-firmware:focus-visible { border-color: #ff7068; background: rgba(244, 67, 54, .14); color: #ff8b83; }
+    #zigbee-clear-firmware-log { border-color: #3a444e; color: #a9b4c1; }
+    #zigbee-clear-firmware-log:hover, #zigbee-clear-firmware-log:focus-visible { border-color: var(--ha-primary); background: var(--ha-action-hover); color: var(--ha-primary); }
     .functions-title { display: inline-flex; align-items: center; gap: 12px; }
     .functions-title-icon { width: 34px; height: 34px; color: var(--ha-primary); fill: currentColor; flex: 0 0 34px; }
     .rs485-toolbar {
@@ -1791,9 +1820,10 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     @media (max-width: 1100px) { .ports, .carrier-io-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .xport-group-toolbar, .xport-group-toolbar.config-hidden { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .xport-group-toolbar .bus-note, .xport-group-toolbar.config-hidden .bus-note { grid-column: 1 / -1; } .relay-grid, .module-card[data-module-kind="digital_input"] .relay-grid, .module-card[data-module-kind="relay_output"] .relay-grid { grid-template-columns: repeat(4, minmax(145px, 1fr)); } .rs485-layout { grid-template-columns: 1fr; } .rs485-capability-grid, .rs485-device-settings { grid-template-columns: repeat(2, minmax(130px, 1fr)); } .rs485-polling-strip { grid-template-columns: 1fr auto; } .rs485-io-head, .rs485-io-row { grid-template-columns: 52px minmax(150px, 1fr) minmax(150px, 1fr) minmax(180px, .9fr); } }
     @media (max-width: 900px) { .diagnostic-led-grid, .buzzer-panel { grid-template-columns: 1fr; } .buzzer-actions { grid-template-columns: repeat(2, minmax(120px, 1fr)); grid-template-rows: auto; } .buzzer-actions .buzzer-group-title { grid-column: 1 / -1; } }
     @media (max-width: 900px) { .xbus-visual { opacity: .3; width: 58%; right: 0; } .xbus-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); } .xbus-toolbar .bus-note { grid-column: 1 / -1; } }
-    @media (max-width: 900px) { .zigbee-firmware-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); } .zigbee-firmware-actions { justify-self: stretch; } }
+    @media (max-width: 1100px) { .zigbee-firmware-chip-profile { min-width: 250px; } .zigbee-firmware-chip-image { width: 130px; } }
+    @media (max-width: 900px) { .zigbee-firmware-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); } .zigbee-firmware-actions { justify-self: stretch; } .zigbee-firmware-header { min-height: 0; } .zigbee-firmware-chip-profile { position: static; min-width: 0; margin-top: 0; } }
     @media (max-width: 620px) { body { padding: 10px; } .app-toolbar { justify-content: stretch; } .theme-switcher { width: 100%; justify-content: space-between; } .theme-choice { flex: 1; } .overview-identity { min-height: 260px; padding: 22px 18px; } .overview-wordmark { font-size: 22px; letter-spacing: .12em; } .overview-title-row { align-items: flex-start; flex-direction: column; gap: 14px; } .overview-title h1 { font-size: 34px; } .overview-title .subtitle { font-size: 16px; } .overview-facts { grid-template-columns: 88px minmax(0, 1fr); } .overview-facts dt, .overview-facts dd { font-size: 14px; } .overview-health { grid-template-columns: 1fr; gap: 18px; } .overview-health-item + .overview-health-item { border-left: 0; padding-left: 0; } .overview-metrics { grid-template-columns: 1fr; } .overview-metric, .overview-metric:nth-child(2n), .overview-metric:nth-last-child(-n+3), .overview-metric:nth-of-type(4) { border: 0; } .extension-panel:not(.overview-panel) { padding-left: 14px; padding-right: 14px; } #controls-section { padding: 18px 14px; } .module-row { align-items: flex-start; } .transport { margin-top: 0; } .xport-group-toolbar, .xport-group-toolbar.config-hidden { grid-template-columns: 1fr; } .xport-group-toolbar .bus-note, .xport-group-toolbar.config-hidden .bus-note { grid-column: 1; } .ports, .carrier-io-grid, .relay-grid, .module-card[data-module-kind="digital_input"] .relay-grid, .module-card[data-module-kind="relay_output"] .relay-grid, .rs485-toolbar { grid-template-columns: 1fr; } .module-card .relay-row { border-left: 0 !important; padding-left: 12px !important; } .rs485-table-row, .rs485-table-row.scan, .rs485-table-row.configured { grid-template-columns: 1fr; align-items: stretch; } .rs485-device-summary { align-items: flex-start; flex-wrap: wrap; gap: 4px 10px; } .rs485-device-meta { flex-wrap: wrap; } .rs485-device-filters, .rs485-device-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } .rs485-row-actions { justify-content: flex-start; } .rs485-detail-head { flex-direction: column; } .rs485-device-identity { align-items: flex-start; } .rs485-detail-meta { position: static; flex-wrap: wrap; } .rs485-detail-last-seen { position: static; } .rs485-detail-actions { justify-content: flex-start; } .module-head { flex-direction: column; } .module-actions { justify-content: flex-start; } .buzzer-row { grid-template-columns: 1fr; gap: 6px; } .xbus-hero { padding: 22px 16px 16px; } .xbus-hero .xbus-title { font-size: 30px; } .xbus-visual { display: none; } .xbus-toolbar { grid-template-columns: 1fr; } .xbus-toolbar .bus-note { grid-column: auto; grid-template-columns: 48px minmax(0, 1fr); } .xbus-toolbar .bus-note .xbus-ready { grid-column: 1 / -1; justify-self: start; } .xbus-toolbar .bus-power-control { grid-template-columns: 48px minmax(0, 1fr) 98px; gap: 10px; } .xbus-toolbar .bus-power-control, .xbus-toolbar .bus-action, .xbus-toolbar .bus-note { min-height: 64px; height: auto; } .xbus-panel-copy small { white-space: normal; } .xbus-status-line { align-items: flex-start; flex-direction: column; gap: 8px; } .xbus-status-line .notice { padding-left: 0; border-left: 0; } }
-    @media (max-width: 620px) { .zigbee-firmware-toolbar { grid-template-columns: 1fr; } .zigbee-firmware-actions { justify-self: stretch; flex-wrap: wrap; } .zigbee-firmware-status { width: 100%; margin-left: 0; } .zigbee-firmware-footer { align-items: flex-start; flex-direction: column; gap: 6px; } .zigbee-firmware-operation-head { flex-direction: column; gap: 6px; } .zigbee-firmware-operation-summary { justify-content: space-between; width: 100%; } .zigbee-firmware-progress-meta { font-size: 20px; } .zigbee-firmware-steps { grid-template-columns: 1fr 1fr; } .zigbee-firmware-step:last-child { grid-column: 1 / -1; } }
+    @media (max-width: 620px) { .zigbee-firmware-toolbar { grid-template-columns: 1fr; } .zigbee-firmware-actions { justify-self: stretch; flex-wrap: wrap; } .zigbee-firmware-status { width: 100%; margin-left: 0; } .zigbee-firmware-footer { align-items: flex-start; flex-direction: column; gap: 6px; } .zigbee-firmware-operation-head { flex-direction: column; gap: 6px; } .zigbee-firmware-operation-summary { justify-content: space-between; width: 100%; } .zigbee-firmware-progress-meta { font-size: 20px; } .zigbee-firmware-steps { grid-template-columns: 1fr 1fr; } .zigbee-firmware-step:last-child { grid-column: 1 / -1; } .zigbee-firmware-header { flex-direction: column; } .zigbee-firmware-header .zigbee-firmware-title { gap: 12px; font-size: 30px; } .zigbee-firmware-header .zigbee-firmware-title-icon { width: 38px; height: 38px; flex-basis: 38px; } .zigbee-firmware-chip-profile { align-self: flex-end; } .zigbee-firmware-chip-image { width: 120px; height: 96px; } .zigbee-firmware-chip-label { font-size: 13px; } .zigbee-firmware-actions .bus-action { min-width: 0 !important; flex: 1 1 auto; } }
     @media (max-width: 620px) { .global-nav .theme-switcher { width: auto; justify-content: initial; } .global-nav .theme-switcher span { display: none; } .global-nav .theme-choice { flex: 0 0 auto; } }
     @media (max-width: 620px) { .global-nav button { min-height: 34px; padding: 6px 10px; font-size: 11px; } .global-nav > button[data-ui-nav-target] { min-width: 72px; } }
     @media (max-width: 620px) { .rs485-device-list-scroll { overflow-x: auto; } .rs485-device-list-head, .rs485-table-row.configured, .rs485-table-row.configured.discovered { min-width: 390px; grid-template-columns: var(--device-columns); align-items: center; } }
@@ -2292,13 +2322,20 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       <pre id="output" class="diagnostics-output">Ready.</pre>
     </section>
     <section id="zigbee-firmware-section" class="extension-panel ui-nav-section">
-      <div class="module-row">
-        <div>
+      <div class="module-row zigbee-firmware-header">
+        <div class="zigbee-firmware-header-copy">
           <div class="eyebrow">Zigbee Coordinator</div>
-          <h1 class="zigbee-firmware-title"><svg class="zigbee-firmware-title-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6,4H18V5H21V7H18V9H21V11H18V13H21V15H18V17H21V19H18V20H6V19H3V17H6V15H3V13H6V11H3V9H6V7H3V5H6V4M8,7V17H16V7H8M10,9H14V15H10Z"/></svg>FIRMWARE</h1>
-          <div class="subtitle">Manage coordinator firmware on internal X-Mod ports. Firmware metadata is read from Koenkk Z-Stack releases.</div>
+          <h1 class="zigbee-firmware-title"><svg class="zigbee-firmware-title-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6,4H18V5H21V7H18V9H21V11H18V13H21V15H18V17H21V19H18V20H6V19H3V17H6V15H3V13H6V11H3V9H6V7H3V5H6V4M11,15V18H12V15H11M13,15V18H14V15H13M15,15V18H16V15H15Z"/></svg>CC2652P7 Firmware</h1>
+          <div class="subtitle">Detect, update, and manage firmware for the CC2652P7 Zigbee coordinator on internal X-Mod ports.</div>
         </div>
-        <div class="transport">CC2652P7</div>
+        <div class="zigbee-firmware-chip-profile">
+          <img class="zigbee-firmware-chip-image" src="assets/cc2652p7.png" alt="CC2652P7 chip">
+          <div class="zigbee-firmware-chip-meta">
+            <div class="transport">IHZB-C1</div>
+            <span class="zigbee-firmware-chip-label">Zigbee Coordinator</span>
+            <span class="zigbee-firmware-chip-soc">CC2652P7 SoC</span>
+          </div>
+        </div>
       </div>
       <div class="zigbee-firmware-toolbar">
         <div class="zigbee-firmware-field">
@@ -2317,17 +2354,20 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         </div>
         <div class="zigbee-firmware-field">
           <label for="zigbee-available-firmware">Available firmware</label>
-          <div id="zigbee-available-firmware" class="mode-select locked" data-value="">
-            <button type="button" class="mode-trigger" disabled>Check for releases</button>
-            <div class="mode-menu" role="listbox"></div>
+          <div class="zigbee-firmware-available-control">
+            <div id="zigbee-available-firmware" class="mode-select locked" data-value="">
+              <button type="button" class="mode-trigger" disabled>Check for releases</button>
+              <div class="mode-menu" role="listbox"></div>
+            </div>
+            <button type="button" class="zigbee-firmware-refresh" aria-label="Check for releases" title="Check for releases" onclick="checkZigbeeFirmware()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.65,6.35C16.2,4.9 14.21,4 12,4C7.58,4 4,7.58 4,12C4,16.42 7.58,20 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.84,16.33 14.61,18 12,18C8.69,18 6,15.31 6,12C6,8.69 8.69,6 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z"/></svg></button>
           </div>
         </div>
         <div class="zigbee-firmware-actions">
-          <button id="zigbee-detect-coordinator" class="bus-action" type="button" onclick="detectZigbeeCoordinator()">Detect</button>
-          <button id="zigbee-check-updates" class="bus-action" type="button" onclick="checkZigbeeFirmware()">Check updates</button>
-          <button id="zigbee-install-firmware" class="bus-action" type="button" onclick="installZigbeeFirmware()" disabled>Install firmware</button>
-          <button id="zigbee-erase-firmware" class="bus-action danger-button" type="button" onclick="eraseZigbeeFirmware()" disabled>Erase</button>
-          <button id="zigbee-clear-firmware-log" class="bus-action" type="button" onclick="clearZigbeeFirmwareOperation()" disabled>Clear log</button>
+          <button id="zigbee-detect-coordinator" class="bus-action" type="button" onclick="detectZigbeeCoordinator()"><svg class="zigbee-firmware-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z"/></svg>Detect</button>
+          <button id="zigbee-check-updates" class="bus-action" type="button" onclick="checkZigbeeFirmware()"><svg class="zigbee-firmware-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5,20H19V18H5V20M19,9H15V3H9V9H5L12,16L19,9Z"/></svg>Check updates</button>
+          <button id="zigbee-install-firmware" class="bus-action" type="button" onclick="installZigbeeFirmware()" disabled><svg class="zigbee-firmware-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9,16H15V10H19L12,3L5,10H9V16M5,20H19V18H5V20Z"/></svg>Install firmware</button>
+          <button id="zigbee-erase-firmware" class="bus-action danger-button" type="button" onclick="eraseZigbeeFirmware()" disabled><svg class="zigbee-firmware-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6,19C6,20.1 6.9,21 8,21H16C17.1,21 18,20.1 18,19V7H6V19M8,9H16V19H8V9M15.5,4L14.5,3H9.5L8.5,4H5V6H19V4H15.5Z"/></svg>Erase</button>
+          <button id="zigbee-clear-firmware-log" class="bus-action" type="button" onclick="clearZigbeeFirmwareOperation()" disabled><svg class="zigbee-firmware-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14,2H6C4.9,2 4,2.9 4,4V20C4,21.1 4.9,22 6,22H18C19.1,22 20,21.1 20,20V8L14,2M14,4L18,8H14V4M8,13H16V15H8V13M8,17H16V19H8V17M8,9H11V11H8V9Z"/></svg>Clear log</button>
           <div id="zigbee-firmware-status" class="zigbee-firmware-status" role="status" aria-live="polite">Select a coordinator port and check for releases.</div>
         </div>
         <div id="zigbee-firmware-operation" class="zigbee-firmware-operation" aria-live="polite">
