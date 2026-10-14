@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.248
+
+- Add local Intel HEX firmware upload from the Zigbee firmware release dropdown.
+- Validate uploaded HEX data before adding it to the approved firmware catalog and keep only the latest local image.
+- Improve release dropdown readability with a field-width menu, wrapped release names, and a stable `Latest` badge.
+- Reject binary firmware uploads; the UI and API support `.hex` files only.
+
 ## 0.5.247
 
 - Remove the redundant blue refresh/check icon from the Zigbee firmware selector and restore the standard dropdown affordance.

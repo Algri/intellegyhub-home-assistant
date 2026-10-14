@@ -446,6 +446,11 @@ def _release_label(release: dict[str, Any]) -> str:
     )
 
 
+def _public_release(release: dict[str, Any]) -> dict[str, Any]:
+    """Remove manager-only fields before a release reaches the API/UI."""
+    return {key: value for key, value in release.items() if not key.startswith("_")}
+
+
 def parse_compatible_releases(payload: Any) -> list[dict[str, Any]]:
     if not isinstance(payload, list):
         raise ZigbeeFirmwareError("GitHub releases response is not a list")
@@ -771,8 +776,48 @@ class ZigbeeFirmwareManager:
 
     async def check_releases(self) -> dict[str, Any]:
         releases = await self.source.fetch_catalog()
-        self._catalog = [item for item in releases if self._is_approved_release(item)]
-        return {"releases": json.loads(json.dumps(self._catalog)), "profile": FIRMWARE_PROFILE}
+        local_releases = [item for item in self._catalog if item.get("source") == "local"]
+        self._catalog = [item for item in releases if self._is_approved_release(item)] + local_releases
+        return {"releases": [_public_release(item) for item in self._catalog], "profile": FIRMWARE_PROFILE}
+
+    async def upload_local_hex(self, filename: str, content: bytes) -> dict[str, Any]:
+        """Validate and add one local Intel HEX image to the approved catalog."""
+        safe_name = Path(filename or "").name
+        if not safe_name or safe_name in {".", ".."} or safe_name.lower().endswith(".hex") is False:
+            raise ZigbeeFirmwareError("Only Intel HEX files with a .hex extension are supported")
+        if not content:
+            raise ZigbeeFirmwareError("The firmware HEX file is empty")
+        if len(content) > MAX_HEX_BYTES:
+            raise ZigbeeFirmwareError("Firmware HEX file is too large")
+
+        local_dir = self.data_dir / "local"
+        await asyncio.to_thread(local_dir.mkdir, parents=True, exist_ok=True)
+        path = local_dir / f"{uuid.uuid4().hex}.hex"
+        await asyncio.to_thread(path.write_bytes, content)
+        try:
+            GithubFirmwareSource._validate_hex(path, safe_name)
+        except Exception:
+            with contextlib.suppress(OSError):
+                await asyncio.to_thread(path.unlink)
+            raise
+
+        for previous in self._catalog:
+            if previous.get("source") == "local" and previous.get("_local_path"):
+                with contextlib.suppress(OSError):
+                    await asyncio.to_thread(Path(str(previous["_local_path"])).unlink)
+        release = {
+            "source": "local",
+            "revision": f"local-{path.stem[:12]}",
+            "published_at": None,
+            "firmware_target": FIRMWARE_TARGET,
+            "profile": FIRMWARE_PROFILE,
+            "chip": FIRMWARE_CHIP,
+            "asset_name": safe_name,
+            "size": len(content),
+            "_local_path": str(path),
+        }
+        self._catalog = [item for item in self._catalog if item.get("source") != "local"] + [release]
+        return _public_release(release)
 
     async def refresh_installed_firmware(self, port: str = "/dev/ttyUSB0") -> dict[str, Any]:
         """Detect coordinator modules and read the selected one over its ZNP UART."""
@@ -885,7 +930,7 @@ class ZigbeeFirmwareManager:
                 "operation_type": "install",
                 "port": port,
                 "port_label": PORT_PROFILES[port]["label"],
-                "release": release,
+                "release": _public_release(release),
                 "stage": "download",
                 "detail": "Downloading approved firmware image",
                 "started_at": _utc_now(),
@@ -1042,7 +1087,22 @@ class ZigbeeFirmwareManager:
 
     async def _prepare_image(self, release: dict[str, Any]) -> dict[str, Any]:
         await self._set_state(status="DOWNLOADING", stage="download", detail="Downloading approved firmware image", progress=None)
-        manifest = await self.source.prepare_image(release, self.data_dir)
+        if release.get("source") == "local":
+            local_path = Path(str(release.get("_local_path") or ""))
+            if not local_path.is_file():
+                raise ZigbeeFirmwareError("The local firmware HEX file is no longer available")
+            await asyncio.to_thread(GithubFirmwareSource._validate_hex, local_path, str(release.get("asset_name") or "local HEX"))
+            manifest = {
+                "profile": FIRMWARE_PROFILE,
+                "chip": FIRMWARE_CHIP,
+                "firmware_target": FIRMWARE_TARGET,
+                "hex": str(local_path),
+                "archive_crc_verified": True,
+                "digest_verified": False,
+                "local": True,
+            }
+        else:
+            manifest = await self.source.prepare_image(release, self.data_dir)
         await self._set_state(status="VERIFYING_IMAGE", stage="download", detail="Verifying archive and Intel HEX", progress=None)
         if manifest.get("profile") != FIRMWARE_PROFILE or manifest.get("chip") != FIRMWARE_CHIP:
             raise ZigbeeFirmwareError("Prepared firmware manifest does not match the coordinator profile")
