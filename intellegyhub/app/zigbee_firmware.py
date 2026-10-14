@@ -56,6 +56,8 @@ FIRMWARE_HEX_RE = re.compile(r"^CC1352P7_coordinator_(?P<revision>\d+)\.hex$", r
 MAX_ARCHIVE_BYTES = 128 * 1024 * 1024
 MAX_HEX_BYTES = 64 * 1024 * 1024
 MAX_LOG_LINES = 2000
+FLASH_PROGRESS_START = 40
+FLASH_PROGRESS_END = 96
 
 UPDATE_STATES = {
     "IDLE",
@@ -430,6 +432,78 @@ def _safe_error(exc: BaseException) -> str:
     return message or exc.__class__.__name__
 
 
+def _read_intel_hex_data(path: Path) -> dict[int, int]:
+    """Read Intel HEX records using only the Python standard library.
+
+    The add-on normally uses ``intelhex`` for validation, but the local/mock
+    backend must remain usable in a lightweight development environment where
+    optional runtime dependencies may not be installed.
+    """
+    data: dict[int, int] = {}
+    upper_address = 0
+    segment_address = 0
+    saw_eof = False
+
+    try:
+        lines = path.read_text(encoding="ascii").splitlines()
+    except (OSError, UnicodeError) as exc:
+        raise ValueError(f"unable to read Intel HEX: {_safe_error(exc)}") from exc
+
+    for line_number, raw_line in enumerate(lines, start=1):
+        line = raw_line.strip()
+        if not line:
+            continue
+        if saw_eof:
+            raise ValueError(f"data found after EOF record on line {line_number}")
+        if not line.startswith(":"):
+            raise ValueError(f"line {line_number} does not start with ':'")
+        try:
+            record = bytes.fromhex(line[1:])
+        except ValueError as exc:
+            raise ValueError(f"line {line_number} contains non-hex characters") from exc
+        if len(record) < 5:
+            raise ValueError(f"line {line_number} is too short")
+        byte_count = record[0]
+        if len(record) != byte_count + 5:
+            raise ValueError(f"line {line_number} has an invalid byte count")
+        if sum(record) & 0xFF:
+            raise ValueError(f"line {line_number} has an invalid checksum")
+
+        address = int.from_bytes(record[1:3], byteorder="big")
+        record_type = record[3]
+        payload = record[4:-1]
+        if len(payload) != byte_count:
+            raise ValueError(f"line {line_number} has an invalid payload length")
+
+        if record_type == 0x00:
+            base_address = upper_address + segment_address
+            for offset, value in enumerate(payload):
+                data[base_address + address + offset] = value
+        elif record_type == 0x01:
+            if byte_count != 0:
+                raise ValueError(f"line {line_number} has a non-empty EOF record")
+            saw_eof = True
+        elif record_type == 0x02:
+            if byte_count != 2:
+                raise ValueError(f"line {line_number} has an invalid segment address record")
+            segment_address = int.from_bytes(payload, byteorder="big") << 4
+            upper_address = 0
+        elif record_type == 0x04:
+            if byte_count != 2:
+                raise ValueError(f"line {line_number} has an invalid linear address record")
+            upper_address = int.from_bytes(payload, byteorder="big") << 16
+            segment_address = 0
+        elif record_type in {0x03, 0x05}:
+            # Start-address records do not contribute flash data.
+            continue
+        else:
+            raise ValueError(f"line {line_number} uses unsupported record type 0x{record_type:02X}")
+
+    if not saw_eof:
+        raise ValueError("Intel HEX EOF record is missing")
+    return data
+
+
 def _is_uart_busy_error(exc: BaseException) -> bool:
     message = _safe_error(exc).lower()
     return "could not exclusively lock" in message or "resource temporarily unavailable" in message or "errno 11" in message
@@ -621,7 +695,12 @@ class GithubFirmwareSource:
     @staticmethod
     def _validate_hex(path: Path, revision: str) -> None:
         try:
-            from intelhex import IntelHex
+            try:
+                from intelhex import IntelHex
+            except ModuleNotFoundError:
+                if not _read_intel_hex_data(path):
+                    raise ZigbeeFirmwareError("Firmware HEX contains no data")
+                return
 
             image = IntelHex(str(path))
             if not image.todict():
@@ -697,6 +776,8 @@ class ZigbeeFirmwareManager:
         self._state_lock = asyncio.Lock()
         self._operation_lock = asyncio.Lock()
         self._operation_task: asyncio.Task[None] | None = None
+        self._flash_progress_total = 0
+        self._flash_progress_written = 0
         self._started = False
 
     async def start(self) -> None:
@@ -957,12 +1038,18 @@ class ZigbeeFirmwareManager:
         try:
             if operation_id != self._state.get("operation_id"):
                 return
+            self._flash_progress_total = 0
+            self._flash_progress_written = 0
             if not self.mock:
                 self.timing.validate()
             if self.carrier is None and not self.mock:
                 raise ZigbeeFirmwareError("Carrier MCP23017 is not available")
             manifest = None if erase_only else await self._prepare_image(release or {})
             if not erase_only:
+                self._flash_progress_total = await asyncio.to_thread(
+                    self._hex_data_byte_count,
+                    Path(manifest["hex"]),
+                )
                 await self._append_log("system", "Firmware image loaded and validated")
             release_revision = "erase" if erase_only else str((release or {}).get("revision"))
             separator = chr(0xB7)
@@ -1406,6 +1493,21 @@ class ZigbeeFirmwareManager:
             detail = self._state.get("detail") or "Running cc2538-bsl"
         progress = self._extract_progress(line)
         if progress is None:
+            written = self._extract_flash_write_bytes(line)
+            if written is not None and self._flash_progress_total > 0:
+                self._flash_progress_written = min(
+                    self._flash_progress_total,
+                    self._flash_progress_written + written,
+                )
+                progress = self._flash_progress_from_bytes(
+                    self._flash_progress_written,
+                    self._flash_progress_total,
+                )
+        if progress is None and status == "FLASHING" and self._flash_progress_total > 0:
+            progress = FLASH_PROGRESS_START
+        if progress is None and status == "VERIFYING_FLASH" and self._flash_progress_total > 0:
+            progress = FLASH_PROGRESS_END
+        if progress is None:
             progress = self._state.get("progress")
         await self._append_log(stream, line)
         await self._set_state(status=status, stage=stage, detail=detail, progress=progress)
@@ -1417,6 +1519,28 @@ class ZigbeeFirmwareManager:
             return None
         value = int(match.group(1))
         return value if 0 <= value <= 100 else None
+
+    @staticmethod
+    def _extract_flash_write_bytes(line: str) -> int | None:
+        match = re.search(r"\bwrite\s+(\d+)\s+bytes?\s+at\s+0x[0-9a-f]+", line, re.IGNORECASE)
+        return int(match.group(1)) if match else None
+
+    @staticmethod
+    def _flash_progress_from_bytes(written: int, total: int) -> int | None:
+        if total <= 0:
+            return None
+        ratio = min(1.0, max(0.0, written / total))
+        span = FLASH_PROGRESS_END - FLASH_PROGRESS_START
+        return FLASH_PROGRESS_START + round(span * ratio)
+
+    @staticmethod
+    def _hex_data_byte_count(hex_path: Path) -> int:
+        try:
+            from intelhex import IntelHex
+        except ModuleNotFoundError:
+            return len(_read_intel_hex_data(hex_path))
+
+        return len(IntelHex(str(hex_path)).todict())
 
     def _is_approved_release(self, release: dict[str, Any]) -> bool:
         return (
@@ -1472,9 +1596,23 @@ class ZigbeeFirmwareManager:
 
     def _write_state_sync(self, state: dict[str, Any]) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)
-        temp_path = self.state_path.with_suffix(".tmp")
-        temp_path.write_text(json.dumps(state, ensure_ascii=True, indent=2) + "\n", encoding="utf-8")
-        temp_path.replace(self.state_path)
+        # A fixed state.tmp collides when the Windows mock server is restarted
+        # or briefly overlaps with another worker. Use a private temp file and
+        # retry the final replace while the previous state file is released.
+        temp_path = self.state_path.with_name(f"{self.state_path.name}.{uuid.uuid4().hex}.tmp")
+        try:
+            temp_path.write_text(json.dumps(state, ensure_ascii=True, indent=2) + "\n", encoding="utf-8")
+            for attempt in range(6):
+                try:
+                    temp_path.replace(self.state_path)
+                    return
+                except PermissionError:
+                    if attempt == 5:
+                        raise
+                    time.sleep(0.02 * (attempt + 1))
+        finally:
+            with contextlib.suppress(OSError):
+                temp_path.unlink()
 
     async def _publish(self, snapshot: dict[str, Any]) -> None:
         if self.publisher is None:

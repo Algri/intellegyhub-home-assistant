@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.250
+
+- Keep local Intel HEX upload and the complete firmware-install flow working in mock mode without requiring the optional `intelhex` module.
+- Make mock `state.json` persistence safe for concurrent Windows workers by using unique temporary files and retrying a locked replacement.
+- Add regression coverage for mock HEX installation and concurrent state writers.
+
+## 0.5.249
+
+- Show incremental firmware-flash progress from `cc2538-bsl` write output instead of leaving the progress bar empty until completion.
+- Keep the five firmware installation stages and final verification state visible while real CC2652P7 firmware is being written.
+
 ## 0.5.248
 
 - Add local Intel HEX firmware upload from the Zigbee firmware release dropdown.
