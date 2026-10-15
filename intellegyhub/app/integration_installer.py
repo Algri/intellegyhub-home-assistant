@@ -8,6 +8,8 @@ import urllib.request
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from .logging_utils import event_message
+
 
 DOMAIN = "intellegyhub"
 DEFAULT_BUNDLED_ROOT = Path("/opt/intellegyhub/bundled_custom_components")
@@ -187,13 +189,25 @@ def main() -> int:
         status_path=Path(os.environ.get("INTELLEGY_INTEGRATION_STATUS", str(DEFAULT_STATUS_PATH))),
     )
     print(
-        "[intellegyhub] integration installer "
-        f"status={status.status} bundled={status.bundled_version} "
-        f"installed={status.installed_version} restart_required={str(status.restart_required).lower()} "
-        f"backend_url={status.backend_url} target={status.target}"
+        "[intellegyhub] INFO integration_installer: "
+        + event_message(
+            "integration_install",
+            status=status.status,
+            bundled=status.bundled_version,
+            installed=status.installed_version,
+            restart_required=status.restart_required,
+            backend_url=status.backend_url,
+            target=status.target,
+        ),
+        flush=True,
     )
     if status.error:
-        print(f"[intellegyhub] integration installer error={status.error}")
+        print(
+            "[intellegyhub] ERROR integration_installer: "
+            + event_message("integration_install_failed", error=status.error),
+            flush=True,
+        )
+        return 1
     return 0
 
 

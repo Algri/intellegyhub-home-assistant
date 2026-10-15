@@ -9,7 +9,7 @@ import os
 from dataclasses import replace
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse
@@ -17,14 +17,15 @@ from pydantic import BaseModel
 
 from .backends import MockGpioBackend, RealGpiodBackend
 from .carrier import APP_VERSION
-from .config import load_config
+from .config import AppConfig, FIXED_INPUT_GPIOS, load_config
+from .logging_utils import configure_logging, log_event
 from .rs485 import Rs485Manager, Rs485Store
 from .rtc import HostRtc, MockRtc
-from .runtime import AppRuntime
+from .runtime import AppRuntime, SHUTDOWN_BUZZER_VOLUME_PERCENT
 from .xport import XPortGroupMode, XPortMode
 from .zigbee_firmware import FirmwareTiming, ZigbeeFirmwareBusyError, ZigbeeFirmwareError, ZigbeeFirmwareManager
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+configure_logging()
 LOGGER = logging.getLogger("intellegyhub")
 I2C_SLAVE = 0x0703
 I2C_QUICK_WRITE = b""
@@ -173,6 +174,37 @@ def collect_device_diagnostics() -> dict[str, list[str]]:
     }
 
 
+def _application_start_fields(config: AppConfig, rs485_enabled: bool) -> dict[str, Any]:
+    return {
+        "version": APP_VERSION,
+        "mode": "mock" if config.mock else "hardware",
+        "port": 8098,
+        "chip": config.chip_path,
+        "led_gpio": config.led_gpio,
+        "led_active_low": config.led_active_low,
+        "button_gpio": config.button_gpio,
+        "fn1_gpio": FIXED_INPUT_GPIOS["fn1_gpio"],
+        "fn2_gpio": config.button_gpio,
+        "button_active_low": config.button_active_low,
+        "button_bias": config.button_bias,
+        "button_debounce_ms": config.button_debounce_ms,
+        "startup_buzzer_enabled": config.startup_buzzer_enabled,
+        "shutdown_buzzer_enabled": config.shutdown_buzzer_enabled,
+        "startup_buzzer_frequency": config.startup_buzzer_frequency,
+        "startup_buzzer_duration_ms": config.startup_buzzer_duration_ms,
+        "shutdown_buzzer_volume_percent": SHUTDOWN_BUZZER_VOLUME_PERCENT,
+        "carrier_monitoring_poll_interval_seconds": config.carrier_monitoring_poll_interval_seconds,
+        "ste_heartbeat_on_seconds": config.ste_heartbeat_on_seconds,
+        "ste_heartbeat_off_seconds": config.ste_heartbeat_off_seconds,
+        "websocket_connection_grace_seconds": config.websocket_connection_grace_seconds,
+        "onewire_bridge1_poll_interval_seconds": config.onewire_bridge1_poll_interval_seconds,
+        "onewire_bridge2_poll_interval_seconds": config.onewire_bridge2_poll_interval_seconds,
+        "power_button_shutdown_enabled": config.power_button_shutdown_enabled,
+        "power_button_shutdown_hold_seconds": config.power_button_shutdown_hold_seconds,
+        "rs485_enabled": rs485_enabled,
+    }
+
+
 def scan_i2c_bus(bus: int) -> dict:
     if bus < 0 or bus > 255:
         raise ValueError("bus must be between 0 and 255")
@@ -270,30 +302,13 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     async def lifespan(app: FastAPI):
         if app.state.runtime is None:
             config = load_config(app.state.options_path)
-            LOGGER.info(
-        "Starting v0.5.250 chip=%s led=%s active_low=%s fn1_gpio=27 fn2_gpio=%s active_low=%s bias=%s debounce_ms=%s startup_buzzer=%s shutdown_buzzer=%s buzzer_frequency=%s buzzer_duration_ms=%s shutdown_buzzer_volume_percent=80 carrier_monitoring_poll_interval_seconds=%s ste_heartbeat_on_seconds=%s ste_heartbeat_off_seconds=%s websocket_connection_grace_seconds=%s onewire_bus1_poll_interval_seconds=%s onewire_bus2_poll_interval_seconds=%s power_button_shutdown_enabled=%s power_button_shutdown_hold_seconds=%s mock=%s port=8098",
-                config.chip_path,
-                config.led_gpio,
-                config.led_active_low,
-                config.button_gpio,
-                config.button_active_low,
-                config.button_bias,
-                config.button_debounce_ms,
-                config.startup_buzzer_enabled,
-                config.shutdown_buzzer_enabled,
-                config.startup_buzzer_frequency,
-                config.startup_buzzer_duration_ms,
-                config.carrier_monitoring_poll_interval_seconds,
-                config.ste_heartbeat_on_seconds,
-                config.ste_heartbeat_off_seconds,
-                config.websocket_connection_grace_seconds,
-                config.onewire_bridge1_poll_interval_seconds,
-                config.onewire_bridge2_poll_interval_seconds,
-                config.power_button_shutdown_enabled,
-                config.power_button_shutdown_hold_seconds,
-                config.mock,
+            log_event(
+                LOGGER,
+                logging.INFO,
+                "application_start",
+                **_application_start_fields(config, app.state.rs485_enabled),
             )
-            LOGGER.info("Visible devices: %s", collect_device_diagnostics())
+            log_event(LOGGER, logging.INFO, "device_diagnostics", devices=collect_device_diagnostics())
             backend = MockGpioBackend() if config.mock else RealGpiodBackend(config)
             app.state.runtime = AppRuntime(
                 backend,
@@ -320,8 +335,20 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
             try:
                 await app.state.rs485.start()
             except Exception:
-                LOGGER.exception("RS-485 startup failed; continuing with the main runtime")
+                log_event(LOGGER, logging.ERROR, "subsystem_start_failed", subsystem="rs485", action="continue", exc_info=True)
         await app.state.runtime.start()
+        if app.state.runtime.ready:
+            log_event(LOGGER, logging.INFO, "subsystem_ready", subsystem="runtime", ready=True)
+        else:
+            log_event(
+                LOGGER,
+                logging.ERROR,
+                "subsystem_start_failed",
+                subsystem="runtime",
+                action="continue",
+                ready=False,
+                error=app.state.runtime.error,
+            )
         app.state.zigbee_firmware.set_carrier(app.state.runtime.carrier)
         app.state.zigbee_firmware.set_publisher(app.state.runtime.broadcast_nowait)
         if 'config' in locals():
@@ -337,15 +364,17 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
             if overrides:
                 app.state.zigbee_firmware.set_timing(replace(timing, **overrides))
         await app.state.zigbee_firmware.start()
+        log_event(LOGGER, logging.INFO, "subsystem_ready", subsystem="zigbee_firmware")
         try:
             yield
         finally:
+            log_event(LOGGER, logging.INFO, "application_stop", version=APP_VERSION)
             await app.state.zigbee_firmware.stop()
             if app.state.rs485_enabled:
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.250", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.251", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -6980,14 +7009,22 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
 
     @app.post("/api/v1/rs485/devices/{scan_id}/add")
     async def post_rs485_device_add(scan_id: str) -> dict:
-        LOGGER.info("RS485_ADD request scan_id=%s", scan_id)
+        log_event(LOGGER, logging.INFO, "rs485_device_add_requested", scan_id=scan_id)
         try:
             result = await rs485_or_404().add_device(scan_id)
             await app.state.runtime.broadcast({"type": "rs485_changed", "rs485": result})
-            LOGGER.info("RS485_ADD committed scan_id=%s selected_id=%s devices=%s scanned=%s", scan_id, result.get("selected_id"), len(result.get("devices", [])), len(result.get("scanned", [])))
+            log_event(
+                LOGGER,
+                logging.INFO,
+                "rs485_device_add_committed",
+                scan_id=scan_id,
+                selected_id=result.get("selected_id"),
+                devices=len(result.get("devices", [])),
+                scanned=len(result.get("scanned", [])),
+            )
             return result
         except ValueError as exc:
-            LOGGER.warning("RS485_ADD rejected scan_id=%s error=%s", scan_id, exc)
+            log_event(LOGGER, logging.WARNING, "rs485_device_add_rejected", scan_id=scan_id, error=str(exc))
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.delete("/api/v1/rs485/devices/{device_id}")

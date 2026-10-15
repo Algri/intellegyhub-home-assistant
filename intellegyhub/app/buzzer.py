@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import io
+import logging
 import math
 import os
 import socket
@@ -15,6 +16,10 @@ from pathlib import Path
 from typing import Any
 
 from .paths import default_data_path
+from .logging_utils import log_event
+
+
+LOGGER = logging.getLogger("intellegyhub.buzzer")
 
 
 PIGPIO_HOST = "127.0.0.1"
@@ -191,6 +196,7 @@ class BuzzerManager:
     async def stop(self) -> None:
         async with self._lock:
             await self._stop_locked()
+        log_event(LOGGER, logging.INFO, "stopped")
 
     async def set_volume_percent(self, volume_percent: int) -> dict[str, Any]:
         return await self.set_settings(volume_percent=volume_percent)
@@ -235,6 +241,15 @@ class BuzzerManager:
             self.volume_percent = int(volume)
             if volume > 0:
                 self.last_volume_percent = int(volume)
+            log_event(
+                LOGGER,
+                logging.INFO,
+                "playback_started",
+                backend=backend,
+                frequency_hz=frequency,
+                duration_ms=duration_ms,
+                volume_percent=volume,
+            )
             return {
                 "status": "ok",
                 "backend": backend,
@@ -272,6 +287,15 @@ class BuzzerManager:
             self.volume_percent = int(volume)
             if volume > 0:
                 self.last_volume_percent = int(volume)
+        log_event(
+            LOGGER,
+            logging.INFO,
+            "playback_completed",
+            backend=backend,
+            frequency_hz=frequency,
+            duration_ms=duration_ms,
+            volume_percent=volume,
+        )
         return {
             "status": "ok",
             "backend": backend,

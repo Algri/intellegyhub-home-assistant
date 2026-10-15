@@ -4,6 +4,7 @@ import asyncio
 import binascii
 import errno
 import json
+import logging
 import os
 import struct
 import sys
@@ -12,8 +13,13 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Callable
 
+from .logging_utils import log_event
+
+
+LOGGER = logging.getLogger("intellegyhub.carrier")
+
 I2C_SLAVE = 0x0703
-APP_VERSION = "0.5.250"
+APP_VERSION = "0.5.251"
 IDENTITY_EEPROM_ADDR = 0x50
 IDENTITY_EEPROM_OFFSET = 0x0000
 IDENTITY_REGION_SIZE = 1024
@@ -443,12 +449,14 @@ class CarrierManager:
         self._fault_task: asyncio.Task | None = None
         self._monitoring_task: asyncio.Task | None = None
         self._stopped = asyncio.Event()
+        self._poll_failure_state: dict[str, dict[str, Any]] = {}
 
     def set_publisher(self, publisher: Callable[[dict[str, Any]], Any]) -> None:
         self._publisher = publisher
 
     async def start(self) -> None:
         try:
+            log_event(LOGGER, logging.INFO, "start")
             self._stopped.clear()
             self.available = await self.hardware.initialize()
             self.outputs = await self.hardware.outputs()
@@ -461,11 +469,23 @@ class CarrierManager:
             self.error = None if self.available else "carrier MCP23017 unavailable"
             self._fault_task = asyncio.create_task(self._monitor_faults(), name="intellegyhub_carrier_faults")
             self._monitoring_task = asyncio.create_task(self._monitor_metrics(), name="intellegyhub_carrier_monitoring")
+            log_event(
+                LOGGER,
+                logging.INFO,
+                "ready",
+                available=self.available,
+                identity_status=self.identity_status,
+                faults=len(self.faults),
+                outputs=len(self.outputs),
+                error=self.error,
+            )
         except Exception as exc:
             self.available = False
             self.error = str(exc)
+            log_event(LOGGER, logging.ERROR, "start_failed", error=str(exc), exc_info=True)
 
     async def stop(self) -> None:
+        log_event(LOGGER, logging.INFO, "stop")
         self._stopped.set()
         if self._fault_task:
             self._fault_task.cancel()
@@ -481,6 +501,7 @@ class CarrierManager:
             except asyncio.CancelledError:
                 pass
             self._monitoring_task = None
+        log_event(LOGGER, logging.INFO, "stopped")
 
     async def set_xbus_power(self, on: bool) -> bool:
         return await self.hardware.set_bit(CarrierHardware.bit_xbus_power, on)
@@ -503,6 +524,7 @@ class CarrierManager:
         self.outputs[output_id] = confirmed
         state = self._output_state(output_id, confirmed)
         if previous != confirmed:
+            log_event(LOGGER, logging.INFO, "output_changed", output=output_id, on=confirmed)
             await self._publish({"type": "carrier_output_changed", "output": asdict(state), "carrier": self.snapshot()})
         return state
 
@@ -528,9 +550,11 @@ class CarrierManager:
             try:
                 previous = self._fault_signature()
                 await self.refresh_faults()
+                self._poll_recovered("faults")
                 if previous != self._fault_signature():
                     await self._publish({"type": "carrier_changed", "carrier": self.snapshot()})
-            except Exception:
+            except Exception as exc:
+                self._poll_failed("faults", exc)
                 continue
 
     def _fault_signature(self) -> tuple[tuple[str, bool, bool, str | None], ...]:
@@ -548,10 +572,44 @@ class CarrierManager:
             try:
                 previous = self._monitoring_signature()
                 await self.refresh_monitoring()
+                self._poll_recovered("monitoring")
                 if previous != self._monitoring_signature():
                     await self._publish({"type": "carrier_changed", "carrier": self.snapshot()})
-            except Exception:
+            except Exception as exc:
+                self._poll_failed("monitoring", exc)
                 continue
+
+    def _poll_failed(self, subsystem: str, error: Exception) -> None:
+        now = time.monotonic()
+        state = self._poll_failure_state.setdefault(
+            subsystem,
+            {"attempts": 0, "last_logged_at": None},
+        )
+        state["attempts"] += 1
+        last_logged_at = state["last_logged_at"]
+        if last_logged_at is not None and now - last_logged_at < 30:
+            return
+        state["last_logged_at"] = now
+        log_event(
+            LOGGER,
+            logging.WARNING,
+            "poll_failed",
+            subsystem=subsystem,
+            error=str(error),
+            failed_attempts=state["attempts"],
+        )
+
+    def _poll_recovered(self, subsystem: str) -> None:
+        state = self._poll_failure_state.pop(subsystem, None)
+        if state is None:
+            return
+        log_event(
+            LOGGER,
+            logging.INFO,
+            "poll_recovered",
+            subsystem=subsystem,
+            failed_attempts=state["attempts"],
+        )
 
     def _monitoring_signature(self) -> str:
         return repr(self.monitoring)

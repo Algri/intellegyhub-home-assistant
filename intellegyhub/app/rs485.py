@@ -19,6 +19,7 @@ from typing import Any
 import yaml
 
 from .paths import default_data_path
+from .logging_utils import log_event
 
 try:
     from pymodbus.client import ModbusSerialClient
@@ -1042,6 +1043,7 @@ class Rs485Manager:
         await self._publish({"type": "rs485_device_changed", "device": snapshot})
 
     async def start(self) -> None:
+        log_event(LOGGER, logging.INFO, "start", protocol="modbus_rtu")
         self._stopping = False
         self.registry.reload()
         await self.store.initialize()
@@ -1079,8 +1081,17 @@ class Rs485Manager:
                 self._schedule_device_polling(device)
         for serial_port in {str(device.serial_port) for device in self.devices.values() if device.enabled}:
             self._ensure_poll_task(serial_port)
+        log_event(
+            LOGGER,
+            logging.INFO,
+            "ready",
+            devices=len(self.devices),
+            buses=len(self.buses),
+            enabled=sum(1 for device in self.devices.values() if device.enabled),
+        )
 
     async def stop(self) -> None:
+        log_event(LOGGER, logging.INFO, "stop")
         self._stopping = True
         await self.stop_scan()
         scan_task = self._scan_task
@@ -1119,6 +1130,7 @@ class Rs485Manager:
                 pass
         if hasattr(self.transport, "close_all"):
             await self.transport.close_all()
+        log_event(LOGGER, logging.INFO, "stopped")
 
     async def stop_scan(self, compact: bool = False) -> dict[str, Any]:
         self.scan_state["stop_requested"] = True
@@ -1501,6 +1513,7 @@ class Rs485Manager:
 
     async def scan(self, settings: dict[str, Any], compact: bool = False) -> dict[str, Any]:
         if self._scan_task and not self._scan_task.done():
+            log_event(LOGGER, logging.WARNING, "scan_rejected", reason="already_running")
             return self.scan_progress_snapshot() if compact else self.snapshot(status="RS-485: scan already running")
         scan_bus = normalize_bus_settings(settings)
         self.bus = scan_bus
@@ -1510,6 +1523,7 @@ class Rs485Manager:
         # Mock discovery is deterministic and short; return its completed
         # snapshot so API callers can immediately add a discovered device.
         if self._bus_is_mock(scan_bus):
+            log_event(LOGGER, logging.INFO, "scan_started", serial_port=scan_bus["serial_port"], mode="mock")
             return await self._scan_impl(settings, compact=compact)
         template_id = str(settings.get("template_id") or "")
         if template_id not in self.registry.templates:
@@ -1529,6 +1543,7 @@ class Rs485Manager:
             "started_at": datetime.now(timezone.utc).isoformat(),
         }
         self._scan_task = asyncio.create_task(self._scan_impl(settings, compact=True), name="rs485_scan")
+        log_event(LOGGER, logging.INFO, "scan_started", serial_port=scan_bus["serial_port"], mode="hardware", template=template_id)
         return self.scan_progress_snapshot() if compact else self.snapshot(status=self.status)
 
     async def _scan_impl(self, settings: dict[str, Any], compact: bool = False) -> dict[str, Any]:
@@ -1703,12 +1718,20 @@ class Rs485Manager:
             self.scan_log = self.scan_log[-512:]
 
     async def add_device(self, scan_id: str) -> dict[str, Any]:
-        LOGGER.info("RS-485 add requested: scan_id=%s running=%s scanned=%s devices=%s", scan_id, bool(self._scan_task and not self._scan_task.done()), len(self.scanned), len(self.devices))
+        log_event(
+            LOGGER,
+            logging.INFO,
+            "device_add_requested",
+            scan_id=scan_id,
+            running=bool(self._scan_task and not self._scan_task.done()),
+            scanned=len(self.scanned),
+            devices=len(self.devices),
+        )
         self._command_pending += 1
         try:
             scan = next((item for item in self.scanned if item["id"] == scan_id), None)
             if scan is None:
-                LOGGER.warning("RS-485 add rejected: scan result not found: %s", scan_id)
+                log_event(LOGGER, logging.WARNING, "device_add_rejected", scan_id=scan_id, reason="scan_result_not_found")
                 raise ValueError("scan result not found")
             if self._scan_task and not self._scan_task.done():
                 self.scan_state["stop_requested"] = True
@@ -1744,7 +1767,14 @@ class Rs485Manager:
                 self._ensure_bus_worker(device.serial_port)
                 self._ensure_poll_task(device.serial_port)
                 self.scanned = [item for item in self.scanned if item["id"] != scan_id]
-                LOGGER.info("RS-485 add committed: device_id=%s remaining_scanned=%s devices=%s", device.id, len(self.scanned), len(self.devices))
+                log_event(
+                    LOGGER,
+                    logging.INFO,
+                    "device_add_committed",
+                    device_id=device.id,
+                    remaining_scanned=len(self.scanned),
+                    devices=len(self.devices),
+                )
                 if not self._device_is_mock(device):
                     asyncio.create_task(
                         self._hydrate_added_device(device, template),

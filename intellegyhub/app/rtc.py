@@ -1,10 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+
+from .logging_utils import log_event
+
+
+LOGGER = logging.getLogger("intellegyhub.rtc")
 
 
 @dataclass(frozen=True)
@@ -28,6 +34,7 @@ class HostRtc:
     async def status(self) -> RtcStatus:
         system_time = datetime.now(timezone.utc)
         if shutil.which(self.command) is None:
+            log_event(LOGGER, logging.WARNING, "status_unavailable", reason="command_not_found", command=self.command)
             return RtcStatus(
                 available=False,
                 rtc_time=None,
@@ -49,6 +56,7 @@ class HostRtc:
                 rtc_local_time=rtc_local_time,
             )
         except (OSError, RuntimeError, ValueError) as exc:
+            log_event(LOGGER, logging.WARNING, "status_failed", error=str(exc))
             return RtcStatus(
                 available=False,
                 rtc_time=None,
@@ -63,8 +71,10 @@ class HostRtc:
             return await self.status()
         try:
             await self._run(*self._args("-w", "-u"))
+            log_event(LOGGER, logging.INFO, "synchronized", source="system")
             return await self.status()
         except (OSError, RuntimeError) as exc:
+            log_event(LOGGER, logging.ERROR, "synchronization_failed", error=str(exc))
             current = await self.status()
             return RtcStatus(
                 available=current.available,

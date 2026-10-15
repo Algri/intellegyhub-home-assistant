@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import errno
 import json
+import logging
 import os
 import sqlite3
 import sys
@@ -13,6 +14,10 @@ from typing import Any, Callable
 
 from .carrier import CarrierManager
 from .paths import default_data_path
+from .logging_utils import log_event
+
+
+LOGGER = logging.getLogger("intellegyhub.onewire")
 
 I2C_SLAVE = 0x0703
 POWER_SETTLE_SECONDS = 0.35
@@ -574,6 +579,7 @@ class OneWireManager:
         self._lock = asyncio.Lock()
         self._publisher: Callable[[dict[str, Any]], Any] | None = None
         self._poll_tasks: dict[str, asyncio.Task] = {}
+        self._poll_failure_state: dict[str, dict[str, Any]] = {}
         self._settle_scan_task: asyncio.Task[None] | None = None
 
     def set_publisher(self, publisher: Callable[[dict[str, Any]], Any]) -> None:
@@ -581,6 +587,7 @@ class OneWireManager:
 
     async def start(self) -> None:
         try:
+            log_event(LOGGER, logging.INFO, "start")
             await self.store.initialize()
             self.bridge_enabled = await self.store.load_bridge_enabled(self.hardware.bridge_addresses)
             self.bridges = self._configured_bridges()
@@ -596,12 +603,15 @@ class OneWireManager:
                 await asyncio.sleep(POWER_SETTLE_SECONDS)
                 await self._scan_locked()
                 self._sync_poll_tasks()
+            log_event(LOGGER, logging.INFO, "ready", power=self.power_on, bridges=len(self.bridges), sensors=len(self.sensors))
         except Exception as exc:
             self.power_on = False
             self.power_available = False
             self.error = str(exc)
+            log_event(LOGGER, logging.ERROR, "start_failed", error=str(exc), exc_info=True)
 
     async def stop(self) -> None:
+        log_event(LOGGER, logging.INFO, "stop")
         if self._settle_scan_task:
             self._settle_scan_task.cancel()
             try:
@@ -612,6 +622,7 @@ class OneWireManager:
         await self._cancel_poll_tasks()
         await self.store.save_power(self.power_on)
         await self.store.save_sensors(list(self.sensors.values()))
+        log_event(LOGGER, logging.INFO, "stopped")
 
     def snapshot(self) -> dict[str, Any]:
         return {
@@ -642,6 +653,7 @@ class OneWireManager:
             self.error = None
             await self._publish({"type": "onewire_power_changed", "on": self.power_on})
             await self._publish({"type": "onewire_changed", "onewire": self.snapshot()})
+            log_event(LOGGER, logging.INFO, "power_changed", on=self.power_on)
             return self.snapshot()
 
     async def scan(self) -> dict[str, Any]:
@@ -649,6 +661,7 @@ class OneWireManager:
             await self._scan_locked()
             self.error = None
             await self._publish({"type": "onewire_changed", "onewire": self.snapshot()})
+            log_event(LOGGER, logging.INFO, "scan_completed", bridges=len(self.bridges), sensors=len(self.sensors))
             return self.snapshot()
 
     async def refresh(self) -> dict[str, Any]:
@@ -799,6 +812,7 @@ class OneWireManager:
             if bridge_id not in wanted:
                 task.cancel()
                 self._poll_tasks.pop(bridge_id, None)
+                self._poll_failure_state.pop(bridge_id, None)
         for bridge_id in wanted:
             task = self._poll_tasks.get(bridge_id)
             if task is None or task.done():
@@ -848,28 +862,86 @@ class OneWireManager:
             interval = self._bridge_poll_interval(bridge_id)
             try:
                 await asyncio.sleep(interval)
-                await self._refresh_bridge(bridge_id)
+                refreshed = await self._refresh_bridge(bridge_id)
+                if refreshed:
+                    self._poll_recovered(bridge_id)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
-                async with self._lock:
-                    self._mark_bridge_sensors_unavailable(bridge_id, str(exc))
-                    await self.store.save_sensors(list(self.sensors.values()))
-                    await self._publish({"type": "onewire_changed", "onewire": self.snapshot()})
+                state_errors: list[str] = []
+                snapshot: dict[str, Any] | None = None
+                sensors: list[OneWireSensor] | None = None
+                try:
+                    async with self._lock:
+                        self._mark_bridge_sensors_unavailable(bridge_id, str(exc))
+                        sensors = list(self.sensors.values())
+                        snapshot = self.snapshot()
+                except Exception as state_exc:
+                    state_errors.append(f"state_update={state_exc}")
 
-    async def _refresh_bridge(self, bridge_id: str) -> None:
+                if sensors is not None:
+                    try:
+                        await self.store.save_sensors(sensors)
+                    except Exception as persist_exc:
+                        state_errors.append(f"state_persist={persist_exc}")
+
+                if snapshot is not None:
+                    try:
+                        await self._publish({"type": "onewire_changed", "onewire": snapshot})
+                    except Exception as publish_exc:
+                        state_errors.append(f"state_publish={publish_exc}")
+
+                failure = exc
+                if state_errors:
+                    failure = RuntimeError(f"{exc}; " + "; ".join(state_errors))
+                self._poll_failed(bridge_id, failure)
+
+    def _poll_failed(self, bridge_id: str, error: Exception) -> None:
+        now = time.monotonic()
+        state = self._poll_failure_state.setdefault(
+            bridge_id,
+            {"attempts": 0, "last_logged_at": None},
+        )
+        state["attempts"] += 1
+        last_logged_at = state["last_logged_at"]
+        if last_logged_at is not None and now - last_logged_at < 30:
+            return
+        state["last_logged_at"] = now
+        log_event(
+            LOGGER,
+            logging.WARNING,
+            "poll_failed",
+            bridge=bridge_id,
+            error=str(error),
+            failed_attempts=state["attempts"],
+        )
+
+    def _poll_recovered(self, bridge_id: str) -> None:
+        state = self._poll_failure_state.pop(bridge_id, None)
+        if state is None:
+            return
+        log_event(
+            LOGGER,
+            logging.INFO,
+            "poll_recovered",
+            bridge=bridge_id,
+            failed_attempts=state["attempts"],
+        )
+
+    async def _refresh_bridge(self, bridge_id: str) -> bool:
         async with self._lock:
             if not self.power_on or not self.bridge_enabled.get(bridge_id, True):
-                return
+                return False
             sensors = self._enabled_bridge_sensors(bridge_id)
             if not sensors:
                 await self._scan_locked()
                 await self._publish({"type": "onewire_changed", "onewire": self.snapshot()})
-                return
+                return True
             updated = await self.hardware.read_temperatures(sensors, self.power_on)
             self._merge_sensors(updated)
             await self.store.save_sensors(list(self.sensors.values()))
             await self._publish({"type": "onewire_changed", "onewire": self.snapshot()})
+            return True
 
     async def _publish(self, message: dict[str, Any]) -> None:
         if self._publisher:

@@ -13,12 +13,14 @@ from .buzzer import BuzzerManager, BuzzerSettingsStore
 from .carrier import CarrierManager
 from .diagnostic_indicators import DiagnosticIndicatorManager, DiagnosticIndicatorSettings
 from .extensions import ExtensionHardware, ExtensionManager
+from .logging_utils import log_event
 from .onewire import OneWireHardware, OneWireManager
 from .supervisor import shutdown_host
 from .ui_settings import UiSettings, UiSettingsStore, UiTheme
 from .xport import XPortManager
 
-LOGGER = logging.getLogger(__name__)
+LOGGER = logging.getLogger("intellegyhub.runtime")
+SHUTDOWN_BUZZER_VOLUME_PERCENT = 80
 
 
 class AppRuntime:
@@ -76,6 +78,7 @@ class AppRuntime:
 
     async def start(self) -> None:
         try:
+            log_event(LOGGER, logging.INFO, "runtime_start", backend=type(self.backend).__name__)
             await self.ui_store.initialize()
             self.ui_settings = await self.ui_store.load()
             await self.buzzer_store.initialize()
@@ -93,11 +96,12 @@ class AppRuntime:
             await self.onewire.start()
             self.ready = True
             self.error = None
+            log_event(LOGGER, logging.INFO, "runtime_ready", subsystems="carrier,indicators,xport,xbus,onewire")
             await self._play_startup_buzzer()
         except Exception as exc:
             self.ready = False
             self.error = str(exc)
-            LOGGER.exception("Hardware startup failed")
+            log_event(LOGGER, logging.ERROR, "runtime_start_failed", error=str(exc), exc_info=True)
 
     async def _play_startup_buzzer(self) -> None:
         if not self._startup_buzzer_enabled:
@@ -109,13 +113,15 @@ class AppRuntime:
                 self._startup_buzzer_duration_ms,
                 0.5,
             )
-            LOGGER.info(
-                "Startup buzzer played: frequency=%sHz duration_ms=%s",
-                self._startup_buzzer_frequency,
-                self._startup_buzzer_duration_ms,
+            log_event(
+                LOGGER,
+                logging.INFO,
+                "startup_buzzer_played",
+                frequency_hz=self._startup_buzzer_frequency,
+                duration_ms=self._startup_buzzer_duration_ms,
             )
         except Exception as exc:
-            LOGGER.warning("Startup buzzer failed: %s", exc)
+            log_event(LOGGER, logging.WARNING, "startup_buzzer_failed", error=str(exc))
         finally:
             self.buzzer.apply_settings(saved_settings)
 
@@ -127,21 +133,24 @@ class AppRuntime:
             await self.buzzer.play_pwm_once(
                 self._startup_buzzer_frequency,
                 self._startup_buzzer_duration_ms,
-                volume_percent=80,
+                volume_percent=SHUTDOWN_BUZZER_VOLUME_PERCENT,
             )
             await self.broadcast({"type": "power_button_shutdown_buzzer_played"})
-            LOGGER.info(
-                "Power button shutdown buzzer played: frequency=%sHz duration_ms=%s volume=%s%%",
-                self._startup_buzzer_frequency,
-                self._startup_buzzer_duration_ms,
-                80,
+            log_event(
+                LOGGER,
+                logging.INFO,
+                "shutdown_buzzer_played",
+                frequency_hz=self._startup_buzzer_frequency,
+                duration_ms=self._startup_buzzer_duration_ms,
+                volume_percent=SHUTDOWN_BUZZER_VOLUME_PERCENT,
             )
         except Exception as exc:
-            LOGGER.warning("Power button shutdown buzzer failed: %s", exc)
+            log_event(LOGGER, logging.WARNING, "shutdown_buzzer_failed", error=str(exc))
         finally:
             self.buzzer.apply_settings(saved_settings)
 
     async def stop(self) -> None:
+        log_event(LOGGER, logging.INFO, "runtime_stop")
         self.ready = False
         if self._power_shutdown_task:
             self._power_shutdown_task.cancel()
@@ -172,6 +181,7 @@ class AppRuntime:
             except Exception:
                 pass
         self._clients.clear()
+        log_event(LOGGER, logging.INFO, "runtime_stopped")
 
     def snapshot(self) -> dict[str, Any]:
         outputs = self.state.outputs or {output_id: False for output_id in OUTPUTS}
@@ -206,7 +216,7 @@ class AppRuntime:
                 "shutdown_buzzer_enabled": self._shutdown_buzzer_enabled,
                 "buzzer_frequency": self._startup_buzzer_frequency,
                 "buzzer_duration_ms": self._startup_buzzer_duration_ms,
-                "shutdown_buzzer_volume_percent": 80,
+                "shutdown_buzzer_volume_percent": SHUTDOWN_BUZZER_VOLUME_PERCENT,
             },
             "xport": self.xport.snapshot(),
             "extensions": self.extensions.snapshot(),
@@ -329,16 +339,19 @@ class AppRuntime:
                 "hold_seconds": self._power_button_shutdown_hold_seconds,
             }
             await self.broadcast(event)
-            LOGGER.warning(
-                "Power button held for %.1fs; requesting Supervisor host shutdown",
-                self._power_button_shutdown_hold_seconds,
+            log_event(
+                LOGGER,
+                logging.WARNING,
+                "power_button_shutdown_requested",
+                hold_seconds=self._power_button_shutdown_hold_seconds,
+                action="supervisor_host_shutdown",
             )
             await self._play_power_shutdown_buzzer()
             await self._shutdown_host_callback()
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            LOGGER.exception("Power button shutdown request failed")
+            log_event(LOGGER, logging.ERROR, "power_button_shutdown_failed", error=str(exc), exc_info=True)
             await self.broadcast({"type": "power_button_shutdown_failed", "error": str(exc)})
 
     async def add_client(self, websocket: WebSocket) -> None:

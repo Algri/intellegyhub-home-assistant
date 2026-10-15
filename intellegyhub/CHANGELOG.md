@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.251
+
+- Make structured logging reliable with pre-existing Home Assistant and Uvicorn handlers.
+- Prevent integration installer failures from being reported as successful startup.
+- Keep 1-Wire polling alive through persistence and publish failures with rate-limited diagnostics.
+- Restore complete startup diagnostics and distinguish subsystem startup failure from readiness.
+
 ## 0.5.250
 
 - Keep local Intel HEX upload and the complete firmware-install flow working in mock mode without requiring the optional `intelhex` module.

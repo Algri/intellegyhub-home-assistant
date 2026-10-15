@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Callable, Coroutine
 
 from .carrier import CarrierManager
+from .logging_utils import log_event
 from .paths import default_data_path
 
 I2C_SLAVE = 0x0703
@@ -651,6 +652,7 @@ class ExtensionManager:
 
     async def start(self) -> None:
         try:
+            log_event(LOGGER, logging.INFO, "start", bus="xbus")
             self._loop = asyncio.get_running_loop()
             await self.store.initialize()
             self.modules = {module.id: module for module in await self.store.load_modules()}
@@ -669,12 +671,15 @@ class ExtensionManager:
             await self.hardware.start_xdi16_interrupt(self._wake_xdi16_interrupt)
             self._xdi16_task = asyncio.create_task(self._run_xdi16_interrupt_worker(), name="intellegyhub_xdi16_interrupt")
             self._wake_xdi16_interrupt()
+            log_event(LOGGER, logging.INFO, "ready", power=self.power_on, modules=len(self.modules))
         except Exception as exc:
             self.power_on = False
             self.power_available = False
             self.error = str(exc)
+            log_event(LOGGER, logging.ERROR, "start_failed", error=str(exc), exc_info=True)
 
     async def stop(self) -> None:
+        log_event(LOGGER, logging.INFO, "stop", bus="xbus")
         self._stopped.set()
         await self._cancel_power_refresh()
         await self.hardware.stop_xdi16_interrupt()
@@ -690,6 +695,7 @@ class ExtensionManager:
             self._module_persistence_task = None
         await self.store.save_power(self.power_on)
         await self.store.save_modules(list(self.modules.values()))
+        log_event(LOGGER, logging.INFO, "stopped", bus="xbus")
 
     async def wait_for_power_refresh(self) -> None:
         if self._power_refresh_task is not None:
@@ -725,8 +731,8 @@ class ExtensionManager:
             self._pending_modules_snapshot = None
             try:
                 await self.store.save_modules(snapshot)
-            except Exception:
-                LOGGER.exception("X-BUS state persistence failed")
+            except Exception as exc:
+                log_event(LOGGER, logging.ERROR, "state_persistence_failed", bus="xbus", error=str(exc), exc_info=True)
 
     def snapshot(self) -> dict[str, Any]:
         return {
@@ -763,6 +769,7 @@ class ExtensionManager:
                 self._mark_modules_unavailable("BUS_POWER_OFF")
                 self._persist_modules_nowait()
             self.error = None
+            log_event(LOGGER, logging.INFO, "power_changed", bus="xbus", on=self.power_on)
             await self._publish({"type": "extension_power_changed", "on": self.power_on})
             await self._publish({"type": "extensions_changed", "extensions": self.snapshot()})
             return self.snapshot()
@@ -780,7 +787,7 @@ class ExtensionManager:
             raise
         except Exception as exc:
             self.error = str(exc)
-            LOGGER.exception("X-BUS power refresh failed")
+            log_event(LOGGER, logging.ERROR, "power_refresh_failed", bus="xbus", error=str(exc), exc_info=True)
             await self._publish({"type": "extensions_changed", "extensions": self.snapshot()})
 
     async def scan(self) -> dict[str, Any]:
@@ -788,6 +795,7 @@ class ExtensionManager:
             removed_ids = await self._scan_locked()
             self._wake_xdi16_interrupt()
             self.error = None
+            log_event(LOGGER, logging.INFO, "scan_completed", bus="xbus", modules=len(self.modules))
             for module_id in removed_ids:
                 await self._publish({"type": "extension_module_removed", "module_id": module_id})
             await self._publish({"type": "extensions_changed", "extensions": self.snapshot()})

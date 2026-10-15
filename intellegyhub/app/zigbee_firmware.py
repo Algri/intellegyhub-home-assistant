@@ -21,9 +21,10 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Awaitable, Callable, Protocol
 
 from .carrier import CarrierManager
+from .logging_utils import log_event
 from .paths import default_data_path
 
-LOGGER = logging.getLogger(__name__)
+LOGGER = logging.getLogger("intellegyhub.zigbee")
 
 FIRMWARE_RELEASES_URL = "https://api.github.com/repos/Koenkk/Z-Stack-firmware/releases?per_page=100"
 FIRMWARE_DOWNLOAD_PREFIX = "https://github.com/Koenkk/Z-Stack-firmware/releases/download/"
@@ -781,6 +782,7 @@ class ZigbeeFirmwareManager:
         self._started = False
 
     async def start(self) -> None:
+        log_event(LOGGER, logging.INFO, "start", mode="mock" if self.mock else "hardware")
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self._state = await asyncio.to_thread(self._load_state)
         if self._state.get("status") in ACTIVE_UPDATE_STATES:
@@ -792,8 +794,10 @@ class ZigbeeFirmwareManager:
             await self._persist_and_publish()
             await self._release_controls(self._state.get("port"))
         self._started = True
+        log_event(LOGGER, logging.INFO, "ready", status=self._state.get("status"), data_dir=self.data_dir)
 
     async def stop(self) -> None:
+        log_event(LOGGER, logging.INFO, "stop")
         task = self._operation_task
         if task is not None and not task.done():
             task.cancel()
@@ -808,6 +812,7 @@ class ZigbeeFirmwareManager:
         await self._release_controls(self._state.get("port"))
         await self._persist_and_publish()
         self._started = False
+        log_event(LOGGER, logging.INFO, "stopped")
 
     def set_carrier(self, carrier: CarrierProtocol) -> None:
         self.carrier = carrier
@@ -940,7 +945,7 @@ class ZigbeeFirmwareManager:
             try:
                 firmware = await self.coordinator_reader.read_firmware_version(path)
             except ZigbeeFirmwareError as exc:
-                LOGGER.info("Coordinator probe failed port=%s: %s", path, exc)
+                log_event(LOGGER, logging.INFO, "coordinator_probe_failed", port=path, error=str(exc))
                 if _is_uart_busy_error(exc):
                     return path, {
                         "available": False,
@@ -1130,7 +1135,7 @@ class ZigbeeFirmwareManager:
             primary_error = "Firmware update cancelled"
         except Exception as exc:
             primary_error = _safe_error(exc)
-            LOGGER.exception("Zigbee firmware update failed")
+            log_event(LOGGER, logging.ERROR, "firmware_operation_failed", error=primary_error, exc_info=True)
             with contextlib.suppress(Exception):
                 await self._append_log("error", primary_error)
         finally:
@@ -1141,7 +1146,7 @@ class ZigbeeFirmwareManager:
                     await self._restart_coordinator(port)
                     await self._append_log("system", "Coordinator reset after failed ROM bootloader operation")
                 except Exception as exc:
-                    LOGGER.exception("Unable to recover coordinator after failed firmware operation")
+                    log_event(LOGGER, logging.ERROR, "coordinator_recovery_failed", error=_safe_error(exc), exc_info=True)
                     await self._append_log("error", f"Coordinator recovery failed: {_safe_error(exc)}")
             if lease is not None:
                 lease.release()
@@ -1244,7 +1249,7 @@ class ZigbeeFirmwareManager:
             try:
                 await self.carrier.set_output(output_id, False)
             except Exception:
-                LOGGER.exception("Unable to release Zigbee bootloader control %s", output_id)
+                log_event(LOGGER, logging.ERROR, "bootloader_control_release_failed", output=output_id, exc_info=True)
 
     async def _restart_coordinator(self, port: str) -> None:
         if self.carrier is None:
@@ -1268,12 +1273,12 @@ class ZigbeeFirmwareManager:
                 installed = await self.coordinator_reader.read_firmware_version(port)
             except ZigbeeFirmwareError:
                 installed = None
-                LOGGER.info("Coordinator firmware readback is not ready after reset", exc_info=True)
+                log_event(LOGGER, logging.DEBUG, "firmware_readback_retry", port=port, exc_info=True)
             if installed:
                 return installed
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                LOGGER.info("Coordinator firmware readback was not available after reset")
+                log_event(LOGGER, logging.WARNING, "firmware_readback_unavailable", port=port)
                 return None
             await asyncio.sleep(min(0.25, remaining))
 
@@ -1556,7 +1561,7 @@ class ZigbeeFirmwareManager:
         except FileNotFoundError:
             return empty_update_state()
         except (OSError, json.JSONDecodeError):
-            LOGGER.exception("Unable to load Zigbee firmware state")
+            log_event(LOGGER, logging.ERROR, "state_load_failed", path=self.state_path, exc_info=True)
             return empty_update_state()
         if not isinstance(payload, dict) or payload.get("status") not in UPDATE_STATES:
             return empty_update_state()
@@ -1585,7 +1590,19 @@ class ZigbeeFirmwareManager:
         if not text:
             return
         logs = self._state.setdefault("logs", [])
-        logs.append({"timestamp": datetime.now().astimezone().strftime("%H:%M:%S"), "stream": stream, "line": text})
+        level = "ERROR" if stream == "error" else "WARNING" if stream == "stderr" else "INFO" if stream == "system" else "DEBUG"
+        event = "operation_error" if stream == "error" else "operation_message" if stream == "system" else "utility_output"
+        logs.append(
+            {
+                "timestamp": datetime.now().astimezone().strftime("%H:%M:%S"),
+                "stream": stream,
+                "line": text,
+                "level": level,
+                "component": "zigbee",
+                "event": event,
+            }
+        )
+        log_event(LOGGER, getattr(logging, level), event, stream=stream, line=text)
         del logs[:-MAX_LOG_LINES]
 
     async def _persist_and_publish(self) -> None:

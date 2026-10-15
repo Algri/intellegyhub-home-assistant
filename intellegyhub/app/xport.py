@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import errno
+import logging
 import math
 import os
 import sys
@@ -14,6 +15,10 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .paths import default_data_path
+from .logging_utils import log_event
+
+
+LOGGER = logging.getLogger("intellegyhub.xport")
 
 I2C_SLAVE = 0x0703
 
@@ -598,6 +603,7 @@ class XPortManager:
         self._publisher = publisher
 
     async def start(self) -> None:
+        log_event(LOGGER, logging.INFO, "start")
         await self.store.initialize()
         topology, availability, error = await self.hardware.discover()
         self.topology = topology
@@ -633,8 +639,19 @@ class XPortManager:
             await self._enable_led_dimmer_group(restore_values=True)
         self._stopping.clear()
         self._monitor_task = asyncio.create_task(self._monitor_inputs(), name="intellegy-xport-monitor")
+        log_event(
+            LOGGER,
+            logging.INFO,
+            "ready",
+            topology=topology,
+            availability=availability,
+            group_mode=self.group_mode,
+            channels=len(self.channels),
+            error=error,
+        )
 
     async def stop(self) -> None:
+        log_event(LOGGER, logging.INFO, "stop")
         self._stopping.set()
         if self._monitor_task:
             self._monitor_task.cancel()
@@ -653,6 +670,7 @@ class XPortManager:
                     state.error = f"shutdown disable failed: {exc}"
                     state.updated_at = self._now()
                     await self.store.save(state)
+                    log_event(LOGGER, logging.WARNING, "channel_shutdown_failed", channel=channel, error=str(exc))
 
     def snapshot(self) -> dict[str, Any]:
         return {
@@ -687,6 +705,7 @@ class XPortManager:
                 result = self._publisher({"type": "xport_changed", "xport": self.snapshot()})
                 if asyncio.iscoroutine(result):
                     await result
+            log_event(LOGGER, logging.INFO, "group_mode_changed", mode=mode)
             return {"group_mode": self.group_mode, "status": "Succeeded", "xport": self.snapshot()}
 
     async def configure(self, channel: int, mode: XPortMode, revision: int | None = None) -> dict[str, Any]:
@@ -722,6 +741,7 @@ class XPortManager:
                 await self.store.save(state)
                 await self.store.save_profile_channels(self.group_mode, [state])
                 await self._publish_state(state)
+                log_event(LOGGER, logging.INFO, "channel_configured", channel=channel, mode=mode, revision=state.revision)
                 return self._operation(state, "Succeeded", None)
             except Exception as exc:
                 state.confirmed_mode = XPortMode.DISABLED
@@ -731,6 +751,7 @@ class XPortManager:
                 await self.store.save(state)
                 await self.store.save_profile_channels(self.group_mode, [state])
                 await self._publish_state(state)
+                log_event(LOGGER, logging.ERROR, "channel_configuration_failed", channel=channel, mode=mode, error=str(exc))
                 return self._operation(state, "Failed", state.error)
 
     async def set_value(self, channel: int, value: float) -> dict[str, Any]:

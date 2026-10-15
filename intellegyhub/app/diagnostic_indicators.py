@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import sqlite3
 import time
 from dataclasses import dataclass
@@ -8,6 +9,10 @@ from pathlib import Path
 from typing import Awaitable, Callable
 
 from .paths import default_data_path
+from .logging_utils import log_event
+
+
+LOGGER = logging.getLogger("intellegyhub.indicators")
 
 
 DEFAULT_STE_HEARTBEAT_ON_SECONDS = 0.2
@@ -119,14 +124,17 @@ class DiagnosticIndicatorManager:
         self._publisher = publisher
 
     async def start(self) -> None:
+        log_event(LOGGER, logging.INFO, "start")
         await self.store.initialize()
         self.settings = await self.store.load()
         self._begin_connection_grace()
         await self._apply_ste()
         await self._apply_net()
         await self._apply_err()
+        log_event(LOGGER, logging.INFO, "ready", heartbeat=self.settings.ste_heartbeat_enabled, net=self.settings.net_indicator_enabled)
 
     async def stop(self) -> None:
+        log_event(LOGGER, logging.INFO, "stop")
         await self._stop_connection_grace()
         await self._stop_heartbeat()
         await self._stop_net_blink()
@@ -134,6 +142,7 @@ class DiagnosticIndicatorManager:
         await self._set_output("ste", False)
         await self._set_output("net", False)
         await self._set_output("err", False)
+        log_event(LOGGER, logging.INFO, "stopped")
 
     def snapshot(self) -> dict:
         payload = self.settings.snapshot()
@@ -161,6 +170,7 @@ class DiagnosticIndicatorManager:
         await self.store.save(self.settings)
         await self._apply_ste()
         await self._publish()
+        log_event(LOGGER, logging.INFO, "heartbeat_settings_changed", enabled=settings.ste_heartbeat_enabled)
         return self.snapshot()
 
     async def set_net_indicator(self, enabled: bool) -> dict:
@@ -168,6 +178,7 @@ class DiagnosticIndicatorManager:
         await self.store.save(self.settings)
         await self._apply_net()
         await self._publish()
+        log_event(LOGGER, logging.INFO, "network_indicator_changed", enabled=self.settings.net_indicator_enabled)
         return self.snapshot()
 
     async def set_err_indicator(self, enabled: bool) -> dict:
@@ -175,6 +186,7 @@ class DiagnosticIndicatorManager:
         await self.store.save(self.settings)
         await self._apply_err()
         await self._publish()
+        log_event(LOGGER, logging.INFO, "error_indicator_changed", enabled=self.settings.err_indicator_enabled)
         return self.snapshot()
 
     async def set_connected_clients(self, count: int) -> None:
