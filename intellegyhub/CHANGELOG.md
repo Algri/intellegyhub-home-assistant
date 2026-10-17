@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.252
+
+- Add a managed software reset for the carrier MCP23017 during add-on shutdown.
+- Restore the project-defined safe output state and verify it by reading the GPIO ports back.
+
 ## 0.5.251
 
 - Make structured logging reliable with pre-existing Home Assistant and Uvicorn handlers.

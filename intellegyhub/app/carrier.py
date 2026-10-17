@@ -19,7 +19,7 @@ from .logging_utils import log_event
 LOGGER = logging.getLogger("intellegyhub.carrier")
 
 I2C_SLAVE = 0x0703
-APP_VERSION = "0.5.251"
+APP_VERSION = "0.5.252"
 IDENTITY_EEPROM_ADDR = 0x50
 IDENTITY_EEPROM_OFFSET = 0x0000
 IDENTITY_REGION_SIZE = 1024
@@ -110,8 +110,21 @@ class CarrierHardware:
 
     _iodira = 0x00
     _iodirb = 0x01
+    _ipola = 0x02
+    _ipolb = 0x03
+    _gpintena = 0x04
+    _gpintenb = 0x05
+    _defvala = 0x06
+    _defvalb = 0x07
+    _intcona = 0x08
+    _intconb = 0x09
+    _iocon = 0x0A
+    _gppua = 0x0C
+    _gppub = 0x0D
     _gpioa = 0x12
     _gpiob = 0x13
+    _olata = 0x14
+    _olatb = 0x15
 
     bit_onewire_power = 14
     bit_xbus_power = 15
@@ -171,6 +184,28 @@ class CarrierHardware:
                 self._available = await asyncio.to_thread(self._initialize_sync)
             return self._bit_on_unlocked(bit)
 
+    async def reset_to_safe_state(self) -> bool:
+        """Restore the carrier expander to its project-defined safe state."""
+        if _is_mock_platform():
+            self._gpio_a = 0
+            self._gpio_b = 0
+            self._available = True
+            return True
+        async with self._lock:
+            if not self._available:
+                self._available = await asyncio.to_thread(self._probe_register, self._iodirb, 1)
+            if not self._available:
+                return False
+            try:
+                confirmed = await asyncio.to_thread(self._reset_to_safe_state_sync)
+            except OSError:
+                self._available = False
+                return False
+            if confirmed:
+                self._gpio_a = 0
+                self._gpio_b = 0
+            return confirmed
+
     def _bit_on_unlocked(self, bit: int) -> bool:
         if bit < 8:
             return bool(self._gpio_a & (1 << bit))
@@ -206,6 +241,30 @@ class CarrierHardware:
     def _write_outputs(self) -> None:
         self._i2c_write(bytes([self._gpioa, self._gpio_a & 0xFF]))
         self._i2c_write(bytes([self._gpiob, self._gpio_b & 0xFF]))
+
+    def _reset_to_safe_state_sync(self) -> bool:
+        # Keep every carrier-controlled line low and disable stale input/interrupt state.
+        for register in (
+            self._ipola,
+            self._ipolb,
+            self._gpintena,
+            self._gpintenb,
+            self._defvala,
+            self._defvalb,
+            self._intcona,
+            self._intconb,
+            self._gppua,
+            self._gppub,
+            self._olata,
+            self._olatb,
+        ):
+            self._i2c_write(bytes([register, 0x00]))
+        self._i2c_write(bytes([self._iocon, 0x00]))
+        self._i2c_write(bytes([self._iodira, 0x00]))
+        self._i2c_write(bytes([self._iodirb, 0x00]))
+        gpio_a = self._i2c_read_register(self._gpioa, 1)[0]
+        gpio_b = self._i2c_read_register(self._gpiob, 1)[0]
+        return gpio_a == 0 and gpio_b == 0
 
     def _read_fault_lines(self) -> list[FaultLineState]:
         return [
@@ -501,7 +560,18 @@ class CarrierManager:
             except asyncio.CancelledError:
                 pass
             self._monitoring_task = None
-        log_event(LOGGER, logging.INFO, "stopped")
+        try:
+            reset_ok = await self.software_reset()
+        except Exception as exc:
+            reset_ok = False
+            log_event(LOGGER, logging.ERROR, "safe_reset_failed", error=str(exc), exc_info=True)
+        log_event(LOGGER, logging.INFO, "stopped", safe_reset=reset_ok)
+
+    async def software_reset(self) -> bool:
+        reset_ok = await self.hardware.reset_to_safe_state()
+        if reset_ok:
+            self.outputs = {output_id: False for output_id in CARRIER_OUTPUTS}
+        return reset_ok
 
     async def set_xbus_power(self, on: bool) -> bool:
         return await self.hardware.set_bit(CarrierHardware.bit_xbus_power, on)
