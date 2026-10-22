@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.254
+
+- Fix X-Port PWM slider rendering and interaction across native range controls.
+- Keep the visible track and thumb aligned while updating the percentage live during drag.
+- Use a compact invisible hit area around the slider track and commit the hardware value after release.
+
 ## 0.5.253
 
 - Refine the X-Port digital-input settings dialog layout and remove duplicated channel context from the title.

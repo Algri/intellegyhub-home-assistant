@@ -19,7 +19,7 @@ from .logging_utils import log_event
 LOGGER = logging.getLogger("intellegyhub.carrier")
 
 I2C_SLAVE = 0x0703
-APP_VERSION = "0.5.253"
+APP_VERSION = "0.5.254"
 IDENTITY_EEPROM_ADDR = 0x50
 IDENTITY_EEPROM_OFFSET = 0x0000
 IDENTITY_REGION_SIZE = 1024

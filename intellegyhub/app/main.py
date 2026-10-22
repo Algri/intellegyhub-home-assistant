@@ -374,7 +374,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.253", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.254", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -890,11 +890,14 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .xport-control-icon.do { fill: currentColor; stroke: none; }
     .xport-control-icon.state { fill: currentColor; stroke: none; }
     .xport-control-row > strong { padding-left: 16px; }
-    .xport-control-row.pwm > input[type="range"] { width: 100%; min-width: 0; box-sizing: border-box; border: 0; padding: 0; outline: none; box-shadow: none; background: transparent; accent-color: var(--ha-primary); appearance: none; }
-    .xport-control-row.pwm > input[type="range"]::-webkit-slider-runnable-track { height: 4px; border: 0; border-radius: 4px; background: var(--ha-row-border); }
-    .xport-control-row.pwm > input[type="range"]::-webkit-slider-thumb { width: 16px; height: 16px; margin-top: -6px; border: 0; border-radius: 50%; background: var(--ha-primary); appearance: none; }
+    .xport-control-row.pwm > input[type="range"] { width: 100%; height: 24px; min-height: 24px; min-width: 0; box-sizing: border-box; margin: 0; border: 0; padding: 0; outline: none; box-shadow: none; background: transparent; accent-color: var(--ha-primary); -webkit-appearance: none; appearance: none; cursor: pointer; touch-action: none; }
+    .xport-control-row.pwm > input[type="range"]::-webkit-slider-runnable-track { height: 4px; border: 0; border-radius: 4px; background: linear-gradient(to right, var(--ha-primary) 0 var(--xport-slider-progress, 0%), var(--ha-row-border) var(--xport-slider-progress, 0%) 100%); }
+    .xport-control-row.pwm > input[type="range"]::-webkit-slider-thumb { width: 16px; height: 16px; margin-top: -6px; border: 0; border-radius: 50%; background: var(--ha-primary); -webkit-appearance: none; appearance: none; cursor: grab; }
+    .xport-control-row.pwm > input[type="range"]:active::-webkit-slider-thumb { cursor: grabbing; }
     .xport-control-row.pwm > input[type="range"]::-moz-range-track { height: 4px; border: 0; border-radius: 4px; background: var(--ha-row-border); }
-    .xport-control-row.pwm > input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border: 0; border-radius: 50%; background: var(--ha-primary); }
+    .xport-control-row.pwm > input[type="range"]::-moz-range-progress { height: 4px; border: 0; border-radius: 4px; background: var(--ha-primary); }
+    .xport-control-row.pwm > input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border: 0; border-radius: 50%; background: var(--ha-primary); cursor: grab; }
+    .xport-control-row.pwm > input[type="range"]:active::-moz-range-thumb { cursor: grabbing; }
     .xport-control-row.pwm > input[type="range"]:focus, .xport-control-row.pwm > input[type="range"]:focus-visible { outline: none; box-shadow: none; }
     .xport-control-row.pwm strong { text-align: right; padding-right: 2px; }
     .xport-control-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -3418,14 +3421,27 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         await renderXPort();
       }
     }
+    function paintPwmSlider(slider, valueEl) {
+      const percent = Math.round(Number(slider.value || 0));
+      slider.style.setProperty('--xport-slider-progress', `${percent}%`);
+      slider.setAttribute('aria-valuetext', `${percent}%`);
+      if (valueEl) { valueEl.textContent = `${percent}%`; }
+    }
+    function bindPwmSlider(slider, valueEl, commit) {
+      slider.addEventListener('input', () => paintPwmSlider(slider, valueEl));
+      slider.addEventListener('change', () => commit(Number(slider.value) / 100));
+      paintPwmSlider(slider, valueEl);
+    }
     function syncLinkedWhiteSliders(channels, value) {
       const percent = Math.round(Number(value || 0) * 100);
       document.querySelectorAll('[data-xport-linked-white="true"]').forEach((wrap) => {
         if (!channels.includes(Number(wrap.dataset.xportChannel || 0))) { return; }
         const slider = wrap.querySelector('input[type="range"]');
         const valueEl = wrap.querySelector('strong');
-        if (slider) { slider.value = String(percent); }
-        if (valueEl) { valueEl.textContent = `${percent}%`; }
+        if (slider) {
+          slider.value = String(percent);
+          paintPwmSlider(slider, valueEl);
+        }
       });
     }
     function renderModeBody(channel) {
@@ -3491,7 +3507,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       slider.min = '0';
       slider.max = '100';
       slider.value = String(percent);
-      slider.onchange = () => setGroupChannelValue(channel.channel, Number(slider.value) / 100);
+      slider.setAttribute('aria-label', `${label.textContent} PWM level`);
+      bindPwmSlider(slider, value, (nextValue) => setGroupChannelValue(channel.channel, nextValue));
       wrap.append(label, slider, value);
       return wrap;
     }
@@ -3545,7 +3562,8 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       slider.min = '0';
       slider.max = '100';
       slider.value = String(percent);
-      slider.onchange = () => setValue(channel.channel, Number(slider.value) / 100);
+      slider.setAttribute('aria-label', `X${channel.channel} PWM level`);
+      bindPwmSlider(slider, value, (nextValue) => setValue(channel.channel, nextValue));
       wrap.append(label, slider, value);
       return wrap;
     }
