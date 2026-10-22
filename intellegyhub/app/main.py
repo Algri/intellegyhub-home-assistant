@@ -374,7 +374,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
                 await app.state.rs485.stop()
             await app.state.runtime.stop()
 
-    app = FastAPI(title="IntellegyHUB", version="0.5.252", lifespan=lifespan)
+    app = FastAPI(title="IntellegyHUB", version="0.5.253", lifespan=lifespan)
     app.state.runtime = runtime
     app.state.options_path = options_path
     app.state.rtc = MockRtc() if is_mock_enabled() else HostRtc()
@@ -719,6 +719,153 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .active-row .active-mode { margin-top: 0; min-width: 0; }
     .xport-action-slot { min-width: 112px; min-height: 38px; display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
     .xport-action-slot:empty { visibility: hidden; }
+    .xport-settings-button {
+      width: 20px;
+      height: 20px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      color: var(--ha-primary);
+      cursor: pointer;
+    }
+    .xport-settings-button:hover,
+    .xport-settings-button:focus-visible {
+      color: var(--ha-strong);
+      outline: none;
+    }
+    .xport-settings-button svg { width: 20px; height: 20px; fill: currentColor; }
+    body.di-modal-open, html:has(body.di-modal-open) { overflow: hidden; }
+    .di-settings-modal {
+      box-sizing: border-box;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      right: auto;
+      bottom: auto;
+      width: min(760px, calc(100vw - 32px));
+      max-width: 760px;
+      max-height: calc(100dvh - 32px);
+      height: auto;
+      margin: 0;
+      transform: translate(-50%, -50%);
+      padding: 0;
+      outline: none;
+      overflow: hidden;
+      border: 1px solid var(--ha-card-border);
+      border-radius: 12px;
+      background: var(--ha-card);
+      color: var(--ha-text);
+      box-shadow: 0 18px 60px rgba(0, 0, 0, .48);
+    }
+    .di-settings-modal:focus,
+    .di-settings-modal:focus-visible { outline: none; }
+    .di-settings-modal::backdrop { background: rgba(0, 0, 0, .66); backdrop-filter: blur(2px); }
+    .di-settings-dialog { box-sizing: border-box; height: auto; max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; padding: 20px 24px 18px; }
+    .di-settings-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+    .di-settings-eyebrow { margin-bottom: 5px; color: var(--ha-primary); font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    .di-settings-title { display: flex; align-items: center; gap: 9px; margin: 0; color: var(--ha-text); font-size: 23px; line-height: 1.15; }
+    .di-settings-title-icon { width: 24px; height: 24px; flex: 0 0 24px; color: var(--ha-primary); fill: currentColor; }
+    .di-settings-subtitle { margin-top: 6px; color: var(--ha-secondary); font-size: 13px; }
+    .di-settings-close { display: inline-grid; place-items: center; width: 32px; min-width: 32px; height: 32px; min-height: 32px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--ha-secondary); cursor: pointer; }
+    .di-settings-close:hover, .di-settings-close:focus-visible { background: var(--ha-field); color: var(--ha-text); outline: none; }
+    .di-settings-close svg { width: 18px; height: 18px; fill: currentColor; }
+    .di-settings-summary { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0; margin: 16px 0 20px; padding: 11px 14px; border: 1px solid var(--ha-row-border); border-radius: 8px; background: var(--ha-surface); }
+    .di-settings-summary-config { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); min-width: 0; }
+    .di-settings-summary-item { display: grid; grid-template-columns: 38px minmax(0, 1fr); align-items: center; gap: 12px; min-width: 0; }
+    .di-settings-summary-config > .di-settings-summary-item + .di-settings-summary-item { padding-left: 18px; border-left: 1px solid var(--ha-row-border); }
+    .di-settings-summary-icon { display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: 8px; background: var(--ha-field); color: var(--ha-primary); }
+    .di-settings-summary-icon svg { width: 20px; height: 20px; fill: currentColor; }
+    .di-settings-summary-label { display: block; margin-bottom: 4px; color: var(--ha-secondary); font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+    .di-settings-summary-value { display: block; overflow: hidden; color: var(--ha-text); font-size: 15px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+    .di-settings-summary-status { display: flex; align-items: center; gap: 10px; min-width: 174px; padding-left: 18px; border-left: 1px solid var(--ha-row-border); }
+    .di-settings-summary-status .di-settings-summary-label { margin: 0; white-space: nowrap; }
+    .di-settings-summary-status .toggle { margin-left: 2px; }
+    .di-settings-fieldset { margin: 0 0 18px; padding: 0; border: 0; }
+    .di-settings-fieldset legend { margin-bottom: 8px; color: var(--ha-text); font-size: 14px; font-weight: 800; }
+    .di-settings-label, .di-settings-row-title { display: flex; align-items: center; gap: 8px; }
+    .di-settings-icon { width: 18px; height: 18px; flex: 0 0 18px; color: var(--ha-primary); fill: currentColor; }
+    .di-event-type-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .di-event-type-option { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 9px 14px; border: 1px solid var(--ha-row-border); border-radius: 8px; background: var(--ha-surface); color: var(--ha-secondary); text-align: left; cursor: pointer; }
+    .di-event-type-option:hover, .di-event-type-option:focus-visible { border-color: var(--ha-primary); background: var(--ha-field); color: var(--ha-text); outline: none; }
+    .di-event-type-option.active { border-color: var(--ha-primary); background: var(--ha-field); color: var(--ha-primary); box-shadow: inset 0 0 0 1px var(--ha-primary); }
+    .di-option-icon { display: inline-grid; place-items: center; width: 38px; height: 38px; flex: 0 0 38px; border-radius: 8px; background: var(--ha-field); color: var(--ha-secondary); }
+    .di-option-icon svg { width: 22px; height: 22px; fill: currentColor; }
+    .di-option-copy { display: grid; gap: 4px; min-width: 0; }
+    .di-option-copy strong { color: var(--ha-text); font-size: 14px; font-weight: 800; }
+    .di-option-copy small { color: var(--ha-secondary); font-size: 12px; font-weight: 500; line-height: 1.25; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .di-event-type-option.active .di-option-icon { background: var(--ha-action-hover); color: var(--ha-primary); }
+    .di-event-type-option.active .di-option-copy strong { color: var(--ha-primary); }
+    .di-trigger-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .di-trigger-option { display: flex; align-items: center; justify-content: flex-start; gap: 10px; min-height: 58px; padding: 9px 12px; border: 1px solid var(--ha-row-border); border-radius: 8px; background: var(--ha-surface); color: var(--ha-secondary); text-align: left; cursor: pointer; }
+    .di-trigger-option:hover, .di-trigger-option:focus-visible { border-color: var(--ha-primary); background: var(--ha-field); color: var(--ha-text); outline: none; }
+    .di-trigger-option.active { border-color: var(--ha-primary); background: var(--ha-field); color: var(--ha-primary); box-shadow: inset 0 0 0 1px var(--ha-primary); }
+    .di-trigger-icon { display: inline-grid; place-items: center; width: 30px; height: 30px; flex: 0 0 30px; color: currentColor; }
+    .di-trigger-icon svg { width: 24px; height: 24px; fill: currentColor; stroke: none; }
+    .di-trigger-option .di-option-copy small { font-size: 13px; }
+    .di-trigger-option.active .di-trigger-icon { color: var(--ha-primary); }
+    .di-trigger-option.active .di-option-copy strong { color: var(--ha-primary); }
+    .di-edge-preview { margin-top: 12px; padding: 12px 14px 10px; border: 1px solid var(--ha-row-border); border-radius: 8px; background: var(--ha-surface); }
+    .di-edge-preview[hidden] { display: none; }
+    .di-edge-preview-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+    .di-edge-preview-heading { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+    .di-edge-preview-icon { display: inline-grid; place-items: center; width: 24px; height: 24px; flex: 0 0 24px; color: var(--ha-primary); }
+    .di-edge-preview-icon svg { width: 18px; height: 18px; fill: currentColor; }
+    .di-edge-preview-title { display: block; color: var(--ha-text); font-size: 14px; font-weight: 800; }
+    .di-edge-preview-subtitle { display: block; margin-top: 4px; color: var(--ha-secondary); font-size: 12px; line-height: 1.3; }
+    .di-edge-preview-caption { display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto; padding: 7px 10px; border-radius: 999px; background: var(--ha-field); color: var(--ha-secondary); font-size: 11px; font-weight: 700; }
+    .di-edge-preview-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ha-primary); box-shadow: 0 0 0 3px var(--ha-action-hover); }
+    .di-edge-preview-plot { margin-top: 10px; padding: 9px 0 0; border-top: 1px solid var(--ha-row-border); }
+    .di-edge-preview-svg { display: block; width: 100%; height: 112px; overflow: visible; color: var(--ha-primary); }
+    .di-edge-preview-svg .di-edge-plot-bg { fill: var(--ha-field); }
+    .di-edge-preview-svg .di-edge-level { stroke: var(--ha-row-border); stroke-width: 1; }
+    .di-edge-preview-svg .di-edge-wave { fill: none; stroke: var(--ha-primary); stroke-linecap: round; stroke-linejoin: round; stroke-width: 2.5; }
+    .di-edge-preview-svg .di-edge-transition { fill: none; stroke: var(--ha-primary); stroke-linecap: round; stroke-width: 2; marker-end: url(#di-edge-arrow); }
+    .di-edge-preview-svg .di-edge-event-line { stroke: var(--ha-primary); stroke-dasharray: 3 3; stroke-width: 1; }
+    .di-edge-preview-svg .di-edge-event-label { fill: var(--ha-primary); font-size: 10px; font-weight: 800; text-anchor: middle; }
+    .di-edge-preview-svg text { fill: var(--ha-secondary); font-family: inherit; font-size: 11px; font-weight: 700; }
+    .di-edge-preview-svg [data-di-edge-preview] { display: none; }
+    .di-edge-preview-svg [data-di-edge-preview].active { display: inline; }
+    .di-settings-timing { margin: -2px 0 16px; }
+    .di-settings-timing .di-settings-row { padding-block: 10px; }
+    .di-settings-timing[hidden], .di-settings-timing-field[hidden] { display: none; }
+    .di-settings-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 42px; padding: 9px 0; border-top: 1px solid var(--ha-row-border); }
+    .di-settings-row-copy { min-width: 0; }
+    .di-settings-row-title { color: var(--ha-text); font-size: 14px; font-weight: 800; }
+    .di-settings-row-note { display: block; margin-top: 4px; color: var(--ha-secondary); font-size: 12px; line-height: 1.35; }
+    .di-settings-number { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; color: var(--ha-secondary); font-size: 13px; }
+    .di-settings-number input { width: 82px; height: 38px; box-sizing: border-box; border: 1px solid var(--ha-row-border); border-radius: 7px; background: var(--ha-field); color: var(--ha-text); padding: 0 10px; font: inherit; text-align: right; }
+    .di-settings-number input:focus, .di-settings-number input:focus-visible { border-color: var(--ha-primary); outline: none; box-shadow: 0 0 0 1px var(--ha-primary); }
+    .di-settings-number input:disabled { cursor: default; opacity: .48; }
+    .di-settings-footer { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 13px; }
+    .di-settings-footer button { min-height: 38px; padding: 8px 14px; border: 1px solid var(--ha-primary); border-radius: 8px; background: transparent; color: var(--ha-primary); font-weight: 800; cursor: pointer; }
+    .di-settings-footer button:hover, .di-settings-footer button:focus-visible { background: var(--ha-action-hover); outline: none; }
+    .di-settings-footer #di-settings-done { background: var(--ha-primary); color: #fff; }
+    @media (max-width: 560px) {
+      .di-settings-modal { width: calc(100vw - 24px); max-height: calc(100dvh - 24px); height: auto; }
+      .di-settings-dialog { max-height: calc(100dvh - 24px); padding: 18px 16px 16px; }
+      .di-settings-summary { grid-template-columns: 1fr; gap: 12px; }
+      .di-settings-summary-config { grid-template-columns: 1fr; gap: 12px; }
+      .di-settings-summary-config > .di-settings-summary-item + .di-settings-summary-item { padding: 12px 0 0; border-top: 1px solid var(--ha-row-border); border-left: 0; }
+      .di-settings-summary-status { min-width: 0; padding: 12px 0 0; border-top: 1px solid var(--ha-row-border); border-left: 0; }
+      .di-event-type-grid { grid-template-columns: 1fr; }
+      .di-trigger-grid { grid-template-columns: 1fr; }
+      .di-edge-preview-head { flex-direction: column; }
+      .di-edge-preview-caption { align-self: flex-start; }
+      .di-settings-footer { align-items: stretch; flex-wrap: wrap; }
+    }
+    @media (max-height: 760px) and (min-width: 561px) {
+      .di-settings-dialog { padding: 16px 20px 14px; }
+      .di-settings-summary { margin: 14px 0 16px; }
+      .di-settings-fieldset { margin-bottom: 14px; }
+      .di-edge-preview { margin-top: 9px; }
+      .di-edge-preview-svg { height: 112px; }
+      .di-settings-row { min-height: 40px; padding: 8px 0; }
+      .di-settings-footer { margin-top: 12px; }
+    }
     .mode-body { color: var(--ha-secondary); font-size: 15px; line-height: 1.6; margin-top: 26px; min-height: 54px; }
     .metric strong, .active-mode strong { color: var(--ha-strong); font-weight: 700; }
     .mode-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -807,10 +954,14 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       color: var(--ha-primary);
       outline: none;
     }
-    .reset-button.icon-only { width: 28px; min-width: 28px; height: 28px; min-height: 28px; padding: 0; border: 0 !important; background: transparent; color: var(--ha-primary) !important; display: inline-flex; align-items: center; justify-content: center; }
-    .reset-button.icon-only:hover, .reset-button.icon-only:focus-visible { border: 0 !important; background: transparent; color: var(--ha-primary); }
-    .reset-button.icon-only svg { display: block !important; width: 22px !important; height: 22px !important; color: var(--ha-primary) !important; fill: currentColor !important; stroke: none !important; }
-    .reset-button.icon-only svg path { fill: var(--ha-primary) !important; stroke: none !important; }
+    .reset-button.icon-only { width: 20px; min-width: 20px; height: 20px; min-height: 20px; margin-left: auto; padding: 0; border: 0 !important; border-radius: 0; background: transparent !important; color: var(--ha-primary) !important; display: inline-flex; align-items: center; justify-content: center; transition: color .15s ease, opacity .15s ease, transform .12s ease; }
+    .reset-button.icon-only:hover, .reset-button.icon-only:focus-visible { border: 0 !important; background: transparent !important; color: var(--ha-strong) !important; outline: none; box-shadow: none !important; }
+    .reset-button.icon-only:active { transform: scale(.84); color: var(--ha-strong) !important; }
+    .reset-button.icon-only.is-busy { cursor: wait; opacity: .68; }
+    .reset-button.icon-only.is-busy svg { animation: reset-button-spin .7s linear infinite; }
+    @keyframes reset-button-spin { to { transform: rotate(360deg); } }
+    .reset-button.icon-only svg { display: block !important; width: 20px !important; height: 20px !important; color: currentColor !important; fill: currentColor !important; stroke: none !important; }
+    .reset-button.icon-only svg path { fill: currentColor !important; stroke: none !important; }
     .diagnostics-output { margin-top: 16px; }
     .extension-panel { margin-top: 18px; border: 1px solid var(--ha-card-border); border-radius: 12px; background: var(--ha-card); box-shadow: 0 2px 4px rgba(0, 0, 0, .22); padding: 24px; }
     .extension-panel:not(.overview-panel) { padding-left: 42px; padding-right: 42px; }
@@ -1784,7 +1935,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
     .buzzer-status { margin-top: 14px; color: var(--ha-secondary); font-size: 13px; overflow-wrap: anywhere; max-width: 980px; }
     .buzzer-detail-line { color: var(--ha-secondary); font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; }
     .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
-    button:not(.toggle):not(.mode-trigger):not(.mode-option) {
+    button:not(.toggle):not(.mode-trigger):not(.mode-option):not(.xport-settings-button):not(.reset-button):not(.di-settings-close):not(.di-trigger-option):not(.di-event-type-option) {
       border: 1px solid var(--ha-primary);
       background: transparent;
       color: var(--ha-primary);
@@ -1795,20 +1946,20 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       font-weight: 700;
       transition: background .15s ease, border-color .15s ease, color .15s ease;
     }
-    button:not(.toggle):not(.mode-trigger):not(.mode-option):hover,
-    button:not(.toggle):not(.mode-trigger):not(.mode-option):focus-visible {
+    button:not(.toggle):not(.mode-trigger):not(.mode-option):not(.xport-settings-button):not(.reset-button):not(.di-settings-close):not(.di-trigger-option):not(.di-event-type-option):hover,
+    button:not(.toggle):not(.mode-trigger):not(.mode-option):not(.xport-settings-button):not(.reset-button):not(.di-settings-close):not(.di-trigger-option):not(.di-event-type-option):focus-visible {
       border-color: var(--ha-primary);
       background: var(--ha-action-hover);
       color: var(--ha-primary);
       outline: none;
     }
-    button:not(.toggle):not(.mode-trigger):not(.mode-option):disabled {
+    button:not(.toggle):not(.mode-trigger):not(.mode-option):not(.xport-settings-button):not(.reset-button):not(.di-settings-close):not(.di-trigger-option):not(.di-event-type-option):disabled {
       border-color: #4a4a4a;
       color: var(--ha-secondary);
       cursor: default;
       opacity: .7;
     }
-    button:not(.toggle):not(.mode-trigger):not(.mode-option):disabled:hover {
+    button:not(.toggle):not(.mode-trigger):not(.mode-option):not(.xport-settings-button):not(.reset-button):not(.di-settings-close):not(.di-trigger-option):not(.di-event-type-option):disabled:hover {
       background: transparent;
       color: var(--ha-secondary);
     }
@@ -2449,6 +2600,167 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       </div>
     </section>
   </main>
+  <dialog id="di-settings-modal" class="di-settings-modal" aria-labelledby="di-settings-title">
+    <div class="di-settings-dialog">
+      <div class="di-settings-head">
+        <div>
+          <div class="di-settings-eyebrow">X-Port / Digital input</div>
+          <h2 id="di-settings-title" class="di-settings-title"><svg class="di-settings-title-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 13C6.14 13 4.59 14.28 4.14 16H2V18H4.14C4.59 19.72 6.14 21 8 21S11.41 19.72 11.86 18H22V16H11.86C11.41 14.28 9.86 13 8 13M8 19C6.9 19 6 18.1 6 17C6 15.9 6.9 15 8 15S10 15.9 10 17C10 18.1 9.1 19 8 19M19.86 6C19.41 4.28 17.86 3 16 3S12.59 4.28 12.14 6H2V8H12.14C12.59 9.72 14.14 11 16 11S19.41 9.72 19.86 8H22V6H19.86M16 9C14.9 9 14 8.1 14 7C14 5.9 14.9 5 16 5S18 5.9 18 7C18 8.1 17.1 9 16 9Z"/></svg><span id="di-settings-title-text">DI settings</span></h2>
+          <div class="di-settings-subtitle">Configure input event handling</div>
+        </div>
+        <button id="di-settings-close" class="di-settings-close" type="button" aria-label="Close DI settings" title="Close">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.4 5L5 6.4L10.6 12L5 17.6L6.4 19L12 13.4L17.6 19L19 17.6L13.4 12L19 6.4L17.6 5L12 10.6L6.4 5Z"/></svg>
+        </button>
+      </div>
+      <div class="di-settings-summary">
+        <div class="di-settings-summary-config">
+          <div class="di-settings-summary-item">
+            <span class="di-settings-summary-icon" aria-hidden="true"><svg class="xport-input" viewBox="0 0 24 24"><path d="M1,11H3.17C3.58,9.83 4.69,9 6,9C6.65,9 7.25,9.21 7.74,9.56L14.44,4.87L15.58,6.5L8.89,11.2C8.96,11.45 9,11.72 9,12A3,3 0 0,1 6,15C4.69,15 3.58,14.17 3.17,13H1V11M23,11V13H20.83C20.42,14.17 19.31,15 18,15A3,3 0 0,1 15,12A3,3 0 0,1 18,9C19.31,9 20.42,9.83 20.83,11H23M6,11A1,1 0 0 0 5,12A1,1 0 0 0 6,13A1,1 0 0 0 7,12A1,1 0 0 0 6,11M18,11A1,1 0 0 0 17,12A1,1 0 0 0 18,13A1,1 0 0 0 19,12A1,1 0 0 0 18,11Z"/></svg></span>
+            <span><span class="di-settings-summary-label">Channel</span><strong id="di-settings-channel" class="di-settings-summary-value">X1</strong></span>
+          </div>
+          <div class="di-settings-summary-item">
+            <span class="di-settings-summary-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 8A4 4 0 1 0 12 16A4 4 0 0 0 12 8M12 10A2 2 0 1 1 12 14A2 2 0 0 1 12 10M19.43 12.98C19.47 12.66 19.5 12.34 19.5 12S19.47 11.34 19.43 11L21.54 9.37L19.54 5.91L17.05 6.91C16.53 6.5 15.95 6.16 15.31 5.92L14.93 3.26H10.93L10.55 5.92C9.91 6.16 9.33 6.5 8.81 6.91L6.32 5.91L4.32 9.37L6.43 11C6.39 11.34 6.36 11.66 6.43 12.98L4.32 14.63L6.32 18.09L8.81 17.09C9.33 17.5 9.91 17.84 10.55 18.08L10.93 20.74H14.93L15.31 18.08C15.95 17.84 16.53 17.5 17.05 17.09L19.54 18.09L21.54 14.63L19.43 12.98Z"/></svg></span>
+            <span><span class="di-settings-summary-label">Mode</span><strong id="di-settings-mode" class="di-settings-summary-value">DI</strong></span>
+          </div>
+        </div>
+        <div class="di-settings-summary-status">
+          <span class="di-settings-summary-label">Current input</span>
+          <button id="di-settings-current-state" class="toggle readonly" type="button" tabindex="-1" aria-label="Current input OFF"><span>OFF</span></button>
+        </div>
+      </div>
+      <fieldset class="di-settings-fieldset">
+        <legend><span class="di-settings-label"><svg class="di-settings-icon mdi-format-list-bulleted" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6H2V8H4V6M4 11H2V13H4V11M4 16H2V18H4V16M22 6H6V8H22V6M22 11H6V13H22V11M22 16H6V18H22V16Z"/></svg><span>Event type</span></span></legend>
+        <div class="di-event-type-grid" role="group" aria-label="Input event type">
+          <button type="button" class="di-event-type-option active" data-di-event-type="edges" aria-pressed="true">
+            <span class="di-option-icon" aria-hidden="true"><svg class="mdi-trending-up" viewBox="0 0 24 24"><path d="M16 6H18.59L13 11.59L9 7.59L2.59 14L4 15.41L9 10.41L13 14.41L20 7.41V10H22V4H16V6Z"/></svg></span>
+            <span class="di-option-copy"><strong>Edges</strong><small>Trigger on signal transitions</small></span>
+          </button>
+          <button type="button" class="di-event-type-option" data-di-event-type="gestures" aria-pressed="false">
+            <span class="di-option-icon" aria-hidden="true"><svg class="mdi-signal" viewBox="0 0 24 24"><path d="M3 17H5V7H3V17M7 17H9V5H7V17M11 17H13V3H11V17M15 17H17V7H15V17M19 17H21V5H19V17Z"/></svg></span>
+            <span class="di-option-copy"><strong>Input events</strong><small>Trigger on input level or conditions</small></span>
+          </button>
+        </div>
+      </fieldset>
+      <fieldset class="di-settings-fieldset" data-di-edge-panel>
+        <legend><span class="di-settings-label"><svg class="di-settings-icon mdi-flash" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2L3 14H12L11 22L21 10H12L13 2Z"/></svg><span>React on</span></span></legend>
+        <div class="di-trigger-grid" role="group" aria-label="Input event trigger">
+          <button type="button" class="di-trigger-option" data-di-trigger="rising" aria-pressed="false">
+            <span class="di-trigger-icon" aria-hidden="true"><svg class="mdi-arrow-up" viewBox="0 0 24 24"><path d="M13 20H11V8L5.5 13.5L4.08 12.08L12 4.17L19.92 12.08L18.5 13.5L13 8V20Z"/></svg></span>
+            <span class="di-option-copy"><strong>Rising edge</strong><small>0 &rarr; 1</small></span>
+          </button>
+          <button type="button" class="di-trigger-option" data-di-trigger="falling" aria-pressed="false">
+            <span class="di-trigger-icon" aria-hidden="true"><svg class="mdi-arrow-down" viewBox="0 0 24 24"><path d="M11 4H13V16L18.5 10.5L19.92 11.92L12 19.83L4.08 11.92L5.5 10.5L11 16V4Z"/></svg></span>
+            <span class="di-option-copy"><strong>Falling edge</strong><small>1 &rarr; 0</small></span>
+          </button>
+          <button type="button" class="di-trigger-option active" data-di-trigger="both" aria-pressed="true">
+            <span class="di-trigger-icon" aria-hidden="true"><svg class="mdi-swap-vertical" viewBox="0 0 24 24"><path d="M7 15L12 20L17 15H13V9H17L12 4L7 9H11V15H7Z"/></svg></span>
+            <span class="di-option-copy"><strong>Both edges</strong><small>0 &harr; 1</small></span>
+          </button>
+        </div>
+        <div id="di-edge-preview" class="di-edge-preview" aria-live="polite">
+          <div class="di-edge-preview-head">
+            <div class="di-edge-preview-heading">
+              <span class="di-edge-preview-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 5C7 5 2.73 8.11 1 12C2.73 15.89 7 19 12 19S21.27 15.89 23 12C21.27 8.11 17 5 12 5M12 17C8.69 17 6 14.76 6 12S8.69 7 12 7S18 9.24 18 12S15.31 17 12 17M12 9C10.34 9 9 10.34 9 12S10.34 15 12 15S15 13.66 15 12S13.66 9 12 9Z"/></svg></span>
+              <span><span class="di-edge-preview-title">Edge preview</span><span class="di-edge-preview-subtitle">Visual representation of the input signal and detected events</span></span>
+            </div>
+            <span id="di-edge-preview-caption" class="di-edge-preview-caption"><span class="di-edge-preview-dot" aria-hidden="true"></span><span id="di-edge-preview-caption-text">Triggers on both transitions</span></span>
+          </div>
+          <div class="di-edge-preview-plot">
+          <svg class="di-edge-preview-svg" viewBox="0 0 520 132" role="img" aria-label="Digital input edge preview">
+            <defs>
+              <marker id="di-edge-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M0 0L8 4L0 8Z" fill="currentColor"></path>
+              </marker>
+            </defs>
+            <rect class="di-edge-plot-bg" x="58" y="16" width="450" height="72" rx="4"></rect>
+            <line class="di-edge-level" x1="58" y1="16" x2="508" y2="16"></line>
+            <line class="di-edge-level" x1="58" y1="88" x2="508" y2="88"></line>
+            <text x="4" y="12">Input level</text>
+            <text x="8" y="40">1 (ON)</text>
+            <text x="8" y="92">0 (OFF)</text>
+            <g data-di-edge-preview="rising">
+              <path class="di-edge-wave" d="M58 88H250V16H508"></path>
+              <line class="di-edge-transition" x1="250" y1="78" x2="250" y2="26"></line>
+              <line class="di-edge-event-line" x1="250" y1="16" x2="250" y2="112"></line>
+              <text class="di-edge-event-label" x="250" y="126">Rising edge</text>
+            </g>
+            <g data-di-edge-preview="falling">
+              <path class="di-edge-wave" d="M58 16H250V88H508"></path>
+              <line class="di-edge-transition" x1="250" y1="26" x2="250" y2="78"></line>
+              <line class="di-edge-event-line" x1="250" y1="16" x2="250" y2="112"></line>
+              <text class="di-edge-event-label" x="250" y="126">Falling edge</text>
+            </g>
+            <g data-di-edge-preview="both" class="active">
+              <path class="di-edge-wave" d="M58 88H190V16H350V88H508"></path>
+              <line class="di-edge-transition" x1="190" y1="78" x2="190" y2="26"></line>
+              <line class="di-edge-transition" x1="350" y1="26" x2="350" y2="78"></line>
+              <line class="di-edge-event-line" x1="190" y1="16" x2="190" y2="112"></line>
+              <line class="di-edge-event-line" x1="350" y1="16" x2="350" y2="112"></line>
+              <text class="di-edge-event-label" x="190" y="126">Rising edge</text>
+              <text class="di-edge-event-label" x="350" y="126">Falling edge</text>
+            </g>
+          </svg>
+          </div>
+        </div>
+      </fieldset>
+      <fieldset class="di-settings-fieldset" data-di-gesture-panel hidden>
+        <legend><span class="di-settings-label"><svg class="di-settings-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2H17V4H7V2M7 20H17V22H7V20M4 5H20V19H4V5M6 7V17H18V7H6M8 9H10V11H8V9M12 9H16V11H12V9M8 13H16V15H8V13Z"/></svg><span>Gesture</span></span></legend>
+        <div id="di-settings-gesture-select" class="mode-select" data-value="single">
+          <button type="button" class="mode-trigger" aria-haspopup="listbox" aria-expanded="false">Single press</button>
+          <div class="mode-menu" role="listbox" aria-label="Gesture">
+            <button type="button" class="mode-option active" data-di-gesture="single" role="option" aria-selected="true">Single press</button>
+            <button type="button" class="mode-option" data-di-gesture="double" role="option" aria-selected="false">Double press</button>
+            <button type="button" class="mode-option" data-di-gesture="hold" role="option" aria-selected="false">Long press / Hold</button>
+            <button type="button" class="mode-option" data-di-gesture="repeat" role="option" aria-selected="false">Repeat while active</button>
+          </div>
+        </div>
+      </fieldset>
+      <div id="di-settings-gesture-timing" class="di-settings-timing" hidden>
+        <div class="di-settings-row di-settings-timing-field" data-di-timing-field="double" hidden>
+          <div class="di-settings-row-copy">
+            <span class="di-settings-row-title"><svg class="di-settings-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2M12 20C7.59 20 4 16.41 4 12S7.59 4 12 4 20 7.59 20 12 16.41 20 12 20M11 7V13L16.2 16.2L17.2 14.5L13 12V7H11Z"/></svg><span>Double-press interval</span></span>
+            <span class="di-settings-row-note">Maximum time between the two presses.</span>
+          </div>
+          <label class="di-settings-number"><input id="di-settings-double-window" type="number" min="100" max="2000" step="10" value="350" inputmode="numeric" aria-label="Double-press interval in milliseconds"><span>ms</span></label>
+        </div>
+        <div class="di-settings-row di-settings-timing-field" data-di-timing-field="hold" hidden>
+          <div class="di-settings-row-copy">
+            <span class="di-settings-row-title"><svg class="di-settings-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2M12 20C7.59 20 4 16.41 4 12S7.59 4 12 4 20 7.59 20 12 16.41 20 12 20M11 7V13L16.2 16.2L17.2 14.5L13 12V7H11Z"/></svg><span>Hold threshold</span></span>
+            <span class="di-settings-row-note">Time before a press becomes a hold.</span>
+          </div>
+          <label class="di-settings-number"><input id="di-settings-hold-threshold" type="number" min="200" max="5000" step="10" value="700" inputmode="numeric" aria-label="Hold threshold in milliseconds"><span>ms</span></label>
+        </div>
+        <div class="di-settings-row di-settings-timing-field" data-di-timing-field="repeat" hidden>
+          <div class="di-settings-row-copy">
+            <span class="di-settings-row-title"><svg class="di-settings-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4V1L8 5L12 9V6C15.31 6 18 8.69 18 12C18 13.1 17.7 14.13 17.18 15H19.4C19.78 14.08 20 13.06 20 12C20 7.58 16.42 4 12 4M6 12C6 10.9 6.3 9.87 6.82 9H4.6C4.22 9.92 4 10.94 4 12C4 16.42 7.58 20 12 20V23L16 19L12 15V18C8.69 18 6 15.31 6 12Z"/></svg><span>Repeat interval</span></span>
+            <span class="di-settings-row-note">Time between repeated active-state events.</span>
+          </div>
+          <label class="di-settings-number"><input id="di-settings-repeat-interval" type="number" min="50" max="2000" step="10" value="250" inputmode="numeric" aria-label="Repeat interval in milliseconds"><span>ms</span></label>
+        </div>
+      </div>
+      <div class="di-settings-row">
+        <div class="di-settings-row-copy">
+          <span class="di-settings-row-title"><svg class="di-settings-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 13C6.14 13 4.59 14.28 4.14 16H2V18H4.14C4.59 19.72 6.14 21 8 21S11.41 19.72 11.86 18H22V16H11.86C11.41 14.28 9.86 13 8 13M8 19C6.9 19 6 18.1 6 17C6 15.9 6.9 15 8 15S10 15.9 10 17C10 18.1 9.1 19 8 19M19.86 6C19.41 4.28 17.86 3 16 3S12.59 4.28 12.14 6H2V8H12.14C12.59 9.72 14.14 11 16 11S19.41 9.72 19.86 8H22V6H19.86M16 9C14.9 9 14 8.1 14 7C14 5.9 14.9 5 16 5S18 5.9 18 7C18 8.1 17.1 9 16 9Z"/></svg><span>Software debounce</span></span>
+          <span class="di-settings-row-note">Ignore short transitions before accepting a new state.</span>
+        </div>
+        <button id="di-settings-debounce-toggle" class="toggle" type="button" aria-pressed="false"><span>OFF</span></button>
+      </div>
+      <div class="di-settings-row">
+        <div class="di-settings-row-copy">
+          <span class="di-settings-row-title"><svg class="di-settings-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2M12 20C7.59 20 4 16.41 4 12S7.59 4 12 4 20 7.59 20 12 16.41 20 12 20M11 7V13L16.2 16.2L17.2 14.5L13 12V7H11Z"/></svg><span>Debounce time</span></span>
+          <span class="di-settings-row-note">Applied in software to this input.</span>
+        </div>
+        <label class="di-settings-number">
+          <input id="di-settings-debounce-ms" type="number" min="0" max="1000" step="1" value="50" inputmode="numeric" aria-label="Debounce time in milliseconds">
+          <span>ms</span>
+        </label>
+      </div>
+      <div class="di-settings-footer">
+        <button id="di-settings-cancel" type="button">Cancel</button>
+        <button id="di-settings-done" type="button">Save</button>
+      </div>
+    </div>
+  </dialog>
   <script>
     const labels = {
       Disabled: 'Off',
@@ -2803,6 +3115,18 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       }
       const needsReset = channel.confirmed_mode === 'PulseCounterExternalVoltage' || channel.confirmed_mode === 'PulseCounterInternalPullUp';
       const needsPwmToggle = channel.confirmed_mode === 'PwmOutput';
+      const needsDiSettings = channel.confirmed_mode === 'DigitalInputExternalVoltage' || channel.confirmed_mode === 'DigitalInputInternalPullUp';
+      if (needsDiSettings) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'xport-settings-button';
+        button.setAttribute('aria-label', `Configure DI input X${channel.channel}`);
+        button.title = `Configure DI input X${channel.channel}`;
+        button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 13C6.14 13 4.59 14.28 4.14 16H2V18H4.14C4.59 19.72 6.14 21 8 21S11.41 19.72 11.86 18H22V16H11.86C11.41 14.28 9.86 13 8 13M8 19C6.9 19 6 18.1 6 17C6 15.9 6.9 15 8 15S10 15.9 10 17C10 18.1 9.1 19 8 19M19.86 6C19.41 4.28 17.86 3 16 3S12.59 4.28 12.14 6H2V8H12.14C12.59 9.72 14.14 11 16 11S19.41 9.72 19.86 8H22V6H19.86M16 9C14.9 9 14 8.1 14 7C14 5.9 14.9 5 16 5S18 5.9 18 7C18 8.1 17.1 9 16 9Z"/></svg>';
+        button.onclick = () => openDiSettings(channel);
+        actionSlot.replaceChildren(button);
+        return;
+      }
       if (!needsReset && !needsPwmToggle) {
         actionSlot.replaceChildren();
         return;
@@ -2831,19 +3155,223 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       let reset = actionSlot.querySelector('button');
       if (!reset) {
         reset = document.createElement('button');
-        reset.className = 'reset-button';
+        reset.className = 'reset-button icon-only';
         reset.type = 'button';
         reset.setAttribute('aria-label', 'Reset counter');
         reset.title = 'Reset counter';
-        reset.textContent = 'Reset';
+        reset.append(xportControlIcon('reset'));
         actionSlot.replaceChildren(reset);
       }
-      reset.className = 'reset-button';
+      reset.className = 'reset-button icon-only';
       reset.type = 'button';
       reset.setAttribute('aria-label', 'Reset counter');
       reset.title = 'Reset counter';
-      reset.textContent = 'Reset';
-      reset.onclick = () => resetCounter(channel.channel);
+      reset.replaceChildren(xportControlIcon('reset'));
+      reset.onclick = () => resetCounter(channel.channel, reset);
+    }
+    const diSettingsDrafts = new Map();
+    let activeDiSettingsChannel = null;
+    let activeDiSettingsDraft = null;
+    function defaultDiSettings() {
+      return {
+        eventType: 'edges',
+        trigger: 'both',
+        gesture: 'single',
+        debounceEnabled: false,
+        debounceMs: 50,
+        doublePressWindowMs: 350,
+        holdThresholdMs: 700,
+        repeatIntervalMs: 250
+      };
+    }
+    function normalizeDiSummaryIcons() {
+      const icons = document.querySelectorAll('.di-settings-summary-icon svg');
+      const standardPaths = [
+        'M1,11H3.17C3.58,9.83 4.69,9 6,9C6.65,9 7.25,9.21 7.74,9.56L14.44,4.87L15.58,6.5L8.89,11.2C8.96,11.45 9,11.72 9,12A3,3 0 0,1 6,15C4.69,15 3.58,14.17 3.17,13H1V11M23,11V13H20.83C20.42,14.17 19.31,15 18,15A3,3 0 0,1 15,12A3,3 0 0,1 18,9C19.31,9 20.42,9.83 20.83,11H23M6,11A1,1 0 0,0 5,12A1,1 0 0,0 6,13A1,1 0 0,0 7,12A1,1 0 0,0 6,11M18,11A1,1 0 0,0 17,12A1,1 0 0,0 18,13A1,1 0 0,0 19,12A1,1 0 0,0 18,11Z',
+        'M12 15.5A3.5 3.5 0 1 1 12 8A3.5 3.5 0 0 1 12 15.5M19.43 12.98C19.47 12.66 19.5 12.34 19.43 12S19.47 11.34 19.43 11L21.54 9.37C21.73 9.22 21.78 8.95 21.66 8.73L19.66 5.27C19.54 5.05 19.27 4.97 19.05 5.05L16.56 6.05C16.04 5.66 15.5 5.34 14.87 5.1L14.5 2.5C14.46 2.22 14.22 2 13.94 2H10.06C9.78 2 9.54 2.22 9.5 2.5L9.13 5.1C8.5 5.34 7.96 5.66 7.44 6.05L4.95 5.05C4.73 4.97 4.46 5.05 4.34 5.27L2.34 8.73C2.22 8.95 2.27 9.22 2.46 9.37L4.57 11C4.53 11.32 4.5 11.66 4.5 12S4.53 12.68 4.57 13L2.46 14.63C2.27 14.78 2.22 15.05 2.34 15.27L4.34 18.73C4.46 18.95 4.73 19.03 4.95 18.95L7.44 17.95C7.96 18.34 8.5 18.66 9.13 18.9L9.5 21.5C9.54 21.78 9.78 22 10.06 22H13.94C14.22 22 14.46 21.78 14.5 21.5L14.87 18.9C15.5 18.66 16.04 18.34 16.56 17.95L19.05 18.95C19.27 19.03 19.54 18.95 19.66 18.73L21.66 15.27C21.78 15.05 21.73 14.78 21.54 14.63L19.43 12.98Z'
+      ];
+      icons.forEach((icon, index) => {
+        const path = icon.querySelector('path');
+        if (!path || !standardPaths[index]) return;
+        path.setAttribute('d', standardPaths[index]);
+        icon.classList.add(index === 0 ? 'xport-input' : 'mdi-cog');
+      });
+    }
+    function paintDiSettingsModal() {
+      if (!activeDiSettingsDraft) return;
+      const eventType = activeDiSettingsDraft.eventType || 'edges';
+      document.querySelectorAll('[data-di-event-type]').forEach((option) => {
+        const active = option.dataset.diEventType === eventType;
+        option.classList.toggle('active', active);
+        option.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+      const edgePanel = document.querySelector('[data-di-edge-panel]');
+      const gesturePanel = document.querySelector('[data-di-gesture-panel]');
+      if (edgePanel) edgePanel.hidden = eventType !== 'edges';
+      if (gesturePanel) gesturePanel.hidden = eventType !== 'gestures';
+      document.querySelectorAll('[data-di-trigger]').forEach((option) => {
+        const active = option.dataset.diTrigger === activeDiSettingsDraft.trigger;
+        option.classList.toggle('active', active);
+        option.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+      const edgePreview = document.getElementById('di-edge-preview');
+      if (edgePreview) {
+        const previewVisible = eventType === 'edges';
+        edgePreview.hidden = !previewVisible;
+        const trigger = activeDiSettingsDraft.trigger || 'both';
+        edgePreview.querySelectorAll('[data-di-edge-preview]').forEach((preview) => {
+          const active = preview.dataset.diEdgePreview === trigger;
+          preview.classList.toggle('active', active);
+          preview.setAttribute('aria-hidden', active ? 'false' : 'true');
+        });
+        const captions = {
+          rising: 'Triggers on 0 \u2192 1 transition',
+          falling: 'Triggers on 1 \u2192 0 transition',
+          both: 'Triggers on both transitions'
+        };
+        const caption = document.getElementById('di-edge-preview-caption-text');
+        if (caption) caption.textContent = captions[trigger] || captions.both;
+      }
+      const gestureSelect = document.getElementById('di-settings-gesture-select');
+      const gesture = activeDiSettingsDraft.gesture || 'single';
+      if (gestureSelect) {
+        const selected = gestureSelect.querySelector(`[data-di-gesture="${gesture}"]`);
+        const trigger = gestureSelect.querySelector('.mode-trigger');
+        if (selected && trigger) trigger.textContent = selected.textContent;
+        gestureSelect.dataset.value = gesture;
+        gestureSelect.querySelectorAll('[data-di-gesture]').forEach((option) => {
+          const active = option.dataset.diGesture === gesture;
+          option.classList.toggle('active', active);
+          option.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+      }
+      const timing = document.getElementById('di-settings-gesture-timing');
+      if (timing) timing.hidden = eventType !== 'gestures' || gesture === 'single';
+      document.querySelectorAll('[data-di-timing-field]').forEach((field) => {
+        const fieldType = field.dataset.diTimingField;
+        const visible = eventType === 'gestures' && ((fieldType === 'double' && gesture === 'double') || (fieldType === 'hold' && (gesture === 'hold' || gesture === 'repeat')) || (fieldType === 'repeat' && gesture === 'repeat'));
+        field.hidden = !visible;
+      });
+      const toggle = document.getElementById('di-settings-debounce-toggle');
+      if (toggle) {
+        const enabled = activeDiSettingsDraft.debounceEnabled;
+        toggle.className = `toggle ${enabled ? 'on' : ''}`;
+        toggle.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+        toggle.innerHTML = `<span>${enabled ? 'ON' : 'OFF'}</span>`;
+      }
+      const debounceInput = document.getElementById('di-settings-debounce-ms');
+      if (debounceInput) {
+        debounceInput.value = String(activeDiSettingsDraft.debounceMs);
+        debounceInput.disabled = !activeDiSettingsDraft.debounceEnabled;
+      }
+      const timingValues = {
+        'di-settings-double-window': activeDiSettingsDraft.doublePressWindowMs,
+        'di-settings-hold-threshold': activeDiSettingsDraft.holdThresholdMs,
+        'di-settings-repeat-interval': activeDiSettingsDraft.repeatIntervalMs
+      };
+      Object.entries(timingValues).forEach(([id, value]) => {
+        const input = document.getElementById(id);
+        if (input) input.value = String(value);
+      });
+    }
+    function openDiSettings(channel) {
+      const modal = document.getElementById('di-settings-modal');
+      if (!modal) return;
+      const key = String(channel.channel);
+      const saved = diSettingsDrafts.get(key) || defaultDiSettings();
+      activeDiSettingsChannel = key;
+      activeDiSettingsDraft = { ...saved };
+      document.getElementById('di-settings-title-text').textContent = 'DI settings';
+      document.getElementById('di-settings-channel').textContent = `X${channel.channel}`;
+      document.getElementById('di-settings-mode').textContent = labels[channel.confirmed_mode] || channel.confirmed_mode;
+      const currentState = document.getElementById('di-settings-current-state');
+      if (currentState) {
+        const isOn = Boolean(channel.value);
+        const stateLabel = isOn ? 'ON' : 'OFF';
+        currentState.className = `toggle readonly ${isOn ? 'on' : ''}`;
+        currentState.setAttribute('aria-label', `Current input ${stateLabel}`);
+        currentState.innerHTML = `<span>${stateLabel}</span>`;
+      }
+      paintDiSettingsModal();
+      if (!modal.open) modal.showModal();
+      document.body.classList.add('di-modal-open');
+      document.getElementById('di-settings-close')?.focus();
+    }
+    function closeDiSettings() {
+      const modal = document.getElementById('di-settings-modal');
+      if (modal?.open) modal.close();
+      document.body.classList.remove('di-modal-open');
+      activeDiSettingsChannel = null;
+      activeDiSettingsDraft = null;
+    }
+    function initDiSettingsModal() {
+      const modal = document.getElementById('di-settings-modal');
+      if (!modal) return;
+      normalizeDiSummaryIcons();
+      document.getElementById('di-settings-close')?.addEventListener('click', closeDiSettings);
+      document.getElementById('di-settings-cancel')?.addEventListener('click', closeDiSettings);
+      document.getElementById('di-settings-done')?.addEventListener('click', () => {
+        if (activeDiSettingsChannel && activeDiSettingsDraft) {
+          diSettingsDrafts.set(activeDiSettingsChannel, { ...activeDiSettingsDraft });
+        }
+        closeDiSettings();
+      });
+      document.querySelectorAll('[data-di-event-type]').forEach((option) => {
+        option.addEventListener('click', () => {
+          if (!activeDiSettingsDraft) return;
+          activeDiSettingsDraft.eventType = option.dataset.diEventType;
+          paintDiSettingsModal();
+        });
+      });
+      document.querySelectorAll('[data-di-trigger]').forEach((option) => {
+        option.addEventListener('click', () => {
+          if (!activeDiSettingsDraft) return;
+          activeDiSettingsDraft.trigger = option.dataset.diTrigger;
+          paintDiSettingsModal();
+        });
+      });
+      const gestureSelect = document.getElementById('di-settings-gesture-select');
+      const gestureTrigger = gestureSelect?.querySelector('.mode-trigger');
+      gestureTrigger?.addEventListener('click', () => {
+        document.querySelectorAll('.mode-select.open').forEach((item) => {
+          if (item !== gestureSelect) item.classList.remove('open');
+        });
+        gestureSelect.classList.toggle('open');
+        gestureTrigger.setAttribute('aria-expanded', gestureSelect.classList.contains('open') ? 'true' : 'false');
+      });
+      gestureSelect?.querySelectorAll('[data-di-gesture]').forEach((option) => {
+        option.addEventListener('click', () => {
+          if (!activeDiSettingsDraft) return;
+          activeDiSettingsDraft.gesture = option.dataset.diGesture;
+          gestureSelect.classList.remove('open');
+          gestureTrigger?.setAttribute('aria-expanded', 'false');
+          paintDiSettingsModal();
+        });
+      });
+      document.getElementById('di-settings-debounce-toggle')?.addEventListener('click', () => {
+        if (!activeDiSettingsDraft) return;
+        activeDiSettingsDraft.debounceEnabled = !activeDiSettingsDraft.debounceEnabled;
+        paintDiSettingsModal();
+      });
+      document.getElementById('di-settings-debounce-ms')?.addEventListener('input', (event) => {
+        if (!activeDiSettingsDraft) return;
+        activeDiSettingsDraft.debounceMs = clampNumber(event.target.value, 0, 1000);
+      });
+      const timingInputs = {
+        'di-settings-double-window': ['doublePressWindowMs', 100, 2000],
+        'di-settings-hold-threshold': ['holdThresholdMs', 200, 5000],
+        'di-settings-repeat-interval': ['repeatIntervalMs', 50, 2000]
+      };
+      Object.entries(timingInputs).forEach(([id, [key, min, max]]) => {
+        document.getElementById(id)?.addEventListener('input', (event) => {
+          if (!activeDiSettingsDraft) return;
+          activeDiSettingsDraft[key] = clampNumber(event.target.value, min, max);
+        });
+      });
+      modal.addEventListener('click', (event) => {
+        if (event.target === modal) closeDiSettings();
+      });
+      modal.addEventListener('close', () => document.body.classList.remove('di-modal-open'));
     }
     async function setMode(channel, mode) {
       const output = document.getElementById('output');
@@ -2937,6 +3465,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
         pwm: 'M2 2V12H4V4H11V22H22V12H20V20H13V2H2Z',
         voltage: 'M3 12C3 12 6 4 9 4C12 4 12 20 15 20C18 20 21 12 21 12',
         counter: 'M12 20a8 8 0 1 0 0-16 8 8 0 0 0 0 16M12 8v4l3 2',
+        reset: 'M17.65 6.35C16.2 4.9 14.21 4 12 4C7.58 4 4 7.58 4 12S7.58 20 12 20C15.73 20 18.84 17.45 19.73 14H17.65C16.84 16.33 14.61 18 12 18C8.69 18 6 15.31 6 12C6 8.69 8.69 6 12 6C13.66 6 15.14 6.69 16.22 7.78L13 11H20V4L17.65 6.35Z',
         state: 'M17 6H7C3.69 6 1 8.69 1 12S3.69 18 7 18H17C20.31 18 23 15.31 23 12S20.31 6 17 6M17 16H7C4.79 16 3 14.21 3 12S4.79 8 7 8H17C19.21 8 21 9.79 21 12S19.21 16 17 16M17 9C15.34 9 14 10.34 14 12S15.34 15 17 15 20 13.66 20 12 18.66 9 17 9Z'
       };
       const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -3195,15 +3724,26 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       const current = Number(channel.value || 0);
       await setValue(channel.channel, enabled ? (current > 0 ? current : 1) : 0);
     }
-    async function resetCounter(channel) {
+    async function resetCounter(channel, button = null) {
       const output = document.getElementById('output');
       output.classList.remove('visible');
+      if (button) {
+        button.disabled = true;
+        button.classList.add('is-busy');
+        button.setAttribute('aria-busy', 'true');
+      }
       try {
         await requestJson(`api/v1/xport/channels/${channel}/counter/reset`, { method: 'POST' });
         await renderXPort();
       } catch (error) {
         output.textContent = JSON.stringify(error, null, 2);
         output.classList.add('visible');
+      } finally {
+        if (button?.isConnected) {
+          button.disabled = false;
+          button.classList.remove('is-busy');
+          button.removeAttribute('aria-busy');
+        }
       }
     }
     function closeModeSelects(except = null) {
@@ -6751,6 +7291,7 @@ def create_app(options_path: Path | None = None, runtime: AppRuntime | None = No
       });
     }
     enableOverviewChartHover();
+    initDiSettingsModal();
     renderCarrier();
     renderXPort();
     renderExtensions();

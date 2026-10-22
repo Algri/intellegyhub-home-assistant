@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.253
+
+- Refine the X-Port digital-input settings dialog layout and remove duplicated channel context from the title.
+- Keep `Channel`, `Mode`, and the read-only live input toggle aligned in the summary area.
+- Standardize the DI edge controls, preview labels, and save action wording.
+
 ## 0.5.252
 
 - Add a managed software reset for the carrier MCP23017 during add-on shutdown.
@@ -807,7 +813,7 @@
 
 ## 0.5.85
 
-- Add Carrier I/O retained toggle controls for RS-485 120Ω termination, XMOD Flash/Enable and Reset, and USB reset lines.
+- Add Carrier I/O retained toggle controls for RS-485 120Ω termination, X-Mod Flash/Enable and Reset, and USB reset lines.
 - Expose Carrier I/O outputs through the add-on API, add-on UI, WebSocket events, and Home Assistant switch entities.
 - Document that Carrier MCP23017 `0x20` writes must use the shared shadow so changing one output does not clear other outputs.
 
